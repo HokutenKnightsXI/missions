@@ -104,6 +104,8 @@ def test_horizon_lookup_rejects_invalid_name(client):
 def test_mission_form_uses_grouped_dropdowns(client):
     response = client.get("/members/new")
     assert response.status_code == 200
+    assert b"Look up jobs" not in response.data
+    assert b"enter its current level" in response.data
     assert b'optgroup label="Chapter 1' in response.data
     assert "CoP 1-3 – The Mothercrystals".encode() in response.data
     assert "ZM9 – Ark Angels".encode() in response.data
