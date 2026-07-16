@@ -1,0 +1,26 @@
+.job-choice {
+  display: grid;
+  grid-template-columns: 1fr 58px;
+  align-items: center;
+  background: #11161d;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 6px 8px;
+}
+.job-choice.selected { border-color: #7b6437; background: #1c1a14; }
+.job-check {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 7px !important;
+  background: transparent !important;
+  padding: 0 !important;
+}
+.job-check input { width: auto; }
+.jobs-grid .job-level { padding: 6px; }
+.lookup-row { display: flex; gap: 8px; }
+.lookup-row input { flex: 1; }
+.lookup-button { padding: 8px 12px; font-size: 12px; }
+.lookup-message { color: var(--muted); font-weight: 400; }
+.success-text { color: #8fd6a5; }
+.error-text { color: #ffafa5; }

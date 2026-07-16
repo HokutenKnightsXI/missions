@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% block title %}{{ 'Update' if member else 'Add' }} member · Missions{% endblock %}
+{% block content %}
+<section class="form-heading">
+  <a href="{{ url_for('index') }}">← Back to command board</a>
+  <p class="eyebrow">Adventurer record</p>
+  <h1>{{ 'Update progress' if member else 'Add or update progress' }}</h1>
+</section>
+<form class="member-form" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <fieldset>
+    <legend>Member details</legend>
+    <div class="grid two">
+      <label>Character name *
+        <span class="lookup-row"><input id="character-name" required name="name" value="{{ request.form.get('name', member.name if member else '') }}"><button class="button lookup-button" type="button" id="lookup-jobs">Look up jobs</button></span>
+        <span id="lookup-message" class="lookup-message">Uses the public HorizonXI player directory.</span>
+      </label>
+      <label>Discord name<input name="discord_name" value="{{ request.form.get('discord_name', member.discord_name if member else '') }}"></label>
+      <label>Timezone<input name="timezone" placeholder="Central / GMT-5" value="{{ request.form.get('timezone', member.timezone if member else '') }}"></label>
+      <label>Typical availability<input name="availability" placeholder="Tue/Thu after 7 PM" value="{{ request.form.get('availability', member.availability if member else '') }}"></label>
+    </div>
+  </fieldset>
+  <fieldset>
+    <legend>Jobs available</legend>
+    <p class="hint">Look up your character, then check the jobs you are willing to bring. You can also enter levels manually.</p>
+    <div class="jobs-grid">
+      {% for job in jobs %}
+        {% set level = request.form.get('job_' + job, existing_jobs.get(job, '')) %}
+        <div class="job-choice" data-job="{{ job }}">
+          <label class="job-check"><input type="checkbox" class="job-available" {{ 'checked' if level }}> <span>{{ job }}</span></label>
+          <input aria-label="{{ job }} level" class="job-level" type="number" min="1" max="75" value="{{ level }}" placeholder="—">
+          <input class="job-value" type="hidden" name="job_{{ job }}" value="{{ level }}" {{ 'disabled' if not level }}>
+        </div>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% for campaign in campaigns %}
+  {% set p = progress.get(campaign) %}
+  {% set selected_mission = request.form.get(campaign + '_mission', p.mission if p else '') %}
+  <fieldset class="campaign-field {{ campaign|lower }}">
+    <legend>{{ 'Chains of Promathia' if campaign == 'COP' else 'Rise of the Zilart' }}</legend>
+    <div class="grid two">
+      <label class="mission-select">Current mission or stage
+        <select name="{{ campaign }}_mission" data-mission-select="{{ campaign }}">
+          <option value="" data-chapter="">Choose a mission…</option>
+          {% set state = namespace(found=false) %}
+          {% for group_name, options in mission_options[campaign] %}
+            <optgroup label="{{ group_name }}">
+              {% for mission_name, chapter_name in options %}
+                {% if mission_name == selected_mission %}{% set state.found = true %}{% endif %}
+                <option value="{{ mission_name }}" data-chapter="{{ chapter_name }}" {{ 'selected' if mission_name == selected_mission }}>{{ mission_name }}</option>
+              {% endfor %}
+            </optgroup>
+          {% endfor %}
+          {% if selected_mission and not state.found %}<option value="{{ selected_mission }}" data-chapter="{{ request.form.get(campaign + '_chapter', p.chapter if p else '') }}" selected>{{ selected_mission }} (existing entry)</option>{% endif %}
+        </select>
+        <input type="hidden" name="{{ campaign }}_chapter" data-chapter-input="{{ campaign }}" value="{{ request.form.get(campaign + '_chapter', p.chapter if p else '') }}">
+      </label>
+      <label>Status<select name="{{ campaign }}_status" data-status-select="{{ campaign }}">{% set selected = request.form.get(campaign + '_status', p.status if p else 'Not started') %}{% for item in statuses %}<option {{ 'selected' if item == selected }}>{{ item }}</option>{% endfor %}</select></label>
+      <label>Extra notes<input name="{{ campaign }}_details" placeholder="Cutscenes done; available Friday evening" value="{{ request.form.get(campaign + '_details', p.details if p else '') }}"></label>
+    </div>
+  </fieldset>
+  {% endfor %}
+  <div class="form-actions"><button class="button primary" type="submit">Save progress</button><a href="{{ url_for('index') }}">Cancel</a></div>
+</form>
+{% if member %}<form class="delete-form" method="post" action="{{ url_for('delete_member', member_id=member.id) }}" onsubmit="return confirm('Remove this member from the roster?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Remove member</button></form>{% endif %}
+<script>
+  const lookupButton = document.querySelector('#lookup-jobs');
+  const nameInput = document.querySelector('#character-name');
+  const message = document.querySelector('#lookup-message');
+
+  function syncJob(card) {
+    const checked = card.querySelector('.job-available').checked;
+    const level = card.querySelector('.job-level').value;
+    const hidden = card.querySelector('.job-value');
+    hidden.value = level;
+    hidden.disabled = !checked || !level;
+    card.classList.toggle('selected', checked);
+  }
+  document.querySelectorAll('.job-choice').forEach(card => {
+    card.querySelectorAll('input').forEach(input => input.addEventListener('input', () => syncJob(card)));
+    syncJob(card);
+  });
+
+  document.querySelectorAll('[data-mission-select]').forEach(select => {
+    const campaign = select.dataset.missionSelect;
+    const chapterInput = document.querySelector(`[data-chapter-input="${campaign}"]`);
+    const syncChapter = () => {
+      chapterInput.value = select.selectedOptions[0]?.dataset.chapter || '';
+      if (select.value === 'Complete') {
+        document.querySelector(`[data-status-select="${campaign}"]`).value = 'Complete';
+      }
+    };
+    select.addEventListener('change', syncChapter);
+    if (select.value) syncChapter();
+  });
+
+  lookupButton.addEventListener('click', async () => {
+    const name = nameInput.value.trim();
+    if (!name) { message.textContent = 'Enter your character name first.'; return; }
+    lookupButton.disabled = true;
+    lookupButton.textContent = 'Looking up…';
+    message.className = 'lookup-message';
+    message.textContent = 'Contacting HorizonXI…';
+    try {
+      const response = await fetch(`/api/horizon-player/${encodeURIComponent(name)}`);
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Lookup failed.');
+      nameInput.value = data.name;
+      document.querySelectorAll('.job-choice').forEach(card => {
+        const level = data.jobs[card.dataset.job] || '';
+        card.querySelector('.job-level').value = level;
+        card.querySelector('.job-available').checked = Boolean(level);
+        syncJob(card);
+      });
+      message.className = 'lookup-message success-text';
+      message.textContent = `Found ${data.name}. Uncheck any jobs you do not want to bring.`;
+    } catch (error) {
+      message.className = 'lookup-message error-text';
+      message.textContent = error.message;
+    } finally {
+      lookupButton.disabled = false;
+      lookupButton.textContent = 'Look up jobs';
+    }
+  });
+</script>
+{% endblock %}

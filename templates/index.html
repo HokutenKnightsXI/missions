@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="hero">
+  <div>
+    <p class="eyebrow">Linkshell command board</p>
+    <h1>Find your next mission party.</h1>
+    <p>See who needs the same fight, which jobs they can bring, and when they are ready to go.</p>
+  </div>
+  <a class="button primary" href="{{ url_for('member_form') }}">{{ 'Add or Update Progress' if is_editor() else 'Sign in to update' }}</a>
+</section>
+
+<section class="stats">
+  <div><strong>{{ counts.members or 0 }}</strong><span>Members</span></div>
+  <div><strong>{{ counts.ready or 0 }}</strong><span>Need help</span></div>
+  <div><strong>{{ counts.dreamlands or 0 }}</strong><span>Dynamis Dreamlands</span></div>
+  <div><strong>{{ counts.cop_complete or 0 }}</strong><span>CoP cleared</span></div>
+  <div><strong>{{ counts.zilart_complete or 0 }}</strong><span>ZM cleared</span></div>
+</section>
+
+<div class="progress-layout">
+  {% for campaign in campaigns %}
+  <section class="progress-panel {{ campaign|lower }}">
+    <div class="progress-heading">
+      <div>
+        <span class="campaign {{ campaign|lower }}">{{ campaign }}</span>
+        <h2>{{ 'Chains of Promathia' if campaign == 'COP' else 'Rise of the Zilart' }}</h2>
+      </div>
+      <span class="hover-hint">Hover a member to see jobs</span>
+    </div>
+    <div class="table-scroll">
+      <table class="progress-table">
+        <thead><tr><th>Mission</th><th>Mission name</th><th>Members on this mission</th></tr></thead>
+        <tbody>
+          {% for mission in boards[campaign] %}
+          <tr class="{{ 'has-members' if mission.members }}">
+            <td class="mission-number">{{ mission.number }}</td>
+            <td class="mission-name">{{ mission.title }}</td>
+            <td class="member-list">
+              {% for member in mission.members %}
+                <{{ 'a' if is_editor() else 'span' }} {% if is_editor() %}href="{{ url_for('member_form', member_id=member.id) }}"{% endif %} class="member-pill {{ member.status|lower|replace(' ', '-') }}" title="Jobs: {{ member.jobs or 'None' }} | Status: {{ member.status }} | Availability: {{ member.availability or 'Not provided' }} | Extra notes: {{ member.details or member.notes or 'None' }}">{{ member.name }}<span class="member-tooltip"><span><b>Jobs:</b> {{ member.jobs or 'None' }}</span><span><b>Status:</b> {{ member.status }}</span><span class="availability"><b>Availability:</b> {{ member.availability or 'Not provided' }}</span><span><b>Extra notes:</b> {{ member.details or member.notes or 'None' }}</span></span></{{ 'a' if is_editor() else 'span' }}>{% if not loop.last %}<span class="comma">,</span>{% endif %}
+              {% else %}<span class="none-yet">—</span>{% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endfor %}
+</div>
+{% endblock %}

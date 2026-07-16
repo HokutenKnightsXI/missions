@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Linkshell sign in · Missions{% endblock %}
+{% block content %}
+<section class="form-heading">
+  <a href="{{ url_for('index') }}">← Back to command board</a>
+  <p class="eyebrow">Linkshell members</p>
+  <h1>Sign in to update progress</h1>
+  <p>The board is public to view. Enter the shared linkshell password to make changes.</p>
+</section>
+<form class="member-form" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label>Password<input name="password" type="password" required autofocus autocomplete="current-password"></label>
+  <div class="form-actions"><button class="button primary" type="submit">Sign in</button></div>
+</form>
+{% endblock %}
