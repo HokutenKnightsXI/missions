@@ -18,9 +18,3 @@
 }
 .job-check input { width: auto; }
 .jobs-grid .job-level { padding: 6px; }
-.lookup-row { display: flex; gap: 8px; }
-.lookup-row input { flex: 1; }
-.lookup-button { padding: 8px 12px; font-size: 12px; }
-.lookup-message { color: var(--muted); font-weight: 400; }
-.success-text { color: #8fd6a5; }
-.error-text { color: #ffafa5; }

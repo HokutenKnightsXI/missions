@@ -12,8 +12,7 @@
     <legend>Member details</legend>
     <div class="grid two">
       <label>Character name *
-        <span class="lookup-row"><input id="character-name" required name="name" value="{{ request.form.get('name', member.name if member else '') }}"><button class="button lookup-button" type="button" id="lookup-jobs">Look up jobs</button></span>
-        <span id="lookup-message" class="lookup-message">Uses the public HorizonXI player directory.</span>
+        <input required name="name" value="{{ request.form.get('name', member.name if member else '') }}">
       </label>
       <label>Discord name<input name="discord_name" value="{{ request.form.get('discord_name', member.discord_name if member else '') }}"></label>
       <label>Timezone<input name="timezone" placeholder="Central / GMT-5" value="{{ request.form.get('timezone', member.timezone if member else '') }}"></label>
@@ -22,7 +21,7 @@
   </fieldset>
   <fieldset>
     <legend>Jobs available</legend>
-    <p class="hint">Look up your character, then check the jobs you are willing to bring. You can also enter levels manually.</p>
+    <p class="hint">Check each job you are willing to bring and enter its current level.</p>
     <div class="jobs-grid">
       {% for job in jobs %}
         {% set level = request.form.get('job_' + job, existing_jobs.get(job, '')) %}
@@ -65,10 +64,6 @@
 </form>
 {% if member %}<form class="delete-form" method="post" action="{{ url_for('delete_member', member_id=member.id) }}" onsubmit="return confirm('Remove this member from the roster?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Remove member</button></form>{% endif %}
 <script>
-  const lookupButton = document.querySelector('#lookup-jobs');
-  const nameInput = document.querySelector('#character-name');
-  const message = document.querySelector('#lookup-message');
-
   function syncJob(card) {
     const checked = card.querySelector('.job-available').checked;
     const level = card.querySelector('.job-level').value;
@@ -95,33 +90,5 @@
     if (select.value) syncChapter();
   });
 
-  lookupButton.addEventListener('click', async () => {
-    const name = nameInput.value.trim();
-    if (!name) { message.textContent = 'Enter your character name first.'; return; }
-    lookupButton.disabled = true;
-    lookupButton.textContent = 'Looking up…';
-    message.className = 'lookup-message';
-    message.textContent = 'Contacting HorizonXI…';
-    try {
-      const response = await fetch(`/api/horizon-player/${encodeURIComponent(name)}`);
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Lookup failed.');
-      nameInput.value = data.name;
-      document.querySelectorAll('.job-choice').forEach(card => {
-        const level = data.jobs[card.dataset.job] || '';
-        card.querySelector('.job-level').value = level;
-        card.querySelector('.job-available').checked = Boolean(level);
-        syncJob(card);
-      });
-      message.className = 'lookup-message success-text';
-      message.textContent = `Found ${data.name}. Uncheck any jobs you do not want to bring.`;
-    } catch (error) {
-      message.className = 'lookup-message error-text';
-      message.textContent = error.message;
-    } finally {
-      lookupButton.disabled = false;
-      lookupButton.textContent = 'Look up jobs';
-    }
-  });
 </script>
 {% endblock %}
