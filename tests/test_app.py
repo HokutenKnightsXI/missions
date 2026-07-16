@@ -67,7 +67,7 @@ def test_add_and_filter_member(client):
 
     filtered = client.get("/?campaign=COP&job=PLD&status=Ready+for+help")
     assert b"The Mothercrystals" in filtered.data
-    assert b"The Temple of Uggalepih" not in filtered.data
+    assert b"Need keys" not in filtered.data
 
 
 def test_requires_a_job(client):
@@ -108,7 +108,9 @@ def test_mission_form_uses_grouped_dropdowns(client):
     assert b"enter its current level" in response.data
     assert b'optgroup label="Chapter 1' in response.data
     assert "CoP 1-3 – The Mothercrystals".encode() in response.data
-    assert "ZM9 – Ark Angels".encode() in response.data
+    assert "ZM1 – The New Frontier".encode() in response.data
+    assert "ZM14 – Ark Angels".encode() in response.data
+    assert "ZM18 – The Last Verse".encode() in response.data
     assert b'data-chapter-input="COP"' in response.data
     cop_complete = response.data.index(b'value="Complete"', response.data.index(b'data-mission-select="COP"'))
     assert cop_complete > response.data.index("CoP 8-5".encode())
@@ -121,7 +123,7 @@ def test_dashboard_groups_members_by_mission(client):
         "COP_mission": "CoP 1-3 – The Mothercrystals",
         "COP_status": "Ready for help",
         "COP_details": "Cutscenes done",
-        "ZILART_mission": "ZM9 – Ark Angels", "ZILART_chapter": "ZM9",
+        "ZILART_mission": "ZM14 – Ark Angels", "ZILART_chapter": "ZM14",
         "ZILART_status": "In progress",
     })
     response = client.get("/")
@@ -132,7 +134,24 @@ def test_dashboard_groups_members_by_mission(client):
     assert b"Status:</b> Ready for help" in response.data
     assert b"Extra notes:</b> Cutscenes done" in response.data
     assert b'class="availability"' in response.data
-    assert b"ZM9" in response.data
+    assert b"ZM14" in response.data
+
+
+def test_old_zilart_numbering_is_migrated_without_losing_progress(tmp_path):
+    database = str(tmp_path / "migration.db")
+    config = {"TESTING": True, "DATABASE": database, "SECRET_KEY": "test", "AUTH_DISABLED": True}
+    first_client = create_app(config).test_client()
+    first_client.post("/members/new", data={
+        "name": "Lion", "job_THF": "75", "COP_status": "Not started",
+        "ZILART_mission": "ZM9 – Ark Angels", "ZILART_chapter": "ZM9",
+        "ZILART_status": "Ready for help",
+    })
+
+    migrated_client = create_app(config).test_client()
+    response = migrated_client.get("/")
+    assert b"ZM14" in response.data
+    assert b"Ark Angels" in response.data
+    assert b">Lion<span" in response.data
 
 
 def test_add_progress_updates_an_existing_character(client):

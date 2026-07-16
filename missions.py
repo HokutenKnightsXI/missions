@@ -24,19 +24,24 @@ HORIZON_API = "https://api.horizonxi.com/api/v1"
 MISSION_OPTIONS = {
     "ZILART": [
         ("Rise of the Zilart", [
-            ("ZM1 – Through the Quicksand Caves", "ZM1"),
-            ("ZM2 – The Chamber of Oracles", "ZM2"),
-            ("ZM3 – Return to Delkfutt's Tower", "ZM3"),
-            ("ZM4 – Ro'Maeve", "ZM4"),
-            ("ZM5 – The Temple of Desolation", "ZM5"),
-            ("ZM6 – Hall of the Gods", "ZM6"),
-            ("ZM7 – The Mithra and the Crystal", "ZM7"),
-            ("ZM8 – The Gate of the Gods", "ZM8"),
-            ("ZM9 – Ark Angels", "ZM9"),
-            ("ZM10 – The Sealed Shrine", "ZM10"),
-            ("ZM11 – The Celestial Nexus", "ZM11"),
-            ("ZM12 – Awakening", "ZM12"),
-            ("ZM13 – The Last Verse (epilogue shared with CoP after Apocalypse Nigh)", "ZM13"),
+            ("ZM1 – The New Frontier", "ZM1"),
+            ("ZM2 – Welcome t'Norg", "ZM2"),
+            ("ZM3 – Kazham's Chieftainess", "ZM3"),
+            ("ZM4 – The Temple of Uggalepih", "ZM4"),
+            ("ZM5 – Headstone Pilgrimage", "ZM5"),
+            ("ZM6 – Through the Quicksand Caves", "ZM6"),
+            ("ZM7 – The Chamber of Oracles", "ZM7"),
+            ("ZM8 – Return to Delkfutt's Tower", "ZM8"),
+            ("ZM9 – Ro'Maeve", "ZM9"),
+            ("ZM10 – The Temple of Desolation", "ZM10"),
+            ("ZM11 – The Hall of the Gods", "ZM11"),
+            ("ZM12 – The Mithra and the Crystal", "ZM12"),
+            ("ZM13 – The Gate of the Gods", "ZM13"),
+            ("ZM14 – Ark Angels", "ZM14"),
+            ("ZM15 – The Sealed Shrine", "ZM15"),
+            ("ZM16 – The Celestial Nexus", "ZM16"),
+            ("ZM17 – Awakening", "ZM17"),
+            ("ZM18 – The Last Verse (epilogue shared with CoP after Apocalypse Nigh)", "ZM18"),
             ("Complete", "Complete"),
         ]),
     ],
@@ -94,6 +99,23 @@ MISSION_OPTIONS = {
             ("Complete", "Complete"),
         ]),
     ],
+}
+
+ZILART_MISSION_MIGRATIONS = {
+    "ZM1 – Through the Quicksand Caves": "ZM6 – Through the Quicksand Caves",
+    "ZM2 – The Chamber of Oracles": "ZM7 – The Chamber of Oracles",
+    "ZM3 – Return to Delkfutt's Tower": "ZM8 – Return to Delkfutt's Tower",
+    "ZM4 – Ro'Maeve": "ZM9 – Ro'Maeve",
+    "ZM5 – The Temple of Desolation": "ZM10 – The Temple of Desolation",
+    "ZM6 – Hall of the Gods": "ZM11 – The Hall of the Gods",
+    "ZM7 – The Mithra and the Crystal": "ZM12 – The Mithra and the Crystal",
+    "ZM8 – The Gate of the Gods": "ZM13 – The Gate of the Gods",
+    "ZM9 – Ark Angels": "ZM14 – Ark Angels",
+    "ZM10 – The Sealed Shrine": "ZM15 – The Sealed Shrine",
+    "ZM11 – The Celestial Nexus": "ZM16 – The Celestial Nexus",
+    "ZM12 – Awakening": "ZM17 – Awakening",
+    "ZM13 – The Last Verse (epilogue shared with CoP after Apocalypse Nigh)":
+        "ZM18 – The Last Verse (epilogue shared with CoP after Apocalypse Nigh)",
 }
 
 
@@ -228,6 +250,12 @@ def create_app(test_config=None):
     def init_db():
         with app.open_resource("schema.sql") as schema:
             get_db().executescript(schema.read().decode("utf8"))
+        for old_mission, new_mission in ZILART_MISSION_MIGRATIONS.items():
+            get_db().execute(
+                "UPDATE progress SET mission=?, chapter=? WHERE campaign='ZILART' AND mission=?",
+                (new_mission, new_mission.split(" – ", 1)[0], old_mission),
+            )
+        get_db().commit()
 
     @app.cli.command("init-db")
     def init_db_command():
