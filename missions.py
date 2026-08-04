@@ -1158,10 +1158,21 @@ def create_app(test_config=None):
                JOIN members m ON m.id=v.member_id LEFT JOIN help_volunteer_jobs j ON j.volunteer_id=v.id
                WHERE v.request_id=? GROUP BY v.id ORDER BY v.selected DESC, v.created_at""", (request_id,)
         ).fetchall()
+        viewer_interest = db.execute(
+            "SELECT * FROM help_volunteers WHERE request_id=? AND member_id=?",
+            (request_id, current_member_id()),
+        ).fetchone() if current_member_id() else None
+        viewer_interest_jobs = {
+            row["job"] for row in db.execute(
+                "SELECT job FROM help_volunteer_jobs WHERE volunteer_id=?",
+                (viewer_interest["id"],),
+            )
+        } if viewer_interest else set()
         viewer_jobs = member_jobs(current_member_id()) if current_member_id() else {}
         eligible_viewer_jobs = {job: level for job, level in viewer_jobs.items() if item["level_cap"] is None or level >= item["level_cap"]}
         return render_template("help_request_detail.html", help_request=item, requester_jobs=requester_jobs,
                                selected_jobs=chosen, roles=roles, volunteers=volunteers,
+                               viewer_interest=viewer_interest, viewer_interest_jobs=viewer_interest_jobs,
                                viewer_jobs=eligible_viewer_jobs, can_manage=can_manage(item),
                                help_statuses=HELP_STATUSES, transitions=HELP_STATUS_TRANSITIONS.get(item["status"], set()),
                                availability_modes=AVAILABILITY_MODES)
@@ -1175,9 +1186,6 @@ def create_app(test_config=None):
         jobs = member_jobs(member["id"])
         eligible = {job for job, level in jobs.items() if item["level_cap"] is None or level >= item["level_cap"]}
         selected = {job for job in request.form.getlist("jobs") if job in eligible}
-        if not selected:
-            flash("Choose at least one eligible job.", "error")
-            return redirect(url_for("help_request_detail", request_id=request_id))
         db = get_db()
         db.execute("""INSERT INTO help_volunteers(request_id,member_id,note) VALUES(?,?,?)
             ON CONFLICT(request_id,member_id) DO UPDATE SET note=excluded.note,updated_at=CURRENT_TIMESTAMP""",
@@ -1185,7 +1193,7 @@ def create_app(test_config=None):
         response = db.execute("SELECT id FROM help_volunteers WHERE request_id=? AND member_id=?", (request_id, member["id"])).fetchone()
         db.execute("DELETE FROM help_volunteer_jobs WHERE volunteer_id=?", (response["id"],))
         db.executemany("INSERT INTO help_volunteer_jobs VALUES (?,?)", [(response["id"], job) for job in selected])
-        db.commit(); flash("Your volunteer response was saved.", "success")
+        db.commit(); flash("You are listed as interested in helping.", "success")
         return redirect(url_for("help_request_detail", request_id=request_id))
 
     @app.post("/help-requests/<int:request_id>/withdraw")
