@@ -11,7 +11,18 @@
   <fieldset>
     <legend>Member details</legend>
     <div class="grid two">
-      <label>Character name *{% if member and not is_admin() %}<input type="hidden" name="name" value="{{ member.name }}"><input value="{{ member.name }}" disabled>{% else %}<input required name="name" value="{{ request.form.get('name', member.name if member else '') }}">{% endif %}</label>
+      <label>Character name *
+        {% if is_admin() %}
+          <select required name="name" id="progress-member-select">
+            <option value="">Choose a registered member…</option>
+            {% for registered in registered_members %}
+              <option value="{{ registered.name }}" data-edit-url="{{ url_for('member_form', member_id=registered.id) }}" {{ 'selected' if member and registered.id == member.id }}>{{ registered.name }}</option>
+            {% endfor %}
+          </select>
+        {% else %}
+          <input type="hidden" name="name" value="{{ member.name }}"><input value="{{ member.name }}" disabled>
+        {% endif %}
+      </label>
       <label>Discord name<input name="discord_name" value="{{ request.form.get('discord_name', member.discord_name if member else '') }}"></label>
       <label>Timezone<input name="timezone" placeholder="Central / GMT-5" value="{{ request.form.get('timezone', member.timezone if member else '') }}"></label>
       <label>Typical availability<input name="availability" placeholder="Tue/Thu after 7 PM" value="{{ request.form.get('availability', member.availability if member else '') }}"></label>
@@ -62,6 +73,12 @@
 </form>
 {% if member and is_admin() %}<form class="delete-form" method="post" action="{{ url_for('delete_member', member_id=member.id) }}" onsubmit="return confirm('Remove this member from the roster?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Remove member</button></form>{% endif %}
 <script>
+  const memberSelect = document.querySelector('#progress-member-select');
+  memberSelect?.addEventListener('change', () => {
+    const editUrl = memberSelect.selectedOptions[0]?.dataset.editUrl;
+    if (editUrl) window.location.assign(editUrl);
+  });
+
   function syncJob(card) {
     const checked = card.querySelector('.job-available').checked;
     const level = card.querySelector('.job-level').value;

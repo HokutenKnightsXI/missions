@@ -651,6 +651,9 @@ def create_app(test_config=None):
     @editor_required
     def member_form(member_id=None):
         db = get_db()
+        registered_members = db.execute(
+            "SELECT id, name FROM members ORDER BY name COLLATE NOCASE"
+        ).fetchall()
         if member_id is None and current_member_id() is not None and not is_admin():
             member_id = current_member_id()
         if member_id is not None and not is_admin() and current_member_id() != member_id:
@@ -757,6 +760,7 @@ def create_app(test_config=None):
             "member_form.html", member=member, existing_jobs=existing_jobs,
             progress=existing_progress, jobs=JOBS, campaigns=CAMPAIGNS, statuses=STATUSES,
             mission_options=MISSION_OPTIONS, campaign_names=CAMPAIGN_NAMES,
+            registered_members=registered_members,
         )
 
     @app.get("/members")

@@ -1,5 +1,6 @@
 import pytest
 import json
+import re
 
 import missions
 from missions import create_app
@@ -114,6 +115,22 @@ def test_mission_form_uses_grouped_dropdowns(client):
     assert b'data-chapter-input="COP"' in response.data
     cop_complete = response.data.index(b'value="Complete"', response.data.index(b'data-mission-select="COP"'))
     assert cop_complete > response.data.index("CoP 8-5".encode())
+
+
+def test_progress_form_selects_registered_member_and_populates_jobs(client):
+    client.post("/members/new", data={
+        "name": "Prishe", "job_WHM": "75", "job_BRD": "60",
+    })
+
+    chooser = client.get("/members/new")
+    assert b'id="progress-member-select"' in chooser.data
+    assert b'>Prishe</option>' in chooser.data
+
+    member_id = re.search(rb'/members/(\d+)/edit[^>]*>Prishe</option>', chooser.data).group(1).decode()
+    edit_form = client.get(f"/members/{member_id}/edit")
+    assert b'value="75" placeholder=' in edit_form.data
+    assert b'value="60" placeholder=' in edit_form.data
+    assert edit_form.data.count(b'class="job-available" checked') == 2
 
 
 def test_dashboard_groups_members_by_mission(client):

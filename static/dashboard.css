@@ -105,6 +105,10 @@ main:has(.progress-layout) { max-width: 1600px; }
 .member-tooltip > span { display: block; margin-top: 4px; }
 .member-tooltip > span:first-child { margin-top: 0; color: var(--gold); }
 .member-tooltip .availability { color: #8fd6a5; }
+.progress-table tbody tr:nth-child(-n+3) .member-tooltip {
+  top: calc(100% + 9px);
+  bottom: auto;
+}
 .member-pill:hover .member-tooltip,
 .member-pill:focus .member-tooltip { opacity: 1; transform: translateX(-50%) translateY(0); }
 .comma { color: var(--muted); margin-right: 4px; }
