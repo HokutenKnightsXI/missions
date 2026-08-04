@@ -46,6 +46,13 @@ python refresh_horizon_jobs.py --apply
 Only successful character lookups are updated, and applying the refresh creates another
 timestamped database backup.
 
+On a host that blocks HorizonXI requests, apply the bundled offline snapshot instead:
+
+```bash
+python refresh_horizon_jobs.py --snapshot horizon_jobs_snapshot.json
+python refresh_horizon_jobs.py --snapshot horizon_jobs_snapshot.json --apply
+```
+
 ## Current scope
 
 - Add and update linkshell members

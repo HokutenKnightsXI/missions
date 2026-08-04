@@ -407,6 +407,11 @@ def create_app(test_config=None):
             supplied = request.form.get("csrf_token", "")
             expected = session.get("csrf_token", "")
             if not expected or not hmac.compare_digest(supplied, expected):
+                if request.endpoint == "login":
+                    destination = request.form.get("next", "")
+                    session.clear()
+                    flash("Your sign-in page expired. Please enter your password again.", "error")
+                    return redirect(url_for("login", next=destination))
                 abort(400, description="Invalid or expired form token. Go back, refresh, and try again.")
 
     @app.route("/login", methods=("GET", "POST"))
