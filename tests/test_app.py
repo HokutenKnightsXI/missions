@@ -171,7 +171,7 @@ def test_add_progress_updates_an_existing_character(client):
     }, follow_redirects=True)
     assert response.status_code == 200
     # One appearance in each campaign table, not duplicate roster records.
-    assert response.data.count(b'>lion<span class="member-tooltip">') == 2
+    assert response.data.count(b'>lion<span class="member-tooltip">') == 6
     assert b"CoP 1-3" in response.data
     assert b"BLM 40, WHM 60" in response.data
     assert b"CoP 1-2" in response.data  # The standard empty mission row still exists.
@@ -203,3 +203,19 @@ def test_summary_counts_dreamlands_and_each_campaign_clear(client):
     assert b"2</strong><span>Dynamis Dreamlands" in response.data
     assert b"1</strong><span>CoP cleared" in response.data
     assert b"1</strong><span>ZM cleared" in response.data
+
+
+def test_dashboard_includes_toau_and_three_city_mission_tables(client):
+    response = client.get("/")
+    for heading in ("Treasures of Aht Urhgan", "San d&#39;Oria Missions",
+                    "Bastok Missions", "Windurst Missions"):
+        assert heading.encode() in response.data
+    assert b"ToAU 01" in response.data
+    assert b"San d&#39;Oria 1-1" in response.data
+    assert b"Bastok 1-1" in response.data
+    assert b"Windurst 1-1" in response.data
+    headings = [response.data.index(name) for name in (
+        b"Rise of the Zilart", b"Chains of Promathia", b"Treasures of Aht Urhgan",
+        b"Windurst Missions", b"San d&#39;Oria Missions", b"Bastok Missions",
+    )]
+    assert headings == sorted(headings)

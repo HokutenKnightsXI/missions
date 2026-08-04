@@ -11,6 +11,15 @@
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="next" value="{{ next }}">
   <label>Password<input name="password" type="password" required autofocus autocomplete="current-password"></label>
-  <div class="form-actions"><button class="button primary" type="submit">Sign in</button></div>
+  <label>Your character
+    <select name="member_id">
+      <option value="">Choose your character…</option>
+      {% for member in members %}<option value="{{ member.id }}">{{ member.name }}</option>{% endfor %}
+    </select>
+  </label>
+  <div class="form-actions"><button class="button primary" type="submit" name="action" value="sign_in">Sign in</button></div>
+  <p class="hint">Not listed? Click Add Character After You Have Entered Password.</p>
+  <label>New character name<input name="new_member_name" minlength="2" maxlength="15" pattern="[A-Za-z]+" placeholder="HorizonXI name"></label>
+  <div class="form-actions"><button class="button primary" type="submit" name="action" value="add_player">Add Player</button></div>
 </form>
 {% endblock %}

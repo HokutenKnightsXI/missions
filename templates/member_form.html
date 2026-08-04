@@ -11,9 +11,7 @@
   <fieldset>
     <legend>Member details</legend>
     <div class="grid two">
-      <label>Character name *
-        <input required name="name" value="{{ request.form.get('name', member.name if member else '') }}">
-      </label>
+      <label>Character name *{% if member and not is_admin() %}<input type="hidden" name="name" value="{{ member.name }}"><input value="{{ member.name }}" disabled>{% else %}<input required name="name" value="{{ request.form.get('name', member.name if member else '') }}">{% endif %}</label>
       <label>Discord name<input name="discord_name" value="{{ request.form.get('discord_name', member.discord_name if member else '') }}"></label>
       <label>Timezone<input name="timezone" placeholder="Central / GMT-5" value="{{ request.form.get('timezone', member.timezone if member else '') }}"></label>
       <label>Typical availability<input name="availability" placeholder="Tue/Thu after 7 PM" value="{{ request.form.get('availability', member.availability if member else '') }}"></label>
@@ -37,7 +35,7 @@
   {% set p = progress.get(campaign) %}
   {% set selected_mission = request.form.get(campaign + '_mission', p.mission if p else '') %}
   <fieldset class="campaign-field {{ campaign|lower }}">
-    <legend>{{ 'Chains of Promathia' if campaign == 'COP' else 'Rise of the Zilart' }}</legend>
+    <legend>{{ campaign_names[campaign] }}</legend>
     <div class="grid two">
       <label class="mission-select">Current mission or stage
         <select name="{{ campaign }}_mission" data-mission-select="{{ campaign }}">
@@ -62,7 +60,7 @@
   {% endfor %}
   <div class="form-actions"><button class="button primary" type="submit">Save progress</button><a href="{{ url_for('index') }}">Cancel</a></div>
 </form>
-{% if member %}<form class="delete-form" method="post" action="{{ url_for('delete_member', member_id=member.id) }}" onsubmit="return confirm('Remove this member from the roster?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Remove member</button></form>{% endif %}
+{% if member and is_admin() %}<form class="delete-form" method="post" action="{{ url_for('delete_member', member_id=member.id) }}" onsubmit="return confirm('Remove this member from the roster?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Remove member</button></form>{% endif %}
 <script>
   function syncJob(card) {
     const checked = card.querySelector('.job-available').checked;
