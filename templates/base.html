@@ -10,11 +10,19 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='lookup.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='help_board.css') }}">
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="{{ url_for('index') }}"><span class="crystal">◆</span> Missions</a>
+    <a class="brand" href="{{ url_for('index') }}"><span class="crystal">◆</span> Hokuten Knights</a>
     <span class="subtitle">HorizonXI Linkshell Progress</span>
+    <nav class="site-nav">
+      <a href="{{ url_for('index') }}">Missions</a>
+      <a href="{{ url_for('help_board') }}">Help Requests</a>
+      <a href="{{ url_for('job_roster') }}">Job Roster</a>
+      {% if is_admin() %}<a href="{{ url_for('members_admin') }}">Members</a>{% endif %}
+      {% if is_editor() and current_member_id() %}<a href="{{ url_for('my_help_requests') }}">My Requests</a>{% endif %}
+    </nav>
     {% if is_editor() %}
       <form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button" type="submit">Sign out</button></form>
     {% else %}

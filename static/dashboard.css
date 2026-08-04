@@ -1,9 +1,10 @@
 .progress-layout {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 28px;
   align-items: start;
 }
+main:has(.progress-layout) { max-width: 1600px; }
 .stats { grid-template-columns: repeat(5, 1fr); }
 .stats div:nth-child(3) strong { color: #8fd6a5; }
 @media (max-width: 850px) {
@@ -18,6 +19,14 @@
 }
 .progress-panel.cop { border-top: 3px solid var(--blue); }
 .progress-panel.zilart { border-top: 3px solid var(--gold); }
+.progress-panel.toau { border-top: 3px solid #a78bfa; }
+.progress-panel.sandoria { border-top: 3px solid #e5e7eb; }
+.progress-panel.bastok { border-top: 3px solid #d97757; }
+.progress-panel.windurst { border-top: 3px solid #4ade80; }
+.campaign.toau { color: #c4b5fd; }
+.campaign.sandoria { color: #e5e7eb; }
+.campaign.bastok { color: #f0a184; }
+.campaign.windurst { color: #86efac; }
 .progress-heading {
   display: flex;
   align-items: end;
@@ -107,4 +116,7 @@
 }
 @media (max-width: 900px) {
   .progress-layout { grid-template-columns: 1fr; }
+}
+@media (min-width: 901px) and (max-width: 1250px) {
+  .progress-layout { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }

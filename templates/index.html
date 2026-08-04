@@ -6,7 +6,7 @@
     <h1>Find your next mission party.</h1>
     <p>See who needs the same fight, which jobs they can bring, and when they are ready to go.</p>
   </div>
-  <a class="button primary" href="{{ url_for('member_form') }}">{{ 'Add or Update Progress' if is_editor() else 'Sign in to update' }}</a>
+  <a class="button primary" href="{{ url_for('member_form', member_id=current_member_id()) if current_member_id() else url_for('member_form') }}">{{ 'Add or Update Progress' if is_editor() else 'Sign in to update' }}</a>
 </section>
 
 <section class="stats">
@@ -23,7 +23,7 @@
     <div class="progress-heading">
       <div>
         <span class="campaign {{ campaign|lower }}">{{ campaign }}</span>
-        <h2>{{ 'Chains of Promathia' if campaign == 'COP' else 'Rise of the Zilart' }}</h2>
+        <h2>{{ campaign_names[campaign] }}</h2>
       </div>
       <span class="hover-hint">Hover a member to see jobs</span>
     </div>
@@ -37,7 +37,7 @@
             <td class="mission-name">{{ mission.title }}</td>
             <td class="member-list">
               {% for member in mission.members %}
-                <{{ 'a' if is_editor() else 'span' }} {% if is_editor() %}href="{{ url_for('member_form', member_id=member.id) }}"{% endif %} class="member-pill {{ member.status|lower|replace(' ', '-') }}" title="Jobs: {{ member.jobs or 'None' }} | Status: {{ member.status }} | Availability: {{ member.availability or 'Not provided' }} | Extra notes: {{ member.details or member.notes or 'None' }}">{{ member.name }}<span class="member-tooltip"><span><b>Jobs:</b> {{ member.jobs or 'None' }}</span><span><b>Status:</b> {{ member.status }}</span><span class="availability"><b>Availability:</b> {{ member.availability or 'Not provided' }}</span><span><b>Extra notes:</b> {{ member.details or member.notes or 'None' }}</span></span></{{ 'a' if is_editor() else 'span' }}>{% if not loop.last %}<span class="comma">,</span>{% endif %}
+                {% set may_edit = is_admin() or current_member_id() == member.id %}<{{ 'a' if may_edit else 'span' }} {% if may_edit %}href="{{ url_for('member_form', member_id=member.id) }}"{% endif %} class="member-pill {{ member.status|lower|replace(' ', '-') }}" title="Jobs: {{ member.jobs or 'None' }} | Status: {{ member.status }} | Availability: {{ member.availability or 'Not provided' }} | Extra notes: {{ member.details or member.notes or 'None' }}">{{ member.name }}<span class="member-tooltip"><span><b>Jobs:</b> {{ member.jobs or 'None' }}</span><span><b>Status:</b> {{ member.status }}</span><span class="availability"><b>Availability:</b> {{ member.availability or 'Not provided' }}</span><span><b>Extra notes:</b> {{ member.details or member.notes or 'None' }}</span></span></{{ 'a' if may_edit else 'span' }}>{% if not loop.last %}<span class="comma">,</span>{% endif %}
               {% else %}<span class="none-yet">—</span>{% endfor %}
             </td>
           </tr>
