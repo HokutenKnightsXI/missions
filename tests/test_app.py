@@ -40,7 +40,17 @@ def test_post_rejects_missing_csrf_token(tmp_path):
         "TESTING": True, "DATABASE": str(tmp_path / "csrf.db"),
         "SECRET_KEY": "test", "EDIT_PASSWORD": "shell-secret",
     })
-    assert app.test_client().post("/login", data={"password": "shell-secret"}).status_code == 400
+    response = app.test_client().post("/login", data={"password": "shell-secret"}, follow_redirects=True)
+    assert response.status_code == 200
+    assert b"Your sign-in page expired" in response.data
+
+
+def test_non_login_post_still_rejects_missing_csrf_token(tmp_path):
+    app = create_app({
+        "TESTING": True, "DATABASE": str(tmp_path / "csrf-other.db"),
+        "SECRET_KEY": "test", "EDIT_PASSWORD": "shell-secret",
+    })
+    assert app.test_client().post("/identity", data={"member_id": "1"}).status_code == 400
 
 
 def test_empty_board_loads(client):

@@ -38,10 +38,7 @@ def roster_names(database):
     connection = sqlite3.connect(database)
     try:
         return [row[0] for row in connection.execute(
-            """SELECT name FROM members
-               WHERE EXISTS(SELECT 1 FROM member_jobs j WHERE j.member_id=members.id)
-                  OR EXISTS(SELECT 1 FROM progress p WHERE p.member_id=members.id)
-               ORDER BY name COLLATE NOCASE"""
+            "SELECT name FROM members ORDER BY name COLLATE NOCASE"
         )]
     finally:
         connection.close()
@@ -60,12 +57,36 @@ def fetch_roster(names, workers=4):
     return results, failures
 
 
+def load_snapshot(path, names):
+    """Load previously fetched jobs without requiring network access."""
+    with path.open(encoding="utf-8") as snapshot_file:
+        snapshot = json.load(snapshot_file)
+    indexed = {name.casefold(): jobs for name, jobs in snapshot.items()}
+    results, failures = {}, {}
+    for name in names:
+        raw_jobs = indexed.get(name.casefold())
+        if not isinstance(raw_jobs, dict):
+            failures[name] = "Not present in snapshot"
+            continue
+        jobs = {
+            job: int(level) for job, level in raw_jobs.items()
+            if job in JOBS and isinstance(level, (int, float)) and 1 <= int(level) <= 75
+        }
+        if jobs:
+            results[name] = jobs
+        else:
+            failures[name] = "No job data in snapshot"
+    return results, failures
+
+
 def update_jobs(database, results):
     connection = sqlite3.connect(database)
     connection.execute("PRAGMA foreign_keys = ON")
     try:
         for name, jobs in results.items():
-            member = connection.execute("SELECT id FROM members WHERE name=?", (name,)).fetchone()
+            member = connection.execute(
+                "SELECT id FROM members WHERE name=? COLLATE NOCASE", (name,)
+            ).fetchone()
             if not member:
                 continue
             connection.execute("DELETE FROM member_jobs WHERE member_id=?", (member[0],))
@@ -86,13 +107,24 @@ def main():
     parser.add_argument("--database", default="instance/missions.db")
     parser.add_argument("--apply", action="store_true", help="Update the database; otherwise preview only")
     parser.add_argument("--workers", type=int, default=4)
+    parser.add_argument("--snapshot", type=Path, help="Read job data from an offline JSON snapshot")
+    parser.add_argument("--write-snapshot", type=Path, help="Save successful HorizonXI results as JSON")
     args = parser.parse_args()
     database = Path(args.database).resolve()
     if not database.exists():
         raise SystemExit(f"Database not found: {database}")
     names = roster_names(database)
-    print(f"Checking {len(names)} roster characters against HorizonXI...")
-    results, failures = fetch_roster(names, max(1, min(args.workers, 8)))
+    if args.snapshot:
+        print(f"Loading job data for {len(names)} roster characters from {args.snapshot}...")
+        results, failures = load_snapshot(args.snapshot, names)
+    else:
+        print(f"Checking {len(names)} roster characters against HorizonXI...")
+        results, failures = fetch_roster(names, max(1, min(args.workers, 8)))
+    if args.write_snapshot:
+        args.write_snapshot.write_text(
+            json.dumps(results, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
+        print(f"Saved {len(results)} characters to {args.write_snapshot}.")
     print(f"Retrieved complete jobs for {len(results)} characters; {len(failures)} unavailable.")
     for name, error in sorted(failures.items()):
         print(f"  {name}: {error}")
