@@ -127,6 +127,10 @@ def test_volunteer_update_prevents_duplicates_and_withdraws(app):
     client = app.test_client(); owner = add_member(client, "Maven", RDM=75); helper = add_member(client, "Lion", WHM=75)
     identify(client, owner); created = client.post("/help-requests/new", data=valid_request(owner), follow_redirects=False)
     request_id = int(created.location.rstrip("/").split("/")[-1]); identify(client, helper)
+    interest = client.post(f"/help-requests/{request_id}/volunteer", data={}, follow_redirects=True)
+    assert b"You are listed as interested in helping" in interest.data
+    assert b"Interested helpers" in interest.data and b"Lion" in interest.data
+    assert b"Your name is visible in the list above" in interest.data
     client.post(f"/help-requests/{request_id}/volunteer", data={"jobs": ["WHM"], "note": "Ready"})
     client.post(f"/help-requests/{request_id}/volunteer", data={"jobs": ["WHM"], "note": "Updated"})
     with app.app_context():
