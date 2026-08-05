@@ -40,9 +40,22 @@ def test_header_uses_single_yellow_account_control(tmp_path):
                       "SECRET_KEY": "test", "AUTH_DISABLED": False})
     client = app.test_client()
     signed_out = client.get("/")
-    assert b'class="button account-button"' in signed_out.data
+    assert b'class="button account-button public-signin"' in signed_out.data
     assert b">Sign In</a>" in signed_out.data
     assert b"Sign in to update" not in signed_out.data
+    assert b'class="site-nav"' not in signed_out.data
+    assert b'class="brand"' not in signed_out.data
+    assert signed_out.data.count(b'data-name="') == 13
+    assert b'class="landing-script">Hokuten Knights' in signed_out.data
+    assert b"public_landing.js" in signed_out.data
+    assert b"Enter the Linkshell" not in signed_out.data
+    assert b"public_landing_controls.css" in signed_out.data
+    landing_script = client.get("/static/public_landing.js")
+    assert b"audio.duration/scenes.length" in landing_script.data
+    assert b'id="landing-audio"' in signed_out.data
+    assert b'id="soundtrack-volume"' in signed_out.data
+    assert b"We Depart For Distant Shores" in signed_out.data
+    assert client.get("/static/landing/we-depart-for-distant-shores.mp3").status_code == 200
 
     with client.session_transaction() as session:
         session["is_editor"] = True

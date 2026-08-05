@@ -6,7 +6,7 @@
   <title>{% block title %}Missions{% endblock %}</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Great+Vibes&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='lookup.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
@@ -18,7 +18,8 @@
   {% block head %}{% endblock %}
 </head>
 <body>
-  <header class="site-header">
+  <header class="site-header {{ 'signed-in-header' if is_editor() else 'public-header' }}">
+    {% if is_editor() %}
     <a class="brand" href="{{ url_for('index') }}"><span class="crystal">◆</span> Hokuten Knights</a>
     <span class="subtitle">HorizonXI Linkshell Progress</span>
     <nav class="site-nav">
@@ -30,11 +31,8 @@
       {% if is_admin() %}<a class="admin-nav-link" href="{{ url_for('members_admin') }}">Members</a>{% endif %}
       {% if is_editor() and current_member_id() %}<a href="{{ url_for('my_help_requests') }}">My Requests</a>{% endif %}
     </nav>
-    {% if is_editor() %}
-      <form class="account-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button account-button" type="submit">Sign Out ({{ current_member_name() }})</button></form>
-    {% else %}
-      <a class="button account-button" href="{{ url_for('login') }}">Sign In</a>
-    {% endif %}
+    <form class="account-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button account-button" type="submit">Sign Out ({{ current_member_name() }})</button></form>
+    {% else %}<a class="button account-button public-signin" href="{{ url_for('login') }}">Sign In</a>{% endif %}
   </header>
   <main>
     {% for category, message in get_flashed_messages(with_categories=true) %}
