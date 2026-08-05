@@ -1,0 +1,60 @@
+body:has(.public-landing) .public-header {
+  justify-content: flex-start;
+  padding-left: 0;
+}
+
+body:has(.public-landing) .public-signin {
+  margin-left: clamp(30px, 7vw, 120px);
+  margin-right: 0;
+}
+
+.soundtrack-controls {
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.soundtrack-controls button {
+  width: 38px;
+  height: 38px;
+  font-size: 15px;
+}
+
+.soundtrack-controls label {
+  font-size: 11px;
+}
+
+.soundtrack-controls input {
+  width: 170px;
+  height: 22px;
+}
+
+.soundtrack-controls input::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 999px;
+}
+
+.soundtrack-controls input::-webkit-slider-thumb {
+  width: 18px;
+  height: 18px;
+  margin-top: -6px;
+}
+
+.soundtrack-controls input::-moz-range-track {
+  height: 6px;
+  border-radius: 999px;
+}
+
+.soundtrack-controls input::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+}
+
+@media (max-width: 700px) {
+  body:has(.public-landing) .public-signin {
+    margin-left: 30px;
+  }
+
+  .soundtrack-controls input {
+    width: 125px;
+  }
+}
