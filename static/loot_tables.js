@@ -1,0 +1,16 @@
+const TH_RATES=[
+  [24,15,10,5,1,.5,.1],[48,30,12,6,1.5,.75,.2],[56,40,15,7,2,1,.3],
+  [60,42.5,16.5,7.5,2.25,1.2,.35],[64,45,18,8,2.5,1.4,.4]
+];
+const RARITIES=['Very Common','Common','Uncommon','Rare','Very Rare','Super Rare','Ultra Rare'];
+const controls={item:document.querySelector('#loot-item'),mob:document.querySelector('#loot-mob'),zone:document.querySelector('#loot-zone'),th:document.querySelector('#loot-th')};
+const body=document.querySelector('#loot-body'),count=document.querySelector('#loot-count'),pageText=document.querySelector('#loot-page');
+let rows=[],filtered=[],page=1;const PAGE_SIZE=100;
+const esc=value=>String(value).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pct=value=>value>=100?'100%':`${Number(value.toFixed(value<1?3:value<10?2:1))}%`;
+function renderStrip(){let th=+controls.th.value;document.querySelector('#th-strip').innerHTML=RARITIES.map((name,i)=>`<div class="th-tier"><b>${name}</b><span>${pct(TH_RATES[th][i])}</span></div>`).join('')}
+function apply(){let item=controls.item.value.trim().toLowerCase(),mob=controls.mob.value.trim().toLowerCase(),zone=controls.zone.value;filtered=rows.filter(r=>(!item||r[2].toLowerCase().includes(item))&&(!mob||r[1].toLowerCase().includes(mob))&&(!zone||r[0]===zone));page=1;render()}
+function render(){let pages=Math.max(1,Math.ceil(filtered.length/PAGE_SIZE));page=Math.min(page,pages);let th=+controls.th.value,start=(page-1)*PAGE_SIZE,slice=filtered.slice(start,start+PAGE_SIZE);count.textContent=`${filtered.length.toLocaleString()} matching drops`;pageText.textContent=`Page ${page} of ${pages}`;body.innerHTML=slice.length?slice.map(r=>`<tr><td><span class="item-name">${esc(r[2])}</span>${r[8]>1?`<small>${r[8]} independent/group rolls combined</small>`:''}</td><td class="mob-name">${esc(r[1])}</td><td class="zone-name">${esc(r[0])}</td>${[0,1,2,3,4].map(i=>`<td class="${i===th?'selected-th':''}">${pct(r[3+i])}</td>`).join('')}</tr>`).join(''):'<tr><td colspan="8" class="help-empty">No drops match these filters.</td></tr>';document.querySelectorAll('[data-th]').forEach(x=>x.classList.toggle('selected-th',+x.dataset.th===th));document.querySelector('#loot-prev').disabled=page<=1;document.querySelector('#loot-next').disabled=page>=pages;renderStrip()}
+let timer;[controls.item,controls.mob].forEach(input=>input.addEventListener('input',()=>{clearTimeout(timer);timer=setTimeout(apply,160)}));controls.zone.addEventListener('change',apply);controls.th.addEventListener('change',render);
+document.querySelector('#loot-clear').onclick=()=>{controls.item.value='';controls.mob.value='';controls.zone.value='';controls.th.value='4';apply()};document.querySelector('#loot-prev').onclick=()=>{page--;render()};document.querySelector('#loot-next').onclick=()=>{page++;render()};
+fetch(window.LOOT_DATA_URL).then(r=>{if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json()}).then(data=>{rows=data.rows;filtered=rows;[...new Set(rows.map(r=>r[0]))].sort((a,b)=>a.localeCompare(b)).forEach(zone=>controls.zone.add(new Option(zone,zone)));render()}).catch(error=>{count.textContent='Loot data unavailable';body.innerHTML=`<tr><td colspan="8" class="help-empty">Could not load loot data: ${esc(error.message)}</td></tr>`});

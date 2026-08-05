@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='lookup.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='dashboard.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='help_board.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='loot_tables.css') }}">
 </head>
 <body>
   <header class="site-header">
@@ -20,6 +21,7 @@
       <a href="{{ url_for('index') }}">Missions</a>
       <a href="{{ url_for('help_board') }}">Help Requests</a>
       <a href="{{ url_for('job_roster') }}">Job Roster</a>
+      <a href="{{ url_for('loot_tables') }}">Loot Tables</a>
       {% if is_admin() %}<a href="{{ url_for('members_admin') }}">Members</a>{% endif %}
       {% if is_editor() and current_member_id() %}<a href="{{ url_for('my_help_requests') }}">My Requests</a>{% endif %}
     </nav>

@@ -837,6 +837,10 @@ def create_app(test_config=None):
             sort_job=sort_job, direction=direction, level_75_counts=level_75_counts,
         )
 
+    @app.get("/loot-tables")
+    def loot_tables():
+        return render_template("loot_tables.html")
+
     def require_member_identity():
         member_id = current_member_id()
         if member_id is None and app.config.get("AUTH_DISABLED"):
