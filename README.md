@@ -53,6 +53,30 @@ python refresh_horizon_jobs.py --snapshot horizon_jobs_snapshot.json
 python refresh_horizon_jobs.py --snapshot horizon_jobs_snapshot.json --apply
 ```
 
+## Free daily roster refresh
+
+The `Refresh HorizonXI job roster` GitHub Actions workflow fetches current player data
+once per day and sends only successful lookups to the deployed site. A failed or missing
+HorizonXI profile keeps its existing saved levels.
+
+Configure the same long random value in both places:
+
+1. Set `ROSTER_REFRESH_TOKEN` in the PythonAnywhere WSGI configuration before importing
+   the application, then reload the web app.
+2. In GitHub, open **Settings → Secrets and variables → Actions**, create a repository
+   secret named `ROSTER_REFRESH_TOKEN`, and paste the same value.
+3. Open **Actions → Refresh HorizonXI job roster → Run workflow** to test it immediately.
+
+Generate a suitable token locally with:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+```
+
+The workflow runs daily at 10:17 UTC. Its update endpoint does not use the linkshell or
+administrator passwords and modifies only `member_jobs` plus each updated member's
+timestamp.
+
 ## Current scope
 
 - Add and update linkshell members
