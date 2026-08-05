@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Alliance Builder · Hokuten Knights{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_refined.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_readability.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_compact_filters.css') }}">{% endblock %}
+{% block content %}
+<section class="alliance-hero">
+  <div><p class="eyebrow">Leader Tools</p><h1>Alliance Party Maker</h1><p>Build three six-person parties directly from the current HorizonXI job roster.</p></div>
+  <div class="alliance-hero-actions"><a class="button primary" href="{{ url_for('alliance_builder') }}">+ New Alliance</a><button class="button saved-alliance-button" id="open-saved-alliances" type="button">+ Load Saved Alliance</button></div>
+</section>
+
+<dialog class="saved-alliance-dialog" id="saved-alliance-dialog">
+  <header><div><p class="eyebrow">Leader layouts</p><h2>Load Saved Alliance</h2></div><button type="button" id="close-saved-alliances" aria-label="Close">×</button></header>
+  <div class="saved-alliance-list">{% for saved in events %}<a class="{{ 'active' if event and event.id == saved.id }}" href="{{ url_for('alliance_builder', event=saved.id) }}"><span><b>{{ saved.name }}</b><small>{{ saved.event_at|replace('T',' ') if saved.event_at else 'Date not set' }}</small></span><strong>{{ saved.member_count }}/18</strong></a>{% else %}<p>No saved alliance layouts yet.</p>{% endfor %}</div>
+</dialog>
+
+<form class="alliance-builder" method="post" action="{{ url_for('save_alliance') }}" id="alliance-form">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if event %}<input type="hidden" name="event_id" value="{{ event.id }}">{% endif %}
+  <section class="alliance-event-details">
+    <label><span class="field-title">Alliance name <i>Required</i></span><input name="name" maxlength="80" required placeholder="e.g. Dynamis - Xarcabard" value="{{ event.name if event else '' }}"></label>
+    <label class="calendar-field"><span class="field-title">Event date and time</span><span class="calendar-picker"><button type="button" id="pick-event-date" aria-label="Choose event date and time" title="Choose event date and time"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3M17 2v3M3.5 9h17M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><span id="event-date-display">{{ event.event_at|replace('T',' at ') if event and event.event_at else 'Choose date and time' }}</span><input class="native-date-input" type="datetime-local" name="event_at" value="{{ event.event_at if event and event.event_at else '' }}"></span></label>
+    <label class="alliance-notes"><span class="field-title">Notes</span><input name="notes" maxlength="1000" placeholder="Goals, gathering point, special instructions…" value="{{ event.notes if event else '' }}"></label>
+  </section>
+
+  <div class="alliance-compose">
+    <section class="alliance-roster-panel">
+      <div class="alliance-filter-heading"><div><p class="eyebrow">Level 75 roster</p><h2>Available Characters</h2></div><span id="available-count"></span></div>
+      <div class="roster-inline-filters"><label>Job<select id="alliance-job"><option value="">All level-75 jobs</option>{% for job in jobs %}<option>{{ job }}</option>{% endfor %}</select></label><label>Role<select id="alliance-role"><option value="">All roles</option>{% for role in role_jobs %}<option>{{ role }}</option>{% endfor %}</select></label></div>
+      <div id="selected-slot-message" hidden></div>
+      <div class="available-roster-wrap"><table class="available-roster-table"><thead><tr><th>Character</th><th>Level 75 Jobs</th></tr></thead><tbody id="available-roster"></tbody></table></div>
+    </section>
+
+    <section class="alliance-parties">
+      <div class="alliance-parties-heading"><div><p class="eyebrow">18 alliance positions</p><h2>Party Layout</h2></div><span>Click or drag into any open slot</span></div>
+      <div class="alliance-party-grid">
+        {% for party in range(1,4) %}<article class="alliance-party" data-party="{{ party }}"><header><div><p>Alliance group</p><h2>Party {{ party }}</h2></div><span class="party-count">0/6</span></header><div class="party-slots">
+          {% for slot in range(1,7) %}{% set current=assignments.get(party ~ '-' ~ slot) %}<div class="party-slot" tabindex="0" role="button" data-party="{{ party }}" data-slot="{{ slot }}" data-member="{{ current.member_id if current else '' }}" data-job="{{ current.job if current else '' }}"><input type="hidden" name="member_{{ party }}_{{ slot }}" value="{{ current.member_id if current else '' }}"><input type="hidden" name="job_{{ party }}_{{ slot }}" value="{{ current.job if current else '' }}"><span class="slot-number">{{ slot }}</span><div class="slot-content"><b>Open slot</b><small>Click or drop here</small></div></div>{% endfor %}
+        </div></article>{% endfor %}
+      </div>
+    </section>
+  </div>
+
+  <footer class="alliance-actions"><div><strong id="alliance-total">0/18 assigned</strong><span id="save-name-reminder">An alliance name is required to save.</span></div><button class="button primary" type="submit">Save Alliance Layout</button></footer>
+</form>
+{% if event %}<form class="alliance-delete" method="post" action="{{ url_for('delete_alliance', event_id=event.id) }}" onsubmit="return confirm('Delete this saved alliance layout?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Delete this alliance</button></form>{% endif %}
+<script>window.ALLIANCE_ROSTER={{ roster|tojson }};window.ALLIANCE_ROLES={{ role_jobs|tojson }};</script><script src="{{ url_for('static', filename='alliance_builder.js') }}"></script>
+{% endblock %}

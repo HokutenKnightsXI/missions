@@ -35,6 +35,23 @@ def test_updates_require_shared_password(tmp_path):
     assert client.get("/members/new").status_code == 200
 
 
+def test_header_uses_single_yellow_account_control(tmp_path):
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "account-header.db"),
+                      "SECRET_KEY": "test", "AUTH_DISABLED": False})
+    client = app.test_client()
+    signed_out = client.get("/")
+    assert b'class="button account-button"' in signed_out.data
+    assert b">Sign In</a>" in signed_out.data
+    assert b"Sign in to update" not in signed_out.data
+
+    with client.session_transaction() as session:
+        session["is_editor"] = True
+        session["member_id"] = 1
+    signed_in = client.get("/")
+    assert b"Sign Out (Imaven)" in signed_in.data
+    assert b"Add or Update Progress" in signed_in.data
+
+
 def test_post_rejects_missing_csrf_token(tmp_path):
     app = create_app({
         "TESTING": True, "DATABASE": str(tmp_path / "csrf.db"),
@@ -103,6 +120,14 @@ def test_empty_board_loads(client):
     assert b"Chains of Promathia" in response.data
     assert b"Rise of the Zilart" in response.data
     assert b"Not selected" in response.data
+
+
+def test_ifrit_map_name_uses_calibrated_zone_id(client):
+    response = client.get("/api/map-assets?zone=Ifrits%20Cauldron")
+    assert response.status_code == 200
+    maps = response.get_json()["maps"]
+    assert len(maps) == 8
+    assert maps[0]["url"].startswith("/calibrated-map-assets/205/")
 
 
 def test_add_and_filter_member(client):

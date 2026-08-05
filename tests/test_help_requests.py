@@ -177,7 +177,33 @@ def test_my_requests_view_includes_created_requests(app):
     client = app.test_client(); owner = add_member(client, "Maven", RDM=75); identify(client, owner)
     client.post("/help-requests/new", data=valid_request(owner))
     response = client.get("/my-help-requests")
-    assert response.status_code == 200 and b"Under Observation" in response.data
+    assert response.status_code == 200
+    assert b"Requests You Made" in response.data
+    assert b"Requests You Volunteered For" in response.data
+    assert b"Under Observation" in response.data
+    assert b"0 interested helpers" in response.data
+
+
+def test_my_requests_separates_volunteered_requests(app):
+    client = app.test_client()
+    owner = add_member(client, "Maven", RDM=75)
+    helper = add_member(client, "Lion", WHM=75)
+    identify(client, owner)
+    created = client.post("/help-requests/new", data=valid_request(owner), follow_redirects=False)
+    request_id = int(created.location.rstrip("/").split("/")[-1])
+
+    identify(client, helper)
+    client.post(
+        f"/help-requests/{request_id}/volunteer",
+        data={"jobs": ["WHM"], "note": "Ready"},
+    )
+    response = client.get("/my-help-requests")
+
+    assert response.status_code == 200
+    assert b"You haven\xe2\x80\x99t created a help request yet." in response.data
+    assert b"Under Observation" in response.data
+    assert b"Requested by Maven" in response.data
+    assert b"Helping as WHM" in response.data
 
 
 def test_expired_requests_are_expired_and_hidden_from_active_board(app):

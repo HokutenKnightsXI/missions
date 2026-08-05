@@ -52,6 +52,12 @@ BF_ZONES = (
     "La'Loff Amphitheater", "Empyreal Paradox", "The Shrouded Maw",
 )
 PARTY_ROLES = ("Tank", "DD", "Healer", "Support")
+ALLIANCE_ROLE_JOBS = {
+    "Tank": ("PLD", "NIN", "WAR"),
+    "Damage": ("WAR", "MNK", "BLM", "THF", "DRK", "BST", "RNG", "SAM", "NIN", "DRG", "SMN"),
+    "Healer": ("WHM", "RDM", "SMN"),
+    "Support": ("BRD", "RDM", "WHM", "SMN"),
+}
 REGION_ZONES = {
     "Ronfaure": ("West Ronfaure", "East Ronfaure", "Ghelsba Outpost", "Fort Ghelsba", "Yughott Grotto"),
     "Zulkheim": ("La Theine Plateau", "Valkurm Dunes", "Konschtat Highlands", "Gusgen Mines"),
@@ -100,6 +106,91 @@ HELP_STATUS_TRANSITIONS = {
 }
 EASTERN_TIME = ZoneInfo("America/New_York")
 HORIZON_API = "https://api.horizonxi.com/api/v1"
+MAP_ZONE_ID_OVERRIDES = {"Ifrits Cauldron": 205}
+
+DYNAMIS_RELIC = {
+    "WAR": (("Warrior's Mask", "Head", "Dynamis - Windurst"), ("Warrior's Lorica", "Body", "Dynamis - Xarcabard"), ("Warrior's Mufflers", "Hands", "Dynamis - Jeuno"), ("Warrior's Cuisses", "Legs", "Dynamis - Beaucedine"), ("Warrior's Calligae", "Feet", "Dynamis - San d'Oria")),
+    "MNK": (("Melee Crown", "Head", "Dynamis - Xarcabard"), ("Melee Cyclas", "Body", "Dynamis - Beaucedine"), ("Melee Gloves", "Hands", "Dynamis - Jeuno"), ("Melee Hose", "Legs", "Dynamis - San d'Oria"), ("Melee Gaiters", "Feet", "Dynamis - Bastok")),
+    "WHM": (("Cleric's Cap", "Head", "Dynamis - San d'Oria"), ("Cleric's Bliaut", "Body", "Dynamis - Beaucedine"), ("Cleric's Mitts", "Hands", "Dynamis - Xarcabard"), ("Cleric's Pantaloons", "Legs", "Dynamis - Jeuno"), ("Cleric's Duckbills", "Feet", "Dynamis - Windurst")),
+    "BLM": (("Sorcerer's Petasos", "Head", "Dynamis - Xarcabard"), ("Sorcerer's Coat", "Body", "Dynamis - Beaucedine"), ("Sorcerer's Gloves", "Hands", "Dynamis - Windurst"), ("Sorcerer's Tonban", "Legs", "Dynamis - Bastok"), ("Sorcerer's Sabots", "Feet", "Dynamis - Jeuno")),
+    "RDM": (("Duelist's Chapeau", "Head", "Dynamis - Xarcabard"), ("Duelist's Tabard", "Body", "Dynamis - Beaucedine"), ("Duelist's Gloves", "Hands", "Dynamis - Bastok"), ("Duelist's Tights", "Legs", "Dynamis - Jeuno"), ("Duelist's Boots", "Feet", "Dynamis - San d'Oria")),
+    "THF": (("Assassin's Bonnet", "Head", "Dynamis - Windurst"), ("Assassin's Vest", "Body", "Dynamis - Bastok"), ("Assassin's Armlets", "Hands", "Dynamis - Xarcabard"), ("Assassin's Culottes", "Legs", "Dynamis - Beaucedine"), ("Assassin's Poulaines", "Feet", "Dynamis - Jeuno")),
+    "PLD": (("Valor Coronet", "Head", "Dynamis - Bastok"), ("Valor Surcoat", "Body", "Dynamis - Xarcabard"), ("Valor Gauntlets", "Hands", "Dynamis - San d'Oria"), ("Valor Breeches", "Legs", "Dynamis - Beaucedine"), ("Valor Leggings", "Feet", "Dynamis - Windurst")),
+    "DRK": (("Abyss Burgeonet", "Head", "Dynamis - Xarcabard"), ("Abyss Cuirass", "Body", "Dynamis - Beaucedine"), ("Abyss Gauntlets", "Hands", "Dynamis - Windurst"), ("Abyss Flanchard", "Legs", "Dynamis - Jeuno"), ("Abyss Sollerets", "Feet", "Dynamis - Bastok")),
+    "BST": (("Monster Helm", "Head", "Dynamis - Windurst"), ("Monster Jackcoat", "Body", "Dynamis - Bastok"), ("Monster Gloves", "Hands", "Dynamis - Xarcabard"), ("Monster Trousers", "Legs", "Dynamis - San d'Oria"), ("Monster Gaiters", "Feet", "Dynamis - Beaucedine")),
+    "BRD": (("Bard's Roundlet", "Head", "Dynamis - San d'Oria"), ("Bard's Justaucorps", "Body", "Dynamis - Beaucedine"), ("Bard's Cuffs", "Hands", "Dynamis - Bastok"), ("Bard's Cannions", "Legs", "Dynamis - Xarcabard"), ("Bard's Slippers", "Feet", "Dynamis - Jeuno")),
+    "RNG": (("Scout's Beret", "Head", "Dynamis - Jeuno"), ("Scout's Jerkin", "Body", "Dynamis - Xarcabard"), ("Scout's Bracers", "Hands", "Dynamis - Windurst"), ("Scout's Braccae", "Legs", "Dynamis - San d'Oria"), ("Scout's Socks", "Feet", "Dynamis - Beaucedine")),
+    "SAM": (("Saotome Kabuto", "Head", "Dynamis - Beaucedine"), ("Saotome Domaru", "Body", "Dynamis - Xarcabard"), ("Saotome Kote", "Hands", "Dynamis - Bastok"), ("Saotome Haidate", "Legs", "Dynamis - Windurst"), ("Saotome Sune-Ate", "Feet", "Dynamis - Jeuno")),
+    "NIN": (("Koga Hatsuburi", "Head", "Dynamis - Windurst"), ("Koga Chainmail", "Body", "Dynamis - Beaucedine"), ("Koga Tekko", "Hands", "Dynamis - Xarcabard"), ("Koga Hakama", "Legs", "Dynamis - San d'Oria"), ("Koga Kyahan", "Feet", "Dynamis - Jeuno")),
+    "DRG": (("Wyrm Armet", "Head", "Dynamis - Xarcabard"), ("Wyrm Mail", "Body", "Dynamis - Beaucedine"), ("Wyrm Finger Gauntlets", "Hands", "Dynamis - Jeuno"), ("Wyrm Brais", "Legs", "Dynamis - Bastok"), ("Wyrm Greaves", "Feet", "Dynamis - San d'Oria")),
+    "SMN": (("Summoner's Horn", "Head", "Dynamis - Xarcabard"), ("Summoner's Doublet", "Body", "Dynamis - Beaucedine"), ("Summoner's Bracers", "Hands", "Dynamis - Bastok"), ("Summoner's Spats", "Legs", "Dynamis - Windurst"), ("Summoner's Pigaches", "Feet", "Dynamis - San d'Oria")),
+}
+LIMBUS_LOOT = {
+    "Proto-Omega": (("Omega's Eye", "Homam Zucchetto", "Head"), ("Omega's Heart", "Homam Corazza", "Body"), ("Omega's Foreleg", "Homam Manopolas", "Hands"), ("Omega's Hind Leg", "Homam Cosciales", "Legs"), ("Omega's Tail", "Homam Gambieras", "Feet")),
+    "Proto-Ultima": (("Ultima's Cerebrum", "Nashira Turban", "Head"), ("Ultima's Heart", "Nashira Manteel", "Body"), ("Ultima's Claw", "Nashira Gages", "Hands"), ("Ultima's Leg", "Nashira Seraweels", "Legs"), ("Ultima's Tail", "Nashira Crackows", "Feet")),
+}
+LIMBUS_AF1 = {
+    "WAR": {"temenos": ("Ecarlate Cloth", "North F2/F4 · West F1/F2/F4/F5/F7"), "apollyon": ("Argyro Rivet", "NE F3 · NW F1/F4/F5 · SE F4 · SW F2/F3"), "pieces": ("Fighter's Mask +1", "Fighter's Lorica +1", "Fighter's Mufflers +1", "Fighter's Cuisses +1", "Fighter's Calligae +1")},
+    "MNK": {"temenos": ("Utopian Gold Thread", "North F1/F2/F3/F5/F7 · West F5/F6"), "apollyon": ("Ancient Brass", "NE F1-F4 · NW F3-F5 · SE F3 · SW F4"), "pieces": ("Temple Crown +1", "Temple Cyclas +1", "Temple Gloves +1", "Temple Hose +1", "Temple Gaiters +1")},
+    "WHM": {"temenos": ("Benedict Silk", "North F1/F3/F4/F5/F7 · West F2/F6"), "apollyon": ("Benedict Yarn", "NE F1 · NW F1/F4/F5 · SE F4 · SW F1/F3"), "pieces": ("Healer's Cap +1", "Healer's Bliaut +1", "Healer's Mitts +1", "Healer's Pantaloons +1", "Healer's Duckbills +1")},
+    "BLM": {"temenos": ("Diabolic Silk", "North F3/F4/F6 · East F1/F2/F6/F7"), "apollyon": ("Diabolic Yarn", "NE F2 · NW F1/F5 · SE F4 · SW F1-F3"), "pieces": ("Wizard's Petasos +1", "Wizard's Coat +1", "Wizard's Gloves +1", "Wizard's Tonban +1", "Wizard's Sabots +1")},
+    "RDM": {"temenos": ("Ruby Silk Thread", "West F1/F2/F4-F7 · East F2/F3/F5"), "apollyon": ("Cardinal Cloth", "NE F1/F3 · NW F4/F5 · SE F1 · SW F4"), "pieces": ("Warlock's Chapeau +1", "Warlock's Tabard +1", "Warlock's Gloves +1", "Warlock's Tights +1", "Warlock's Boots +1")},
+    "THF": {"temenos": ("Supple Skin", "North F1/F3-F5/F7 · East F3-F6"), "apollyon": ("Light Filament", "NE F2/F3 · NW F3-F5 · SE F1/F4 · SW F4"), "pieces": ("Rogue's Bonnet +1", "Rogue's Vest +1", "Rogue's Armlets +1", "Rogue's Culottes +1", "Rogue's Poulaines +1")},
+    "PLD": {"temenos": ("Snowy Cermet", "North F5/F6 · East F1-F3/F7"), "apollyon": ("White Rivet", "NE F1/F2 · NW F1/F3/F5 · SE F2/F4 · SW F4"), "pieces": ("Gallant Coronet +1", "Gallant Surcoat +1", "Gallant Gauntlets +1", "Gallant Breeches +1", "Gallant Leggings +1")},
+    "DRK": {"temenos": ("Dark Orichalcum", "West F2/F4 · East F1/F4/F5/F7"), "apollyon": ("Black Rivet", "NE F4 · NW F2/F4/F5 · SE F1/F3 · SW F1"), "pieces": ("Chaos Burgeonet +1", "Chaos Cuirass +1", "Chaos Gauntlets +1", "Chaos Flanchard +1", "Chaos Sollerets +1")},
+    "BST": {"temenos": ("Smalt Leather", "West F3/F5 · East F1/F2/F6/F7"), "apollyon": ("Fetid Lanolin", "NE F1/F2 · NW F3-F5 · SE F2 · SW F3/F4"), "pieces": ("Beast Helm +1", "Beast Jackcoat +1", "Beast Gloves +1", "Beast Trousers +1", "Beast Gaiters +1")},
+    "BRD": {"temenos": ("Coiled Yarn", "West F1-F3/F6/F7 · East F3/F6"), "apollyon": ("Brown Doeskin", "NE F4 · NW F2/F4/F5 · SE F3 · SW F1"), "pieces": ("Choral Roundlet +1", "Choral Justaucorps +1", "Choral Cuffs +1", "Choral Cannions +1", "Choral Slippers +1")},
+    "RNG": {"temenos": ("Chameleon Yarn", "North F2/F6 · East F1/F3-F5/F7"), "apollyon": ("Charcoal Cotton", "NE F4 · NW F2/F5 · SE F1-F3 · SW F2"), "pieces": ("Hunter's Beret +1", "Hunter's Jerkin +1", "Hunter's Bracers +1", "Hunter's Braccae +1", "Hunter's Socks +1")},
+    "SAM": {"temenos": ("Scarlet Odoshi", "West F1-F4/F6/F7 · East F3/F4"), "apollyon": ("Kurogane", "NE F1/F5 · NW F1/F5 · SE F4 · SW F2/F3"), "pieces": ("Myochin Kabuto +1", "Myochin Domaru +1", "Myochin Kote +1", "Myochin Haidate +1", "Myochin Sune-Ate +1")},
+    "NIN": {"temenos": ("Plaited Cord", "North F1/F2/F6/F7 · West F3-F6"), "apollyon": ("Ebony Lacquer", "NE F4 · NW F2/F5 · SE F2/F3 · SW F2/F3"), "pieces": ("Ninja Hatsuburi +1", "Ninja Chainmail +1", "Ninja Tekko +1", "Ninja Hakama +1", "Ninja Kyahan +1")},
+    "DRG": {"temenos": ("Cobalt Mythril Sheet", "North F1-F3/F6/F7 · East F5/F6"), "apollyon": ("Blue Rivet", "NE F2 · NW F1/F5 · SE F4 · SW F1"), "pieces": ("Drachen Armet +1", "Drachen Mail +1", "Drachen Finger Gauntlets +1", "Drachen Brais +1", "Drachen Greaves +1")},
+    "SMN": {"temenos": ("Glittering Yarn", "North F3-F5 · West F1/F4-F7"), "apollyon": ("Astral Leather", "NE F4 · NW F2/F4/F5 · SE F1-F3 · SW F2"), "pieces": ("Evoker's Horn +1", "Evoker's Doublet +1", "Evoker's Bracers +1", "Evoker's Spats +1", "Evoker's Pigaches +1")},
+}
+AF1_SLOTS = ("Head", "Body", "Hands", "Legs", "Feet")
+DYNAMIS_ACCESSORIES = {
+    "WAR": ("Warrior's Stone", "Waist", ("Dynamis - Valkurm", "Dynamis - Buburimu")),
+    "MNK": ("Melee Cape", "Back", ("Dynamis - Buburimu", "Dynamis - Qufim")),
+    "WHM": ("Cleric's Belt", "Waist", ("Dynamis - Valkurm", "Dynamis - Qufim")),
+    "BLM": ("Sorcerer's Belt", "Waist", ("Dynamis - Valkurm", "Dynamis - Buburimu")),
+    "RDM": ("Duelist's Belt", "Waist", ("Dynamis - Buburimu", "Dynamis - Qufim")),
+    "THF": ("Assassin's Cape", "Back", ("Dynamis - Valkurm", "Dynamis - Qufim")),
+    "PLD": ("Valor Cape", "Back", ("Dynamis - Valkurm", "Dynamis - Buburimu")),
+    "DRK": ("Abyss Cape", "Back", ("Dynamis - Buburimu", "Dynamis - Qufim")),
+    "BST": ("Monster Belt", "Waist", ("Dynamis - Valkurm", "Dynamis - Qufim")),
+    "BRD": ("Bard's Cape", "Back", ("Dynamis - Valkurm", "Dynamis - Buburimu")),
+    "RNG": ("Scout's Belt", "Waist", ("Dynamis - Buburimu", "Dynamis - Qufim")),
+    "SAM": ("Saotome Koshi-Ate", "Waist", ("Dynamis - Valkurm", "Dynamis - Qufim")),
+    "NIN": ("Koga Sarashi", "Waist", ("Dynamis - Valkurm", "Dynamis - Buburimu")),
+    "DRG": ("Wyrm Belt", "Waist", ("Dynamis - Buburimu", "Dynamis - Qufim")),
+    "SMN": ("Summoner's Cape", "Back", ("Dynamis - Valkurm", "Dynamis - Qufim")),
+}
+JOB_COLORS = {
+    "WAR": "#b84b42", "MNK": "#d47a3f", "WHM": "#e8e3d5", "BLM": "#7456a8",
+    "RDM": "#c44f62", "THF": "#d5b84a", "PLD": "#6e9ed2", "DRK": "#654078",
+    "BST": "#8b6848", "BRD": "#d47aaa", "RNG": "#4f9a68", "SAM": "#9c493f",
+    "NIN": "#58617d", "DRG": "#6659a8", "SMN": "#4f9b92",
+}
+
+
+def dynamis_catalog():
+    pieces = []
+    for job, relic_pieces in DYNAMIS_RELIC.items():
+        for item, slot, area in relic_pieces:
+            pieces.append({"key": f"dynamis:{job}:{slot.lower()}", "job": job,
+                           "item": item, "slot": slot, "area": area, "kind": "Relic armor"})
+        by_slot = {slot: item for item, slot, _area in relic_pieces}
+        dream_slots = {"Head": "Dynamis - Valkurm", "Hands": "Dynamis - Buburimu",
+                       "Feet": "Dynamis - Qufim", "Body": "Dynamis - Tavnazia",
+                       "Legs": "Dynamis - Tavnazia"}
+        for slot, area in dream_slots.items():
+            pieces.append({"key": f"dynamis:dream:{job}:{slot.lower()}", "job": job,
+                           "item": f"{by_slot[slot]} -1", "slot": slot, "area": area,
+                           "kind": "Relic armor -1"})
+        item, slot, areas = DYNAMIS_ACCESSORIES[job]
+        for area in areas:
+            pieces.append({"key": f"dynamis:accessory:{job}", "job": job, "item": item,
+                           "slot": slot, "area": area, "kind": "Relic accessory"})
+    return pieces
 
 MISSION_OPTIONS = {
     "ZILART": [
@@ -376,6 +467,13 @@ def create_app(test_config=None):
         value = session.get("member_id")
         return int(value) if value is not None else None
 
+    def current_member_name():
+        member_id = current_member_id()
+        if not member_id:
+            return "Administrator" if is_admin() else ""
+        member = get_db().execute("SELECT name FROM members WHERE id=?", (member_id,)).fetchone()
+        return member["name"] if member else ("Administrator" if is_admin() else "")
+
     def editor_required(view):
         @wraps(view)
         def wrapped(*args, **kwargs):
@@ -399,7 +497,7 @@ def create_app(test_config=None):
 
     app.jinja_env.globals.update(
         csrf_token=csrf_token, is_editor=is_editor, is_admin=is_admin,
-        current_member_id=current_member_id,
+        current_member_id=current_member_id, current_member_name=current_member_name,
     )
 
     @app.before_request
@@ -785,6 +883,120 @@ def create_app(test_config=None):
         ).fetchall()
         return render_template("members_admin.html", members=members)
 
+    @app.get("/alliance-builder")
+    @admin_required
+    def alliance_builder():
+        db = get_db()
+        events = db.execute(
+            """SELECT e.*, COUNT(s.member_id) member_count
+               FROM alliance_events e LEFT JOIN alliance_slots s ON s.event_id=e.id
+               GROUP BY e.id ORDER BY COALESCE(e.event_at, e.created_at) DESC, e.id DESC"""
+        ).fetchall()
+        event = None
+        event_id = request.args.get("event", "")
+        if event_id.isdigit():
+            event = db.execute("SELECT * FROM alliance_events WHERE id=?", (event_id,)).fetchone()
+            if not event:
+                abort(404)
+        slot_rows = db.execute(
+            "SELECT party_number,slot_number,member_id,job FROM alliance_slots WHERE event_id=?",
+            (event["id"],),
+        ).fetchall() if event else []
+        assignments = {
+            f"{row['party_number']}-{row['slot_number']}": {
+                "member_id": row["member_id"], "job": row["job"],
+            }
+            for row in slot_rows
+        }
+        member_rows = db.execute(
+            """SELECT m.id,m.name,j.job,j.level FROM members m
+               JOIN member_jobs j ON j.member_id=m.id
+               ORDER BY m.name COLLATE NOCASE,j.level DESC,j.job"""
+        ).fetchall()
+        roster = {}
+        for row in member_rows:
+            roster.setdefault(row["id"], {"id": row["id"], "name": row["name"], "jobs": {}})
+            roster[row["id"]]["jobs"][row["job"]] = row["level"]
+        return render_template(
+            "alliance_builder.html", events=events, event=event,
+            assignments=assignments, roster=list(roster.values()), jobs=JOBS,
+            role_jobs=ALLIANCE_ROLE_JOBS,
+        )
+
+    @app.post("/alliance-builder/save")
+    @admin_required
+    def save_alliance():
+        name = request.form.get("name", "").strip()
+        if not name or len(name) > 80:
+            abort(400, description="Enter an event name up to 80 characters.")
+        event_at_value = request.form.get("event_at", "").strip()
+        event_at = parse_local_datetime(event_at_value)
+        if event_at_value and not event_at:
+            abort(400, description="Choose a valid event date and time.")
+        notes = request.form.get("notes", "").strip()[:1000]
+        db = get_db()
+        event_id = request.form.get("event_id", "")
+        if event_id:
+            if not event_id.isdigit() or not db.execute(
+                    "SELECT 1 FROM alliance_events WHERE id=?", (event_id,)).fetchone():
+                abort(404)
+            db.execute(
+                "UPDATE alliance_events SET name=?,event_at=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (name, event_at.isoformat(timespec="minutes") if event_at else None, notes, event_id),
+            )
+            event_id = int(event_id)
+        else:
+            event_id = db.execute(
+                "INSERT INTO alliance_events(name,event_at,notes) VALUES(?,?,?)",
+                (name, event_at.isoformat(timespec="minutes") if event_at else None, notes),
+            ).lastrowid
+
+        roster_jobs = {
+            (row["member_id"], row["job"]): row["level"]
+            for row in db.execute("SELECT member_id,job,level FROM member_jobs")
+        }
+        selected_members = set()
+        slots = []
+        for party_number in range(1, 4):
+            for slot_number in range(1, 7):
+                member_value = request.form.get(f"member_{party_number}_{slot_number}", "").strip()
+                job = request.form.get(f"job_{party_number}_{slot_number}", "").strip().upper()
+                if not member_value and not job:
+                    continue
+                if not member_value.isdigit():
+                    abort(400, description="Choose a valid roster member for every occupied slot.")
+                member_id = int(member_value)
+                if (member_id, job) not in roster_jobs:
+                    abort(400, description="The selected member does not have that job in the roster.")
+                if member_id in selected_members:
+                    abort(400, description="A character can only occupy one alliance slot.")
+                selected_members.add(member_id)
+                slots.append((event_id, party_number, slot_number, member_id, job))
+        try:
+            db.execute("DELETE FROM alliance_slots WHERE event_id=?", (event_id,))
+            db.executemany(
+                "INSERT INTO alliance_slots(event_id,party_number,slot_number,member_id,job) VALUES(?,?,?,?,?)",
+                slots,
+            )
+            db.commit()
+        except sqlite3.DatabaseError:
+            db.rollback()
+            raise
+        flash(f"Saved alliance layout for {name}.", "success")
+        return redirect(url_for("alliance_builder", event=event_id))
+
+    @app.post("/alliance-builder/<int:event_id>/delete")
+    @admin_required
+    def delete_alliance(event_id):
+        db = get_db()
+        event = db.execute("SELECT name FROM alliance_events WHERE id=?", (event_id,)).fetchone()
+        if not event:
+            abort(404)
+        db.execute("DELETE FROM alliance_events WHERE id=?", (event_id,))
+        db.commit()
+        flash(f"Deleted alliance layout for {event['name']}.", "success")
+        return redirect(url_for("alliance_builder"))
+
     @app.get("/job-roster")
     def job_roster():
         db = get_db()
@@ -915,7 +1127,118 @@ def create_app(test_config=None):
 
     @app.get("/loot-tables")
     def loot_tables():
-        return render_template("loot_tables.html")
+        mode = request.args.get("mode", "general")
+        if mode not in {"general", "dynamis", "limbus"}:
+            mode = "general"
+        view = request.args.get("view", "area")
+        if view not in {"area", "job"}:
+            view = "area"
+        db = get_db()
+        members = db.execute("SELECT id,name FROM members ORDER BY name COLLATE NOCASE").fetchall()
+        target_id = current_member_id()
+        if is_admin() and request.args.get("member_id", "").isdigit():
+            target_id = int(request.args["member_id"])
+        target = db.execute("SELECT id,name FROM members WHERE id=?", (target_id,)).fetchone() if target_id else None
+        owned = {
+            row["item_key"] for row in db.execute(
+                "SELECT item_key FROM loot_ownership WHERE member_id=?", (target_id,)
+            ).fetchall()
+        } if target else set()
+        dynamis_by_area = {}
+        dynamis_by_job = {job: [] for job in sorted(DYNAMIS_RELIC)}
+        job_keys = set()
+        for piece in dynamis_catalog():
+            dynamis_by_area.setdefault(piece["area"], []).append(piece)
+            if piece["key"] not in job_keys:
+                dynamis_by_job[piece["job"]].append(dict(piece))
+                job_keys.add(piece["key"])
+            elif piece["kind"] == "Relic accessory":
+                tracked = next(row for row in dynamis_by_job[piece["job"]]
+                               if row["key"] == piece["key"])
+                tracked["area"] += f" / {piece['area'].replace('Dynamis - ', '')}"
+        area_order = ("Dynamis - San d'Oria", "Dynamis - Bastok", "Dynamis - Windurst",
+                      "Dynamis - Jeuno", "Dynamis - Beaucedine", "Dynamis - Xarcabard",
+                      "Dynamis - Valkurm", "Dynamis - Buburimu", "Dynamis - Qufim",
+                      "Dynamis - Tavnazia")
+        dynamis_by_area = {
+            area: sorted(dynamis_by_area.get(area, []), key=lambda piece: (piece["job"], piece["kind"], piece["slot"]))
+            for area in area_order
+        }
+        catalog_by_key = {piece["key"]: piece for piece in dynamis_catalog()}
+        dynamis_job_rows = {}
+        for job in sorted(DYNAMIS_RELIC):
+            rows = []
+            for _item, slot, _area in DYNAMIS_RELIC[job]:
+                rows.append({"main": catalog_by_key[f"dynamis:{job}:{slot.lower()}"],
+                             "minus": catalog_by_key[f"dynamis:dream:{job}:{slot.lower()}"]})
+            accessory = next(piece for piece in dynamis_by_job[job]
+                             if piece["kind"] == "Relic accessory")
+            dynamis_job_rows[job] = {"armor": rows, "accessory": accessory,
+                                      "color": JOB_COLORS[job]}
+        limbus_groups = {
+            boss: [{"key": f"limbus:{boss.lower()}:{slot.lower()}", "component": component,
+                    "item": item, "slot": slot} for component, item, slot in pieces]
+            for boss, pieces in LIMBUS_LOOT.items()
+        }
+        limbus_af1 = []
+        for job, group in sorted(LIMBUS_AF1.items()):
+            materials = []
+            for zone in ("apollyon", "temenos"):
+                item, floors = group[zone]
+                materials.append({"key": f"limbus:af1:{job}:{zone}", "zone": zone.title(),
+                                  "item": item, "floors": floors})
+            pieces = [
+                {"key": f"limbus:af1:{job}:{slot.lower()}", "slot": slot, "item": item}
+                for slot, item in zip(AF1_SLOTS, group["pieces"])
+            ]
+            limbus_af1.append({"job": job, "color": JOB_COLORS[job],
+                               "materials": materials, "pieces": pieces})
+        return render_template(
+            "loot_tables.html", mode=mode, tracker_view=view, members=members,
+            target_member=target, owned=owned, dynamis_relic=DYNAMIS_RELIC,
+            dynamis_by_job=dynamis_by_job,
+            dynamis_job_rows=dynamis_job_rows, job_colors=JOB_COLORS,
+            dynamis_by_area=dynamis_by_area, limbus_groups=limbus_groups,
+            limbus_af1=limbus_af1,
+        )
+
+    @app.post("/loot-tables/ownership")
+    @editor_required
+    def update_loot_ownership():
+        catalog = request.form.get("catalog", "")
+        if catalog not in {"dynamis", "limbus"}:
+            abort(400, description="Choose a valid loot tracker.")
+        target_id = current_member_id()
+        if is_admin() and request.form.get("member_id", "").isdigit():
+            target_id = int(request.form["member_id"])
+        if not target_id:
+            abort(403, description="Select your linkshell character before updating loot.")
+        db = get_db()
+        target = db.execute("SELECT id,name FROM members WHERE id=?", (target_id,)).fetchone()
+        if not target or (not is_admin() and target_id != current_member_id()):
+            abort(403, description="You can only update your own loot tracker.")
+        valid = set()
+        if catalog == "dynamis":
+            valid = {piece["key"] for piece in dynamis_catalog()}
+        else:
+            valid = {f"limbus:{boss.lower()}:{slot.lower()}" for boss, pieces in LIMBUS_LOOT.items()
+                     for _component, _item, slot in pieces}
+            valid.update(
+                f"limbus:af1:{job}:{part}"
+                for job in LIMBUS_AF1
+                for part in ("apollyon", "temenos", "head", "body", "hands", "legs", "feet")
+            )
+        selected = set(request.form.getlist("owned")) & valid
+        db.execute("DELETE FROM loot_ownership WHERE member_id=? AND item_key LIKE ?",
+                   (target_id, f"{catalog}:%"))
+        db.executemany("INSERT INTO loot_ownership(member_id,item_key) VALUES (?,?)",
+                       [(target_id, key) for key in sorted(selected)])
+        db.commit()
+        flash(f"Updated {target['name']}'s {catalog.title()} loot tracker.", "success")
+        destination = url_for("loot_tables", mode=catalog, view=request.form.get("view", "area"))
+        if is_admin():
+            destination += f"&member_id={target_id}"
+        return redirect(destination)
 
     @app.get("/api/map-assets")
     def map_assets():
@@ -941,8 +1264,11 @@ def create_app(test_config=None):
                                             "left": round((x * map_row["mult"] + map_row["xoff"]) / 512 * 100, 3),
                                             "top": round((-map_y * map_row["mult"] + map_row["yoff"]) / 512 * 100, 3)})
                             break
+                zone_id = loot.get("zone_ids", {}).get(zone_name) or MAP_ZONE_ID_OVERRIDES.get(zone_name)
+                if not zone_id:
+                    return jsonify({"maps": []})
                 maps = [{"map_id": row["id"], "label": f"Map {row['id']}",
-                         "url": url_for("calibrated_map_asset", zone_id=loot["zone_ids"][zone_name],
+                         "url": url_for("calibrated_map_asset", zone_id=zone_id,
                                         filename=f"map_{row['id']:02d}.png")}
                         for row in map_rows]
                 return jsonify({"maps": maps, "preferred_map": markers[0]["map_id"] if markers else maps[0]["map_id"],
@@ -1401,11 +1727,34 @@ def create_app(test_config=None):
     @editor_required
     def my_help_requests():
         member = require_member_identity()
-        rows = get_db().execute("""SELECT DISTINCT h.*, m.name requester_name,
-            EXISTS(SELECT 1 FROM help_volunteers v WHERE v.request_id=h.id AND v.member_id=?) volunteered
-            FROM help_requests h JOIN members m ON m.id=h.requester_id
-            WHERE h.requester_id=? OR volunteered=1 ORDER BY h.created_at DESC""", (member["id"], member["id"])).fetchall()
-        return render_template("my_help_requests.html", help_requests=rows, member=member)
+        db = get_db()
+        created_requests = db.execute(
+            """SELECT h.*, m.name requester_name,
+                      (SELECT COUNT(*) FROM help_volunteers v WHERE v.request_id=h.id) volunteer_count
+               FROM help_requests h
+               JOIN members m ON m.id=h.requester_id
+               WHERE h.requester_id=?
+               ORDER BY h.created_at DESC""",
+            (member["id"],),
+        ).fetchall()
+        volunteered_requests = db.execute(
+            """SELECT h.*, m.name requester_name, v.selected volunteer_selected,
+                      v.note volunteer_note, GROUP_CONCAT(vj.job) volunteer_jobs
+               FROM help_volunteers v
+               JOIN help_requests h ON h.id=v.request_id
+               JOIN members m ON m.id=h.requester_id
+               LEFT JOIN help_volunteer_jobs vj ON vj.volunteer_id=v.id
+               WHERE v.member_id=? AND h.requester_id<>?
+               GROUP BY h.id, v.id
+               ORDER BY v.updated_at DESC, h.created_at DESC""",
+            (member["id"], member["id"]),
+        ).fetchall()
+        return render_template(
+            "my_help_requests.html",
+            created_requests=created_requests,
+            volunteered_requests=volunteered_requests,
+            member=member,
+        )
 
     @app.get("/api/horizon-player/<name>")
     def horizon_player(name):

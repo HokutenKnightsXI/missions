@@ -1,0 +1,2067 @@
+{
+  "dynamis:BLM:body": {
+    "job": "BLM",
+    "level": 74,
+    "name": "Sorcerer's Coat",
+    "slot": "Body",
+    "stats": "DEF:41 MP+12\nElemental magic skill +5 Enmity-2\nAdds \"Refresh\" effect"
+  },
+  "dynamis:BLM:feet": {
+    "job": "BLM",
+    "level": 71,
+    "name": "Sorcerer's Sabots",
+    "slot": "Feet",
+    "stats": "DEF:14 MP+18 INT+2 Enmity-1\n\"Conserve MP\"+5"
+  },
+  "dynamis:BLM:hands": {
+    "job": "BLM",
+    "level": 72,
+    "name": "Sorcerer's Gloves",
+    "slot": "Hands",
+    "stats": "DEF:15 MP+24\nDark magic skill +10 Enmity-2\nBonus damage added to magic burst"
+  },
+  "dynamis:BLM:head": {
+    "job": "BLM",
+    "level": 75,
+    "name": "Sorcerer's Petasos",
+    "slot": "Head",
+    "stats": "DEF:23 MP+23\nEnfeebling magic skill +5\nElemental magic skill +10\nEnmity-2"
+  },
+  "dynamis:BLM:legs": {
+    "job": "BLM",
+    "level": 73,
+    "name": "Sorcerer's Tonban",
+    "slot": "Legs",
+    "stats": "DEF:30 MP+13 INT+3 Enmity-2\nElemental magic affected by day"
+  },
+  "dynamis:BRD:body": {
+    "job": "BRD",
+    "level": 74,
+    "name": "Bard's Justaucorps",
+    "slot": "Body",
+    "stats": "DEF:45 HP+19\nAttack+18\n\"Military Parade\""
+  },
+  "dynamis:BRD:feet": {
+    "job": "BRD",
+    "level": 71,
+    "name": "Bard's Slippers",
+    "slot": "Feet",
+    "stats": "DEF:14 HP+12\nParrying skill +3\nString instrument skill +3\nEnmity-2"
+  },
+  "dynamis:BRD:hands": {
+    "job": "BRD",
+    "level": 73,
+    "name": "Bard's Cuffs",
+    "slot": "Hands",
+    "stats": "DEF:18 HP+16 Evasion+5\nWind instrument skill +3\nEnmity-3"
+  },
+  "dynamis:BRD:head": {
+    "job": "BRD",
+    "level": 72,
+    "name": "Bard's Roundlet",
+    "slot": "Head",
+    "stats": "DEF:19 HP+13 CHR+5\nSinging skill +5 Enmity-3"
+  },
+  "dynamis:BRD:legs": {
+    "job": "BRD",
+    "level": 75,
+    "name": "Bard's Cannions",
+    "slot": "Legs",
+    "stats": "DEF:31 HP+17 MP+42\n\"Courtly Measure\""
+  },
+  "dynamis:BST:body": {
+    "job": "BST",
+    "level": 72,
+    "name": "Monster Jackcoat",
+    "slot": "Body",
+    "stats": "DEF:49 HP+21 INT+6\nAugments \"Reward\" II\n\"Charm\"+6"
+  },
+  "dynamis:BST:feet": {
+    "job": "BST",
+    "level": 74,
+    "name": "Monster Gaiters",
+    "slot": "Feet",
+    "stats": "DEF:14 HP+13 VIT+4\nEnhances \"Reward\" effect II\n\"Charm\"+3"
+  },
+  "dynamis:BST:hands": {
+    "job": "BST",
+    "level": 75,
+    "name": "Monster Gloves",
+    "slot": "Hands",
+    "stats": "DEF:15 HP+14 AGI+4\nAugments \"Call Beast\"\n\"Charm\"+4"
+  },
+  "dynamis:BST:head": {
+    "job": "BST",
+    "level": 71,
+    "name": "Monster Helm",
+    "slot": "Head",
+    "stats": "DEF:26 HP+19 CHR+4 Parrying skill +3\n\"Charm\"+5"
+  },
+  "dynamis:BST:legs": {
+    "job": "BST",
+    "level": 73,
+    "name": "Monster Trousers",
+    "slot": "Legs",
+    "stats": "DEF:34 HP+17 DEX+4\nHP recovered while healing +3\n\"Charm\"+2"
+  },
+  "dynamis:DRG:body": {
+    "job": "DRG",
+    "level": 74,
+    "name": "Wyrm Mail",
+    "slot": "Body",
+    "stats": "DEF:49 HP+24 Parrying skill +15\nEnhances \"Resist Blind\" effect \nAdds support job abilities to wyvern"
+  },
+  "dynamis:DRG:feet": {
+    "job": "DRG",
+    "level": 72,
+    "name": "Wyrm Greaves",
+    "slot": "Feet",
+    "stats": "DEF:16 HP+10 VIT+4 +10\nWyvern: HP recovered while healing +6"
+  },
+  "dynamis:DRG:hands": {
+    "job": "DRG",
+    "level": 62,
+    "name": "Wyrm Finger Gauntlets",
+    "slot": "Hands",
+    "stats": "DEF:11 HP+60 VIT+6 AGI-5 MND+1"
+  },
+  "dynamis:DRG:head": {
+    "job": "DRG",
+    "level": 75,
+    "name": "Wyrm Armet",
+    "slot": "Head",
+    "stats": "DEF:25 HP+16 STR+4 +10\nEnhances effect of wyvern's breath"
+  },
+  "dynamis:DRG:legs": {
+    "job": "DRG",
+    "level": 71,
+    "name": "Wyrm Brais",
+    "slot": "Legs",
+    "stats": "DEF:32 HP+13 DEX+5 \nEnhances \"High Jump\" effect\nWyvern: Physical Damage taken-5%"
+  },
+  "dynamis:DRK:body": {
+    "job": "DRK",
+    "level": 74,
+    "name": "Abyss Cuirass",
+    "slot": "Body",
+    "stats": "DEF:49 HP+20 MND+4 Accuracy+10\n\"Magic Atk. Bonus\"+10"
+  },
+  "dynamis:DRK:feet": {
+    "job": "DRK",
+    "level": 71,
+    "name": "Abyss Sollerets",
+    "slot": "Feet",
+    "stats": "DEF:17 MP+12\nEnfeebling magic skill +5 \nEnhances \"Last Resort\" effect"
+  },
+  "dynamis:DRK:hands": {
+    "job": "DRK",
+    "level": 72,
+    "name": "Abyss Gauntlets",
+    "slot": "Hands",
+    "stats": "DEF:20 MP+20 DEX+5 INT+8 \nDark magic skill +5"
+  },
+  "dynamis:DRK:head": {
+    "job": "DRK",
+    "level": 75,
+    "name": "Abyss Burgeonet",
+    "slot": "Head",
+    "stats": "DEF:27 HP+30 VIT+7 Attack+10\nEnhances \"Resist Paralyze\" effect"
+  },
+  "dynamis:DRK:legs": {
+    "job": "DRK",
+    "level": 73,
+    "name": "Abyss Flanchard",
+    "slot": "Legs",
+    "stats": "DEF:38 MP+18 MND+5\n\"Magic Def. Bonus\"+5\nDark magic skill +5"
+  },
+  "dynamis:MNK:body": {
+    "job": "MNK",
+    "level": 74,
+    "name": "Melee Cyclas",
+    "slot": "Body",
+    "stats": "DEF:44 HP+5% VIT+5\nAdds \"Regen\" effect \nHP recovered while healing +6"
+  },
+  "dynamis:MNK:feet": {
+    "job": "MNK",
+    "level": 71,
+    "name": "Melee Gaiters",
+    "slot": "Feet",
+    "stats": "DEF:15 HP+4% DEX+4\nGuarding skill +12\nEnhances \"Counterstance\" effect"
+  },
+  "dynamis:MNK:hands": {
+    "job": "MNK",
+    "level": 73,
+    "name": "Melee Gloves",
+    "slot": "Hands",
+    "stats": "DEF:15 HP+3% Attack+16 \n\"Subtle Blow\"+4\nEnhances \"Chakra\" effect II"
+  },
+  "dynamis:MNK:head": {
+    "job": "MNK",
+    "level": 75,
+    "name": "Melee Crown",
+    "slot": "Head",
+    "stats": "DEF:23 HP+5% STR+5\n\"Subtle Blow\"+6 Enmity-3"
+  },
+  "dynamis:MNK:legs": {
+    "job": "MNK",
+    "level": 72,
+    "name": "Melee Hose",
+    "slot": "Legs",
+    "stats": "DEF:31 HP+6% AGI+4\n\"Kick Attacks\"+5 \n\"Subtle Blow\"+5"
+  },
+  "dynamis:NIN:body": {
+    "job": "NIN",
+    "level": 74,
+    "name": "Koga Chainmail",
+    "slot": "Body",
+    "stats": "DEF:46 Accuracy+12 Attack+16\nRanged Accuracy+8 Ranged Attack+8"
+  },
+  "dynamis:NIN:feet": {
+    "job": "NIN",
+    "level": 72,
+    "name": "Koga Kyahan",
+    "slot": "Feet",
+    "stats": "DEF:15 VIT+7\nNinjutsu skill +10\nNighttime: DEX+7"
+  },
+  "dynamis:NIN:hands": {
+    "job": "NIN",
+    "level": 75,
+    "name": "Koga Tekko",
+    "slot": "Hands",
+    "stats": "DEF:18\n\"Ninja tool expertise\"\nNighttime: STR+12 Haste+4%"
+  },
+  "dynamis:NIN:head": {
+    "job": "NIN",
+    "level": 73,
+    "name": "Koga Hatsuburi",
+    "slot": "Head",
+    "stats": "DEF:22 HP+20\nEnhances ninjutsu damage\nNighttime: Parrying skill +10"
+  },
+  "dynamis:NIN:legs": {
+    "job": "NIN",
+    "level": 71,
+    "name": "Koga Hakama",
+    "slot": "Legs",
+    "stats": "DEF:31 HP+40\nEnhances \"Dual Wield\" effect\nNighttime: Evasion+10"
+  },
+  "dynamis:PLD:body": {
+    "job": "PLD",
+    "level": 75,
+    "name": "Valor Surcoat",
+    "slot": "Body",
+    "stats": "DEF:55 HP+23 DEX+3 Enmity+4\nAugments \"Cover\""
+  },
+  "dynamis:PLD:feet": {
+    "job": "PLD",
+    "level": 71,
+    "name": "Valor Leggings",
+    "slot": "Feet",
+    "stats": "DEF:19 HP+18 MND+3 Enmity+1\nEnhances \"Sentinel\" effect"
+  },
+  "dynamis:PLD:hands": {
+    "job": "PLD",
+    "level": 72,
+    "name": "Valor Gauntlets",
+    "slot": "Hands",
+    "stats": "DEF:22 HP+16 VIT+5 Enmity+3\n\"Shield Bash\"+10"
+  },
+  "dynamis:PLD:head": {
+    "job": "PLD",
+    "level": 73,
+    "name": "Valor Coronet",
+    "slot": "Head",
+    "stats": "DEF:28 HP+18\nHealing magic skill +10\nEnmity+3\nEnhances \"Rampart\" effect"
+  },
+  "dynamis:PLD:legs": {
+    "job": "PLD",
+    "level": 74,
+    "name": "Valor Breeches",
+    "slot": "Legs",
+    "stats": "DEF:43 HP+20 STR+5 Enmity+3\nSpell interruption rate down 10%"
+  },
+  "dynamis:RDM:body": {
+    "job": "RDM",
+    "level": 74,
+    "name": "Duelist's Tabard",
+    "slot": "Body",
+    "stats": "DEF:45 MP+24 AGI+4\nHealing magic skill +10\nEnhances \"Fast Cast\" effect"
+  },
+  "dynamis:RDM:feet": {
+    "job": "RDM",
+    "level": 71,
+    "name": "Duelist's Boots",
+    "slot": "Feet",
+    "stats": "DEF:15 MP+15 MND+4\n\"Magic Atk. Bonus\"+4\nEvasion skill +5"
+  },
+  "dynamis:RDM:hands": {
+    "job": "RDM",
+    "level": 72,
+    "name": "Duelist's Gloves",
+    "slot": "Hands",
+    "stats": "DEF:17 MP+18 INT+4\n\"Magic Def. Bonus\"+2\nEnhancing magic skill +15"
+  },
+  "dynamis:RDM:head": {
+    "job": "RDM",
+    "level": 75,
+    "name": "Duelist's Chapeau",
+    "slot": "Head",
+    "stats": "DEF:24 MP+14 +10\nEnfeebling magic skill +15\nAdds \"Refresh\" effect"
+  },
+  "dynamis:RDM:legs": {
+    "job": "RDM",
+    "level": 73,
+    "name": "Duelist's Tights",
+    "slot": "Legs",
+    "stats": "DEF:33 MP+16 DEX+5\nElemental magic skill +10\nEnhances effect of \"Spikes\" spells"
+  },
+  "dynamis:RNG:body": {
+    "job": "RNG",
+    "level": 75,
+    "name": "Scout's Jerkin",
+    "slot": "Body",
+    "stats": "DEF:45 HP+23 DEX+4\n\"Rapid Shot\"+5\nEnmity-3"
+  },
+  "dynamis:RNG:feet": {
+    "job": "RNG",
+    "level": 74,
+    "name": "Scout's Socks",
+    "slot": "Feet",
+    "stats": "DEF:16 HP+12 VIT+5\nRanged Attack+10 Enmity-3"
+  },
+  "dynamis:RNG:hands": {
+    "job": "RNG",
+    "level": 71,
+    "name": "Scout's Bracers",
+    "slot": "Hands",
+    "stats": "DEF:14 HP+13 AGI+5\nEvasion+7 Enmity-2"
+  },
+  "dynamis:RNG:head": {
+    "job": "RNG",
+    "level": 73,
+    "name": "Scout's Beret",
+    "slot": "Head",
+    "stats": "DEF:24 HP+15 MND+4 Enmity-3\n\"Recycle\""
+  },
+  "dynamis:RNG:legs": {
+    "job": "RNG",
+    "level": 72,
+    "name": "Scout's Braccae",
+    "slot": "Legs",
+    "stats": "DEF:32 HP+18 Ranged Accuracy+7\nParrying skill +10 Enmity-2"
+  },
+  "dynamis:SAM:body": {
+    "job": "SAM",
+    "level": 74,
+    "name": "Saotome Domaru",
+    "slot": "Body",
+    "stats": "DEF:50 HP+34 VIT+6\n\"Store TP\"+3\nEnmity+1"
+  },
+  "dynamis:SAM:feet": {
+    "job": "SAM",
+    "level": 71,
+    "name": "Saotome Sune-Ate",
+    "slot": "Feet",
+    "stats": "DEF:18 HP+23 DEX+5\nAttack+8 Enmity+1"
+  },
+  "dynamis:SAM:hands": {
+    "job": "SAM",
+    "level": 73,
+    "name": "Saotome Kote",
+    "slot": "Hands",
+    "stats": "DEF:21 HP+10 Attack+10 Enmity+1\nEnhances \"Meditate\" effect"
+  },
+  "dynamis:SAM:head": {
+    "job": "SAM",
+    "level": 75,
+    "name": "Saotome Kabuto",
+    "slot": "Head",
+    "stats": "DEF:25 HP+20 Accuracy+10\nRanged Accuracy+5 Enmity+1"
+  },
+  "dynamis:SAM:legs": {
+    "job": "SAM",
+    "level": 72,
+    "name": "Saotome Haidate",
+    "slot": "Legs",
+    "stats": "DEF:40 HP+18 AGI+3 Enmity+1\nAugments \"Third Eye\""
+  },
+  "dynamis:SMN:body": {
+    "job": "SMN",
+    "level": 74,
+    "name": "Summoner's Doublet",
+    "slot": "Body",
+    "stats": "DEF:38 MP+20\n\"Blood Pact\" ability delay -3\nAvatar: Critical hit rate+3%\nDepending on day:\nAvatar perpetuation cost -3"
+  },
+  "dynamis:SMN:feet": {
+    "job": "SMN",
+    "level": 73,
+    "name": "Summoner's Pigaches",
+    "slot": "Feet",
+    "stats": "DEF:14 MP+20 VIT+3\nAvatar: Enhances attack\n\"Blood Pact\" ability delay -2"
+  },
+  "dynamis:SMN:hands": {
+    "job": "SMN",
+    "level": 72,
+    "name": "Summoner's Bracers",
+    "slot": "Hands",
+    "stats": "DEF:15 MP+25\nSummoning magic skill +10\n\"Blood Pact\" ability delay -2\nAvatar: Enhances accuracy"
+  },
+  "dynamis:SMN:head": {
+    "job": "SMN",
+    "level": 75,
+    "name": "Summoner's Horn",
+    "slot": "Head",
+    "stats": "DEF:18 MP+25 INT+3\n\"Blood Pact\" ability delay -3\nWeather: Avatar perpetuation cost -3"
+  },
+  "dynamis:SMN:legs": {
+    "job": "SMN",
+    "level": 71,
+    "name": "Summoner's Spats",
+    "slot": "Legs",
+    "stats": "DEF:29 MP+20 MND+3\nShortens magic recast time for\nelemental avatars\n\"Blood Pact\" ability delay -2"
+  },
+  "dynamis:THF:body": {
+    "job": "THF",
+    "level": 72,
+    "name": "Assassin's Vest",
+    "slot": "Body",
+    "stats": "DEF:45 HP+22 AGI+4 Enmity+3\nIncreases rate of critical hits"
+  },
+  "dynamis:THF:feet": {
+    "job": "THF",
+    "level": 73,
+    "name": "Assassin's Poulaines",
+    "slot": "Feet",
+    "stats": "DEF:15 HP+15 CHR+5\n\"Triple Attack\"+1%\nEnmity+2"
+  },
+  "dynamis:THF:hands": {
+    "job": "THF",
+    "level": 75,
+    "name": "Assassin's Armlets",
+    "slot": "Hands",
+    "stats": "DEF:16 HP+7 CHR+5 Enmity+3\n\"Treasure Hunter\"+1"
+  },
+  "dynamis:THF:head": {
+    "job": "THF",
+    "level": 71,
+    "name": "Assassin's Bonnet",
+    "slot": "Head",
+    "stats": "DEF:24 HP+16 DEX+5 Enmity+2\nEnhances \"Mug\" effect"
+  },
+  "dynamis:THF:legs": {
+    "job": "THF",
+    "level": 74,
+    "name": "Assassin's Culottes",
+    "slot": "Legs",
+    "stats": "DEF:34 HP+19 Enmity+4 \"Steal\"+5\nEnhances \"Gilfinder\" effect"
+  },
+  "dynamis:WAR:body": {
+    "job": "WAR",
+    "level": 75,
+    "name": "Warrior's Lorica",
+    "slot": "Body",
+    "stats": "DEF:50 HP+10 Attack+10 Enmity+4\nEnhances \"Aggressor\" effect"
+  },
+  "dynamis:WAR:feet": {
+    "job": "WAR",
+    "level": 71,
+    "name": "Warrior's Calligae",
+    "slot": "Feet",
+    "stats": "DEF:19 HP+10 AGI+5 Enmity+1\nEnhances \"Berserk\" effect"
+  },
+  "dynamis:WAR:hands": {
+    "job": "WAR",
+    "level": 72,
+    "name": "Warrior's Mufflers",
+    "slot": "Hands",
+    "stats": "DEF:22 HP+20 VIT+5\nAttack+12 Enmity+2"
+  },
+  "dynamis:WAR:head": {
+    "job": "WAR",
+    "level": 73,
+    "name": "Warrior's Mask",
+    "slot": "Head",
+    "stats": "DEF:28 DEX+5\nParrying skill +5\nEnmity+1\nEnhances \"Warcry\" effect"
+  },
+  "dynamis:WAR:legs": {
+    "job": "WAR",
+    "level": 74,
+    "name": "Warrior's Cuisses",
+    "slot": "Legs",
+    "stats": "DEF:39 STR+5 Enmity+3\n\"Double Attack\"+1%"
+  },
+  "dynamis:WHM:body": {
+    "job": "WHM",
+    "level": 74,
+    "name": "Cleric's Bliaut",
+    "slot": "Body",
+    "stats": "DEF:42 MP+24 Enmity-2\nAdds \"Refresh\" effect\nEnhances potency of \"Regen\""
+  },
+  "dynamis:WHM:feet": {
+    "job": "WHM",
+    "level": 71,
+    "name": "Cleric's Duckbills",
+    "slot": "Feet",
+    "stats": "DEF:15 MP+18 MND+5\nEnhancing magic skill +10\nEnmity-1"
+  },
+  "dynamis:WHM:hands": {
+    "job": "WHM",
+    "level": 75,
+    "name": "Cleric's Mitts",
+    "slot": "Hands",
+    "stats": "DEF:16 MP+20\nEnfeebling magic skill +15\nEnmity-3\nEnhances potency of\n\"Banish\" vs. undead"
+  },
+  "dynamis:WHM:head": {
+    "job": "WHM",
+    "level": 72,
+    "name": "Cleric's Cap",
+    "slot": "Head",
+    "stats": "DEF:24 MP+25 VIT+4 Enmity-4\nEnhances \"Resist Silence\" effect"
+  },
+  "dynamis:WHM:legs": {
+    "job": "WHM",
+    "level": 73,
+    "name": "Cleric's Pantaloons",
+    "slot": "Legs",
+    "stats": "DEF:31 MP+17\nHealing magic skill +15 Enmity-2\nElemental resistance spells +20"
+  },
+  "dynamis:accessory:BLM": {
+    "job": "BLM",
+    "level": 70,
+    "name": "Sorcerer's Belt",
+    "slot": "Waist",
+    "stats": "DEF:4 HP+20 INT+6\nSpell interruption rate down 8%"
+  },
+  "dynamis:accessory:BRD": {
+    "job": "BRD",
+    "level": 70,
+    "name": "Bard's Cape",
+    "slot": "Back",
+    "stats": "DEF:6 CHR+7 Accuracy+7 Evasion+7"
+  },
+  "dynamis:accessory:BST": {
+    "job": "BST",
+    "level": 70,
+    "name": "Monster Belt",
+    "slot": "Waist",
+    "stats": "DEF:5 CHR+6 Accuracy+7 Enmity-3 "
+  },
+  "dynamis:accessory:DRG": {
+    "job": "DRG",
+    "level": 70,
+    "name": "Wyrm Belt",
+    "slot": "Waist",
+    "stats": "DEF:5 VIT+5 Accuracy+7 Attack+7"
+  },
+  "dynamis:accessory:DRK": {
+    "job": "DRK",
+    "level": 70,
+    "name": "Abyss Cape",
+    "slot": "Back",
+    "stats": "DEF:6 Accuracy+7\nMagic Accuracy+7\nWeapon Skill Accuracy+7"
+  },
+  "dynamis:accessory:MNK": {
+    "job": "MNK",
+    "level": 70,
+    "name": "Melee Cape",
+    "slot": "Back",
+    "stats": "DEF:8 VIT+5 MND+5\nHP recovered while healing +5"
+  },
+  "dynamis:accessory:NIN": {
+    "job": "NIN",
+    "level": 70,
+    "name": "Koga Sarashi",
+    "slot": "Waist",
+    "stats": "DEF:4 Evasion+4\nMagic Accuracy+2\nHaste+4%"
+  },
+  "dynamis:accessory:PLD": {
+    "job": "PLD",
+    "level": 70,
+    "name": "Valor Cape",
+    "slot": "Back",
+    "stats": "DEF:16 HP+40 VIT+6 Enmity+3 "
+  },
+  "dynamis:accessory:RDM": {
+    "job": "RDM",
+    "level": 70,
+    "name": "Duelist's Belt",
+    "slot": "Waist",
+    "stats": "DEF:4 INT+4 MND+4\nHP recovered while healing +4 \nMP recovered while healing +4"
+  },
+  "dynamis:accessory:RNG": {
+    "job": "RNG",
+    "level": 70,
+    "name": "Scout's Belt",
+    "slot": "Waist",
+    "stats": "DEF:4 AGI+5 Ranged Accuracy+7\nRanged Attack+7 "
+  },
+  "dynamis:accessory:SAM": {
+    "job": "SAM",
+    "level": 73,
+    "name": "Saotome Koshi-Ate",
+    "slot": "Waist",
+    "stats": "DEF:21 HP+10 Attack+10 Enmity+1\nEnhances \"Meditate\" effect"
+  },
+  "dynamis:accessory:SMN": {
+    "job": "SMN",
+    "level": 70,
+    "name": "Summoner's Cape",
+    "slot": "Back",
+    "stats": "DEF:6 HP+30 MP+30 Enmity-1"
+  },
+  "dynamis:accessory:THF": {
+    "job": "THF",
+    "level": 70,
+    "name": "Assassin's Cape",
+    "slot": "Back",
+    "stats": "DEF:7 DEX+4 AGI+4 Enmity+5"
+  },
+  "dynamis:accessory:WAR": {
+    "job": "WAR",
+    "level": 70,
+    "name": "Warrior's Stone",
+    "slot": "Waist",
+    "stats": "DEF:5 STR+5 Accuracy+7\nEnemy critical hit rate -2%"
+  },
+  "dynamis:accessory:WHM": {
+    "job": "WHM",
+    "level": 70,
+    "name": "Cleric's Belt",
+    "slot": "Waist",
+    "stats": "DEF:4 MP+40 MND+6\nMP recovered while healing +3"
+  },
+  "dynamis:dream:BLM:body": {
+    "job": "BLM",
+    "level": 75,
+    "name": "Sorcerer's Coat -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Sorcerer's Coat +1\nDEF:42 HP+12 MP+12\nElemental magic skill +7 Enmity-2\nAdds \"Refresh\" effect"
+  },
+  "dynamis:dream:BLM:feet": {
+    "job": "BLM",
+    "level": 75,
+    "name": "Sorcerer's Sabots -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Sorcerer's Sabots +1\nDEF:15 MP+18 INT+3 Enmity-2\n\"Conserve MP\"+5"
+  },
+  "dynamis:dream:BLM:hands": {
+    "job": "BLM",
+    "level": 75,
+    "name": "Sorcerer's Gloves -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Sorcerer's Gloves +1\nDEF:16 MP+24\nDark magic skill +12 Enmity-3 \nBonus damage added to magic burst"
+  },
+  "dynamis:dream:BLM:head": {
+    "job": "BLM",
+    "level": 75,
+    "name": "Sorcerer's Petasos -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Sorcerer's Petasos +1\nDEF:24 MP+29\nEnfeebling magic skill +5\nElemental magic skill +10\nEnmity-3"
+  },
+  "dynamis:dream:BLM:legs": {
+    "job": "BLM",
+    "level": 75,
+    "name": "Sorcerer's Tonban -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Sorcerer's Tonban +1\nDEF:31 MP+20 INT+3 Enmity-3 \nElemental magic affected by day"
+  },
+  "dynamis:dream:BRD:body": {
+    "job": "BRD",
+    "level": 58,
+    "name": "Bard's Justaucorps -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Bard's Justaucorps +1\nDEF:37 HP+15 STR-1 DEX-1 VIT-1 \nAGI-1 INT+3 MND+3 CHR+3"
+  },
+  "dynamis:dream:BRD:feet": {
+    "job": "BRD",
+    "level": 75,
+    "name": "Bard's Slippers -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Bard's Slippers +1\nDEF:15 HP+12\nParrying skill +4\nString instrument skill +3\nEnmity-3"
+  },
+  "dynamis:dream:BRD:hands": {
+    "job": "BRD",
+    "level": 75,
+    "name": "Bard's Cuffs -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Bard's Cuffs +1\nDEF:19 HP+16 Evasion+5\nWind instrument skill +5 \nEnmity-4 "
+  },
+  "dynamis:dream:BRD:head": {
+    "job": "BRD",
+    "level": 75,
+    "name": "Bard's Roundlet -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Bard's Roundlet +1\nDEF:20 HP+13 CHR+6\nSinging skill +5 Enmity-4"
+  },
+  "dynamis:dream:BRD:legs": {
+    "job": "BRD",
+    "level": 75,
+    "name": "Bard's Cannions -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Bard's Cannions +1\nDEF:32 HP+26 MP+42\n\"Courtly Measure\""
+  },
+  "dynamis:dream:BST:body": {
+    "job": "BST",
+    "level": 75,
+    "name": "Monster Jackcoat -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Monster Jackcoat +1\nDEF:50 HP+21 INT+7\nAugments \"Reward\" II\n\"Charm\"+7 "
+  },
+  "dynamis:dream:BST:feet": {
+    "job": "BST",
+    "level": 75,
+    "name": "Monster Gaiters -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Monster Gaiters +1\nDEF:15 HP+13 VIT+5\nEnhances \"Reward\" effect II\n\"Charm\"+3 "
+  },
+  "dynamis:dream:BST:hands": {
+    "job": "BST",
+    "level": 75,
+    "name": "Monster Gloves -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Monster Gloves +1\nDEF:16 HP+20 AGI+5\nAugments \"Call Beast\" \n\"Charm\"+4"
+  },
+  "dynamis:dream:BST:head": {
+    "job": "BST",
+    "level": 75,
+    "name": "Monster Helm -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Monster Helm +1\nDEF:27 HP+19 MP+19 CHR+5\nParrying skill +3\n\"Charm\"+5"
+  },
+  "dynamis:dream:BST:legs": {
+    "job": "BST",
+    "level": 75,
+    "name": "Monster Trousers -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Monster Trousers +1\nDEF:35 HP+17 DEX+5\nHP recovered while healing +4\n\"Charm\"+2"
+  },
+  "dynamis:dream:DRG:body": {
+    "job": "DRG",
+    "level": 75,
+    "name": "Wyrm Mail -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Wyrm Mail +1\nDEF:50 HP+33 Parrying skill +15\nHaste+2%\nAdds support job abilities to wyvern"
+  },
+  "dynamis:dream:DRG:feet": {
+    "job": "DRG",
+    "level": 75,
+    "name": "Wyrm Greaves -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Wyrm Greaves +1\nDEF:17 HP+10 VIT+5 +10 \nWyvern: HP recovered while healing +7"
+  },
+  "dynamis:dream:DRG:hands": {
+    "job": "DRG",
+    "level": 119,
+    "name": "Wyrm Finger Gauntlets -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Wyrm Finger Gauntlets +1\nDEF:106 HP+22 MP+59 STR+25 DEX+30\nVIT+25 AGI+25 INT+30 MND+25 CHR+25\nAccuracy+40 Attack+40 Ranged Accuracy+40 Ranged Attack+40 Magic Accuracy+40 \"Magic Atk. Bonus\"+35\nEvasion+71 Magic Evasion+72 \"Magic Def. Bonus\"+2 Haste+4%\nDamage taken-6%"
+  },
+  "dynamis:dream:DRG:head": {
+    "job": "DRG",
+    "level": 75,
+    "name": "Wyrm Armet -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Wyrm Armet +1\nDEF:26 HP+16 STR+5 Attack+2\nEnhances effect of wyvern's breath"
+  },
+  "dynamis:dream:DRG:legs": {
+    "job": "DRG",
+    "level": 75,
+    "name": "Wyrm Brais -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Wyrm Brais +1\nDEF:33 HP+13 DEX+6\nEnhances \"High Jump\" effect\nWyvern: Physical Damage taken-6% "
+  },
+  "dynamis:dream:DRK:body": {
+    "job": "DRK",
+    "level": 75,
+    "name": "Abyss Cuirass -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Abyss Cuirass +1\nDEF:50 HP+27 MND+4 Accuracy+12 \n\"Magic Atk. Bonus\"+10"
+  },
+  "dynamis:dream:DRK:feet": {
+    "job": "DRK",
+    "level": 75,
+    "name": "Abyss Sollerets -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Abyss Sollerets +1\nDEF:18 MP+12 Accuracy+2\nEnfeebling magic skill +5\nEnhances \"Last Resort\" effect"
+  },
+  "dynamis:dream:DRK:hands": {
+    "job": "DRK",
+    "level": 75,
+    "name": "Abyss Gauntlets -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Abyss Gauntlets +1\nDEF:21 MP+20 DEX+5 INT+9 \nDark magic skill +7"
+  },
+  "dynamis:dream:DRK:head": {
+    "job": "DRK",
+    "level": 75,
+    "name": "Abyss Burgeonet -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Abyss Burgeonet +1\nDEF:28 HP+30 VIT+8 Attack+12 \nEnhances \"Resist Paralyze\" effect"
+  },
+  "dynamis:dream:DRK:legs": {
+    "job": "DRK",
+    "level": 75,
+    "name": "Abyss Flanchard -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Abyss Flanchard +1\nDEF:39 HP+18 MP+18 MND+5\n\"Magic Def. Bonus\"+5\nDark magic skill +7"
+  },
+  "dynamis:dream:MNK:body": {
+    "job": "MNK",
+    "level": 75,
+    "name": "Melee Cyclas -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Melee Cyclas +1\nDEF:45 HP+6% VIT+6\nAdds \"Regen\" effect \nHP recovered while healing +6"
+  },
+  "dynamis:dream:MNK:feet": {
+    "job": "MNK",
+    "level": 75,
+    "name": "Melee Gaiters -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Melee Gaiters +1\nDEF:16 HP+4% DEX+5\nGuarding skill +14\nEnhances \"Counterstance\" effect"
+  },
+  "dynamis:dream:MNK:hands": {
+    "job": "MNK",
+    "level": 75,
+    "name": "Melee Gloves -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Melee Gloves +1\nDEF:16 HP+3% Attack+18\n\"Subtle Blow\"+5 \nEnhances \"Chakra\" effect II"
+  },
+  "dynamis:dream:MNK:head": {
+    "job": "MNK",
+    "level": 75,
+    "name": "Melee Crown -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Melee Crown +1\nDEF:24 HP+5% STR+6\n\"Subtle Blow\"+6 Enmity-4"
+  },
+  "dynamis:dream:MNK:legs": {
+    "job": "MNK",
+    "level": 75,
+    "name": "Melee Hose -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Melee Hose +1\nDEF:32 HP+6% AGI+5\n\"Kick Attacks\"+5\n\"Subtle Blow\"+6"
+  },
+  "dynamis:dream:NIN:body": {
+    "job": "NIN",
+    "level": 75,
+    "name": "Koga Chainmail -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Koga Chainmail +1\nDEF:47 Accuracy+12 Attack+16\nRanged Accuracy+10 Ranged Attack+10"
+  },
+  "dynamis:dream:NIN:feet": {
+    "job": "NIN",
+    "level": 75,
+    "name": "Koga Kyahan -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Koga Kyahan +1\nDEF:16 VIT+8\nNinjutsu skill +12\nDusk to dawn: DEX+7"
+  },
+  "dynamis:dream:NIN:hands": {
+    "job": "NIN",
+    "level": 75,
+    "name": "Koga Tekko -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Koga Tekko +1\nDEF:19\n\"Ninja tool expertise\"\nDusk to dawn: STR+13 Haste+4%"
+  },
+  "dynamis:dream:NIN:head": {
+    "job": "NIN",
+    "level": 75,
+    "name": "Koga Hatsuburi -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Koga Hatsuburi +1\nDEF:23 HP+27\nEnhances ninjutsu damage\nDusk to dawn: Parrying skill +12"
+  },
+  "dynamis:dream:NIN:legs": {
+    "job": "NIN",
+    "level": 75,
+    "name": "Koga Hakama -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Koga Hakama +1\nDEF:32 HP+40\nEnhances \"Dual Wield\" effect\nDusk to dawn: Evasion+12 "
+  },
+  "dynamis:dream:PLD:body": {
+    "job": "PLD",
+    "level": 75,
+    "name": "Valor Surcoat -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Valor Surcoat +1\nDEF:56 HP+30 DEX+3 Enmity+5 \nAugments \"Cover\""
+  },
+  "dynamis:dream:PLD:feet": {
+    "job": "PLD",
+    "level": 75,
+    "name": "Valor Leggings -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Valor Leggings +1\nDEF:20 HP+18 MND+4 Enmity+2\nEnhances \"Sentinel\" effect"
+  },
+  "dynamis:dream:PLD:hands": {
+    "job": "PLD",
+    "level": 75,
+    "name": "Valor Gauntlets -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Valor Gauntlets +1\nDEF:23 HP+16 VIT+6 Enmity+4 \n\"Shield Bash\"+10"
+  },
+  "dynamis:dream:PLD:head": {
+    "job": "PLD",
+    "level": 75,
+    "name": "Valor Coronet -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Valor Coronet +1\nDEF:29 HP+18 MP+18\nHealing magic skill +10\nEnmity+4\nEnhances \"Rampart\" effect"
+  },
+  "dynamis:dream:PLD:legs": {
+    "job": "PLD",
+    "level": 75,
+    "name": "Valor Breeches -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Valor Breeches +1\nDEF:44 HP+20 STR+6 Enmity+4 \nSpell interruption rate down 10%"
+  },
+  "dynamis:dream:RDM:body": {
+    "job": "RDM",
+    "level": 75,
+    "name": "Duelist's Tabard -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Duelist's Tabard +1\nDEF:46 MP+30 AGI+4\nHealing magic skill +12 \nEnhances \"Fast Cast\" effect"
+  },
+  "dynamis:dream:RDM:feet": {
+    "job": "RDM",
+    "level": 75,
+    "name": "Duelist's Boots -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Duelist's Boots +1\nDEF:16 MP+15 MND+5\n\"Magic Atk. Bonus\"+5\nEvasion skill +5"
+  },
+  "dynamis:dream:RDM:hands": {
+    "job": "RDM",
+    "level": 75,
+    "name": "Duelist's Gloves -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Duelist's Gloves +1\nDEF:18 MP+23 INT+5\n\"Magic Def. Bonus\"+2\nEnhancing magic skill +15"
+  },
+  "dynamis:dream:RDM:head": {
+    "job": "RDM",
+    "level": 75,
+    "name": "Duelist's Chapeau -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Duelist's Chapeau +1\nDEF:25 HP+14 MP+14 MND+3 \nEnfeebling magic skill +15\nAdds \"Refresh\" effect"
+  },
+  "dynamis:dream:RDM:legs": {
+    "job": "RDM",
+    "level": 75,
+    "name": "Duelist's Tights -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Duelist's Tights +1\nDEF:34 MP+16 DEX+6\nElemental magic skill +12 \nEnhances effect of \"Spikes\" spells"
+  },
+  "dynamis:dream:RNG:body": {
+    "job": "RNG",
+    "level": 75,
+    "name": "Scout's Jerkin -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Scout's Jerkin +1\nDEF:46 HP+23 DEX+5\n\"Rapid Shot\"+5\nEnmity-4"
+  },
+  "dynamis:dream:RNG:feet": {
+    "job": "RNG",
+    "level": 75,
+    "name": "Scout's Socks -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Scout's Socks +1\nDEF:17 HP+12 VIT+5\nRanged Attack+12 Enmity-4 "
+  },
+  "dynamis:dream:RNG:hands": {
+    "job": "RNG",
+    "level": 75,
+    "name": "Scout's Bracers -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Scout's Bracers +1\nDEF:15 HP+13 AGI+6\nEvasion+9 Enmity-2 "
+  },
+  "dynamis:dream:RNG:head": {
+    "job": "RNG",
+    "level": 75,
+    "name": "Scout's Beret -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Scout's Beret +1\nDEF:25 HP+15 MND+5 Enmity-4\n\"Recycle\""
+  },
+  "dynamis:dream:RNG:legs": {
+    "job": "RNG",
+    "level": 75,
+    "name": "Scout's Braccae -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Scout's Braccae +1\nDEF:33 HP+18 Ranged Accuracy+9\nParrying skill +10 Enmity-3"
+  },
+  "dynamis:dream:SAM:body": {
+    "job": "SAM",
+    "level": 75,
+    "name": "Saotome Domaru -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Saotome Domaru +1\nDEF:51 HP+34 VIT+7\n\"Store TP\"+5\nEnmity+1"
+  },
+  "dynamis:dream:SAM:feet": {
+    "job": "SAM",
+    "level": 75,
+    "name": "Saotome Sune-Ate -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Saotome Sune-Ate +1\nDEF:19 HP+23 DEX+6\nAttack+10 Enmity+1 "
+  },
+  "dynamis:dream:SAM:hands": {
+    "job": "SAM",
+    "level": 75,
+    "name": "Saotome Kote -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Saotome Kote +1\nDEF:22 HP+20 Attack+12 Enmity+1\nEnhances \"Meditate\" effect "
+  },
+  "dynamis:dream:SAM:head": {
+    "job": "SAM",
+    "level": 75,
+    "name": "Saotome Kabuto -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Saotome Kabuto +1\nDEF:26 HP+20 Accuracy+12\nRanged Accuracy+7 Enmity+1"
+  },
+  "dynamis:dream:SAM:legs": {
+    "job": "SAM",
+    "level": 75,
+    "name": "Saotome Haidate -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Saotome Haidate +1\nDEF:41 HP+33 AGI+4 Enmity+1 \nAugments \"Third Eye\""
+  },
+  "dynamis:dream:SMN:body": {
+    "job": "SMN",
+    "level": 75,
+    "name": "Summoner's Doublet -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Summoner's Doublet +1\nDEF:39 MP+20\n\"Blood Pact\" ability delay -4 \nAvatar: Critical hit rate+4%  \nDepending on day:\nAvatar perpetuation cost -3"
+  },
+  "dynamis:dream:SMN:feet": {
+    "job": "SMN",
+    "level": 75,
+    "name": "Summoner's Pigaches -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Summoner's Pigaches +1\nDEF:15 MP+25\nAvatar: Enhances attack\nAvatar: Enmity+2\n\"Blood Pact\" ability delay -2"
+  },
+  "dynamis:dream:SMN:hands": {
+    "job": "SMN",
+    "level": 75,
+    "name": "Summoner's Bracers -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Summoner's Bracers +1\nDEF:16 MP+30\nSummoning magic skill +12\n\"Blood Pact\" ability delay -2\nAvatar: Enhances accuracy"
+  },
+  "dynamis:dream:SMN:head": {
+    "job": "SMN",
+    "level": 75,
+    "name": "Summoner's Horn -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Summoner's Horn +1\nDEF:19 MP+30 INT+4\n\"Blood Pact\" ability delay -3 \nWeather: Avatar perpetuation cost -3"
+  },
+  "dynamis:dream:SMN:legs": {
+    "job": "SMN",
+    "level": 75,
+    "name": "Summoner's Spats -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Summoner's Spats +1\nDEF:30 MP+25\nShortens magic recast time for\nelemental avatars\n\"Blood Pact\" ability delay -2\nAvatar: Enmity+2"
+  },
+  "dynamis:dream:THF:body": {
+    "job": "THF",
+    "level": 75,
+    "name": "Assassin's Vest -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Assassin's Vest +1\nDEF:46 HP+22 AGI+5 Enmity+5 \nIncreases rate of critical hits"
+  },
+  "dynamis:dream:THF:feet": {
+    "job": "THF",
+    "level": 75,
+    "name": "Assassin's Poulaines -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Assassin's Poulaines +1\nDEF:16 HP+15 CHR+6\n\"Triple Attack\"+1%\nEnmity+3"
+  },
+  "dynamis:dream:THF:hands": {
+    "job": "THF",
+    "level": 75,
+    "name": "Assassin's Armlets -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Assassin's Armlets +1\nDEF:17 HP+26 CHR+5 Enmity+4 \n\"Treasure Hunter\"+1 "
+  },
+  "dynamis:dream:THF:head": {
+    "job": "THF",
+    "level": 75,
+    "name": "Assassin's Bonnet -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Assassin's Bonnet +1\nDEF:25 HP+16 DEX+6 Enmity+3 \nEnhances \"Mug\" effect"
+  },
+  "dynamis:dream:THF:legs": {
+    "job": "THF",
+    "level": 75,
+    "name": "Assassin's Culottes -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Assassin's Culottes +1\nDEF:35 HP+25 Enmity+5\n\"Steal\"+5 \nEnhances \"Gilfinder\" effect"
+  },
+  "dynamis:dream:WAR:body": {
+    "job": "WAR",
+    "level": 75,
+    "name": "Warrior's Lorica -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Warrior's Lorica +1\nDEF:51 HP+30 Attack+12 Enmity+4\nEnhances \"Aggressor\" effect"
+  },
+  "dynamis:dream:WAR:feet": {
+    "job": "WAR",
+    "level": 75,
+    "name": "Warrior's Calligae -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Warrior's Calligae +1\nDEF:20 HP+15 AGI+6 Enmity+1\nEnhances \"Berserk\" effect"
+  },
+  "dynamis:dream:WAR:hands": {
+    "job": "WAR",
+    "level": 75,
+    "name": "Warrior's Mufflers -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Warrior's Mufflers +1\nDEF:23 HP+20 VIT+6\nAttack+14 Enmity+2 "
+  },
+  "dynamis:dream:WAR:head": {
+    "job": "WAR",
+    "level": 75,
+    "name": "Warrior's Mask -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Warrior's Mask +1\nDEF:29 DEX+6\nParrying skill +7\nEnmity+1\nEnhances \"Warcry\" effect"
+  },
+  "dynamis:dream:WAR:legs": {
+    "job": "WAR",
+    "level": 75,
+    "name": "Warrior's Cuisses -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Warrior's Cuisses +1\nDEF:40 STR+6 Enmity+4\n\"Double Attack\"+1%"
+  },
+  "dynamis:dream:WHM:body": {
+    "job": "WHM",
+    "level": 75,
+    "name": "Cleric's Bliaut -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Body",
+    "stats": "UPGRADE PREVIEW — Cleric's Bliaut +1\nDEF:43 MP+29 Enmity-3\nAdds \"Refresh\" effect \nEnhances potency of \"Regen\" "
+  },
+  "dynamis:dream:WHM:feet": {
+    "job": "WHM",
+    "level": 75,
+    "name": "Cleric's Duckbills -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Feet",
+    "stats": "UPGRADE PREVIEW — Cleric's Duckbills +1\nDEF:16 MP+18 MND+6\nEnhancing magic skill +10\nEnmity-2 "
+  },
+  "dynamis:dream:WHM:hands": {
+    "job": "WHM",
+    "level": 75,
+    "name": "Cleric's Mitts -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Hands",
+    "stats": "UPGRADE PREVIEW — Cleric's Mitts +1\nDEF:17 HP+20 MP+20\nEnfeebling magic skill +15 \nEnmity-4\nEnhances potency of\n\"Banish\" vs. undead"
+  },
+  "dynamis:dream:WHM:head": {
+    "job": "WHM",
+    "level": 75,
+    "name": "Cleric's Cap -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Head",
+    "stats": "UPGRADE PREVIEW — Cleric's Cap +1\nDEF:25 MP+25 VIT+5 Enmity-5 \nEnhances \"Resist Silence\" effect"
+  },
+  "dynamis:dream:WHM:legs": {
+    "job": "WHM",
+    "level": 75,
+    "name": "Cleric's Pantaloons -1",
+    "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats.",
+    "slot": "Legs",
+    "stats": "UPGRADE PREVIEW — Cleric's Pantaloons +1\nDEF:32 MP+17\nHealing magic skill +15 Enmity-3\nElemental resistance spells +22 "
+  },
+  "limbus:af1:BLM:apollyon": {
+    "job": "BLM",
+    "level": null,
+    "name": "Diabolic Yarn",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F2 · NW F1/F5 · SE F4 · SW F1-F3"
+  },
+  "limbus:af1:BLM:body": {
+    "job": "BLM",
+    "level": 74,
+    "name": "Wizard's Coat +1",
+    "slot": "Body",
+    "stats": "DEF:38 MP+36\nEnfeebling magic skill +12\nEnmity-5 \nMP recovered while healing +5 "
+  },
+  "limbus:af1:BLM:feet": {
+    "job": "BLM",
+    "level": 74,
+    "name": "Wizard's Sabots +1",
+    "slot": "Feet",
+    "stats": "DEF:11 MP+15 AGI+5 MND+5 \nSpell interruption rate down 20%\nMP recovered while healing +1"
+  },
+  "limbus:af1:BLM:hands": {
+    "job": "BLM",
+    "level": 70,
+    "name": "Wizard's Gloves +1",
+    "slot": "Hands",
+    "stats": "DEF:16 HP+15 VIT-3 Accuracy+6 \nEvasion+6"
+  },
+  "limbus:af1:BLM:head": {
+    "job": "BLM",
+    "level": 74,
+    "name": "Wizard's Petasos +1",
+    "slot": "Head",
+    "stats": "DEF:20 MP+30 INT+5 Enmity-4 \nMP recovered while healing +1"
+  },
+  "limbus:af1:BLM:legs": {
+    "job": "BLM",
+    "level": 74,
+    "name": "Wizard's Tonban +1",
+    "slot": "Legs",
+    "stats": "DEF:27 MP+19\nDark magic skill +15\nEnmity-2 \nMP recovered while healing +1"
+  },
+  "limbus:af1:BLM:temenos": {
+    "job": "BLM",
+    "level": null,
+    "name": "Diabolic Silk",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F3/F4/F6 · East F1/F2/F6/F7"
+  },
+  "limbus:af1:BRD:apollyon": {
+    "job": "BRD",
+    "level": null,
+    "name": "Brown Doeskin",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F4 · NW F2/F4/F5 · SE F3 · SW F1"
+  },
+  "limbus:af1:BRD:body": {
+    "job": "BRD",
+    "level": 58,
+    "name": "Choral Justaucorps +1",
+    "slot": "Body",
+    "stats": "DEF:37 HP+15 STR-1 DEX-1 VIT-1 \nAGI-1 INT+3 MND+3 CHR+3"
+  },
+  "limbus:af1:BRD:feet": {
+    "job": "BRD",
+    "level": 74,
+    "name": "Choral Slippers +1",
+    "slot": "Feet",
+    "stats": "DEF:14 HP+10 DEX+5 AGI+5 Evasion+5 \nHP recovered while healing +2\nMP recovered while healing +2 "
+  },
+  "limbus:af1:BRD:hands": {
+    "job": "BRD",
+    "level": 74,
+    "name": "Choral Cuffs +1",
+    "slot": "Hands",
+    "stats": "DEF:18 HP+14 VIT+7 CHR+7\nSinging skill +10\nEnmity-1"
+  },
+  "limbus:af1:BRD:head": {
+    "job": "BRD",
+    "level": 74,
+    "name": "Choral Roundlet +1",
+    "slot": "Head",
+    "stats": "DEF:19 HP+11 MND+6 CHR+6 \nParrying skill +5 Enmity-2"
+  },
+  "limbus:af1:BRD:legs": {
+    "job": "BRD",
+    "level": 74,
+    "name": "Choral Cannions +1",
+    "slot": "Legs",
+    "stats": "DEF:31 HP+12 STR+8 DEX+8\nWind instrument skill +8 \nEnmity-2"
+  },
+  "limbus:af1:BRD:temenos": {
+    "job": "BRD",
+    "level": null,
+    "name": "Coiled Yarn",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: West F1-F3/F6/F7 · East F3/F6"
+  },
+  "limbus:af1:BST:apollyon": {
+    "job": "BST",
+    "level": null,
+    "name": "Fetid Lanolin",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F1/F2 · NW F3-F5 · SE F2 · SW F3/F4"
+  },
+  "limbus:af1:BST:body": {
+    "job": "BST",
+    "level": 74,
+    "name": "Beast Jackcoat +1",
+    "slot": "Body",
+    "stats": "DEF:49 HP+20 VIT+6\nAugments \"Reward\" \n\"Charm\"+6"
+  },
+  "limbus:af1:BST:feet": {
+    "job": "BST",
+    "level": 74,
+    "name": "Beast Gaiters +1",
+    "slot": "Feet",
+    "stats": "DEF:14 HP+11 AGI+5 CHR+5 \nEnhances \"Reward\" effect\n\"Charm\"+2 "
+  },
+  "limbus:af1:BST:hands": {
+    "job": "BST",
+    "level": 74,
+    "name": "Beast Gloves +1",
+    "slot": "Hands",
+    "stats": "DEF:15 HP+11 DEX+5 CHR+5 \nParrying skill +10 \"Charm\"+3"
+  },
+  "limbus:af1:BST:head": {
+    "job": "BST",
+    "level": 74,
+    "name": "Beast Helm +1",
+    "slot": "Head",
+    "stats": "DEF:26 HP+15 INT+8 MND+8 \nImproves \"Tame\" success rate\n\"Charm\"+4 "
+  },
+  "limbus:af1:BST:legs": {
+    "job": "BST",
+    "level": 74,
+    "name": "Beast Trousers +1",
+    "slot": "Legs",
+    "stats": "DEF:34 HP+15 STR+6 CHR+6 \nEnhances \"Killer\" effects\n\"Charm\"+6"
+  },
+  "limbus:af1:BST:temenos": {
+    "job": "BST",
+    "level": null,
+    "name": "Smalt Leather",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: West F3/F5 · East F1/F2/F6/F7"
+  },
+  "limbus:af1:DRG:apollyon": {
+    "job": "DRG",
+    "level": null,
+    "name": "Blue Rivet",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F2 · NW F1/F5 · SE F4 · SW F1"
+  },
+  "limbus:af1:DRG:body": {
+    "job": "DRG",
+    "level": 74,
+    "name": "Drachen Mail +1",
+    "slot": "Body",
+    "stats": "DEF:49 HP+15 STR+6 VIT+6 Attack+7 \nWyvern: Adds \"Regen\" effect"
+  },
+  "limbus:af1:DRG:feet": {
+    "job": "DRG",
+    "level": 74,
+    "name": "Drachen Greaves +1",
+    "slot": "Feet",
+    "stats": "DEF:16 HP+12 DEX+5 AGI+5\nEvasion skill +10 \nEnhances \"Jump\" effects"
+  },
+  "limbus:af1:DRG:hands": {
+    "job": "DRG",
+    "level": 119,
+    "name": "Drachen Finger Gauntlets +1",
+    "slot": "Hands",
+    "stats": "DEF:106 HP+34 MP+14 STR+17 DEX+28\nVIT+39 INT+6 MND+21 CHR+16\nEvasion+19 Magic Evasion+48\n\"Magic Def. Bonus\"+1 Haste+5%\nSword skill +28\n\"Shield Def. Bonus\"+3\nSet: Occ. absorbs damage taken"
+  },
+  "limbus:af1:DRG:head": {
+    "job": "DRG",
+    "level": 74,
+    "name": "Drachen Armet +1",
+    "slot": "Head",
+    "stats": "DEF:25 HP+12 VIT+8 MND+8 \nEnhances \"Spirit Link\" effect\nWyvern uses breaths more effectively"
+  },
+  "limbus:af1:DRG:legs": {
+    "job": "DRG",
+    "level": 74,
+    "name": "Drachen Brais +1",
+    "slot": "Legs",
+    "stats": "DEF:32 HP+15 Accuracy+9 \nEnhances \"Ancient Circle\" effect\nWyvern: HP+15% "
+  },
+  "limbus:af1:DRG:temenos": {
+    "job": "DRG",
+    "level": null,
+    "name": "Cobalt Mythril Sheet",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F1-F3/F6/F7 · East F5/F6"
+  },
+  "limbus:af1:DRK:apollyon": {
+    "job": "DRK",
+    "level": null,
+    "name": "Black Rivet",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F4 · NW F2/F4/F5 · SE F1/F3 · SW F1"
+  },
+  "limbus:af1:DRK:body": {
+    "job": "DRK",
+    "level": 74,
+    "name": "Chaos Cuirass +1",
+    "slot": "Body",
+    "stats": "DEF:49 HP+20 MP+20 STR+7\nVIT+7 Attack+10 \nEnfeebling magic skill +5"
+  },
+  "limbus:af1:DRK:feet": {
+    "job": "DRK",
+    "level": 74,
+    "name": "Chaos Sollerets +1",
+    "slot": "Feet",
+    "stats": "DEF:17 HP+15 MP+15 STR+5 MND+5 \nEnhances \"Arcane Circle\" effect"
+  },
+  "limbus:af1:DRK:hands": {
+    "job": "DRK",
+    "level": 74,
+    "name": "Chaos Gauntlets +1",
+    "slot": "Hands",
+    "stats": "DEF:20 HP+11 MP+11 STR+6\nDEX+6 Accuracy+3 \n\"Weapon Bash\"+10"
+  },
+  "limbus:af1:DRK:head": {
+    "job": "DRK",
+    "level": 74,
+    "name": "Chaos Burgeonet +1",
+    "slot": "Head",
+    "stats": "DEF:27 HP+12 MP+12 STR+7 \nDark magic skill +5\nEnhances \"Souleater\" effect"
+  },
+  "limbus:af1:DRK:legs": {
+    "job": "DRK",
+    "level": 74,
+    "name": "Chaos Flanchard +1",
+    "slot": "Legs",
+    "stats": "DEF:38 HP+15 MP+15 DEX+5\nINT+5 Evasion+5 \nParrying skill +15"
+  },
+  "limbus:af1:DRK:temenos": {
+    "job": "DRK",
+    "level": null,
+    "name": "Dark Orichalcum",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: West F2/F4 · East F1/F4/F5/F7"
+  },
+  "limbus:af1:MNK:apollyon": {
+    "job": "MNK",
+    "level": null,
+    "name": "Ancient Brass",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F1-F4 · NW F3-F5 · SE F3 · SW F4"
+  },
+  "limbus:af1:MNK:body": {
+    "job": "MNK",
+    "level": 74,
+    "name": "Temple Cyclas +1",
+    "slot": "Body",
+    "stats": "DEF:44 HP+20 STR+6 VIT+6 Accuracy+5\nEnhances \"Chakra\" effect"
+  },
+  "limbus:af1:MNK:feet": {
+    "job": "MNK",
+    "level": 74,
+    "name": "Temple Gaiters +1",
+    "slot": "Feet",
+    "stats": "DEF:15 HP+12 DEX+5\nMND+5 Evasion+10 \nEnhances \"Dodge\" effect"
+  },
+  "limbus:af1:MNK:hands": {
+    "job": "MNK",
+    "level": 74,
+    "name": "Temple Gloves +1",
+    "slot": "Hands",
+    "stats": "DEF:15 HP+14 STR+6\nEnhances \"Boost\" effect\n\"Subtle Blow\"+4 "
+  },
+  "limbus:af1:MNK:head": {
+    "job": "MNK",
+    "level": 74,
+    "name": "Temple Crown +1",
+    "slot": "Head",
+    "stats": "DEF:23 HP+16 MND+8\nEnhances \"Focus\" effect \nHP recovered while healing +1"
+  },
+  "limbus:af1:MNK:legs": {
+    "job": "MNK",
+    "level": 74,
+    "name": "Temple Hose +1",
+    "slot": "Legs",
+    "stats": "DEF:31 HP+18 MND+4\nGuarding skill +15 \n\"Counter\"+3 "
+  },
+  "limbus:af1:MNK:temenos": {
+    "job": "MNK",
+    "level": null,
+    "name": "Utopian Gold Thread",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F1/F2/F3/F5/F7 · West F5/F6"
+  },
+  "limbus:af1:NIN:apollyon": {
+    "job": "NIN",
+    "level": null,
+    "name": "Ebony Lacquer",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F4 · NW F2/F5 · SE F2/F3 · SW F2/F3"
+  },
+  "limbus:af1:NIN:body": {
+    "job": "NIN",
+    "level": 74,
+    "name": "Ninja Chainmail +1",
+    "slot": "Body",
+    "stats": "DEF:46 HP+15 DEX+5 VIT+5 \nEnhances \"Dual Wield\" effect\nPhysical damage: \"Shock Spikes\" effect"
+  },
+  "limbus:af1:NIN:feet": {
+    "job": "NIN",
+    "level": 74,
+    "name": "Ninja Kyahan +1",
+    "slot": "Feet",
+    "stats": "DEF:15 HP+12 AGI+6 INT+6 \nDusk to dawn: Movement speed +25%"
+  },
+  "limbus:af1:NIN:hands": {
+    "job": "NIN",
+    "level": 74,
+    "name": "Ninja Tekko +1",
+    "slot": "Hands",
+    "stats": "DEF:18 HP+13 STR+6 DEX+6\nRanged Accuracy+20 Ranged Attack+20\nThrowing skill +5"
+  },
+  "limbus:af1:NIN:head": {
+    "job": "NIN",
+    "level": 74,
+    "name": "Ninja Hatsuburi +1",
+    "slot": "Head",
+    "stats": "DEF:22 HP+10 AGI+8\nCHR+8 Evasion+8 \nNinjutsu skill +5 "
+  },
+  "limbus:af1:NIN:legs": {
+    "job": "NIN",
+    "level": 74,
+    "name": "Ninja Hakama +1",
+    "slot": "Legs",
+    "stats": "DEF:31 Accuracy+5\nRanged Accuracy+10\nDusk to dawn: Evasion+10 "
+  },
+  "limbus:af1:NIN:temenos": {
+    "job": "NIN",
+    "level": null,
+    "name": "Plaited Cord",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F1/F2/F6/F7 · West F3-F6"
+  },
+  "limbus:af1:PLD:apollyon": {
+    "job": "PLD",
+    "level": null,
+    "name": "White Rivet",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F1/F2 · NW F1/F3/F5 · SE F2/F4 · SW F4"
+  },
+  "limbus:af1:PLD:body": {
+    "job": "PLD",
+    "level": 74,
+    "name": "Gallant Surcoat +1",
+    "slot": "Body",
+    "stats": "DEF:55 HP+20 VIT+6\nDivine magic skill +8\nEnmity+2"
+  },
+  "limbus:af1:PLD:feet": {
+    "job": "PLD",
+    "level": 96,
+    "name": "Gallant Leggings +1",
+    "slot": "Feet",
+    "stats": "DEF:25 STR+6 AGI+6 Evasion+10 \n\"Double Attack\"+1%"
+  },
+  "limbus:af1:PLD:hands": {
+    "job": "PLD",
+    "level": 96,
+    "name": "Gallant Gauntlets +1",
+    "slot": "Hands",
+    "stats": "DEF:31 STR+7 DEX+7 Accuracy+10 \n\"Double Attack\"+2%"
+  },
+  "limbus:af1:PLD:head": {
+    "job": "PLD",
+    "level": 74,
+    "name": "Gallant Coronet +1",
+    "slot": "Head",
+    "stats": "DEF:28 HP+12 MND+6\nEnhances \"Cover\" effect\nEnmity+3"
+  },
+  "limbus:af1:PLD:legs": {
+    "job": "PLD",
+    "level": 74,
+    "name": "Gallant Breeches +1",
+    "slot": "Legs",
+    "stats": "DEF:43 HP+20 AGI+4\nEnhancing magic skill +10 \nEnmity+2"
+  },
+  "limbus:af1:PLD:temenos": {
+    "job": "PLD",
+    "level": null,
+    "name": "Snowy Cermet",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F5/F6 · East F1-F3/F7"
+  },
+  "limbus:af1:RDM:apollyon": {
+    "job": "RDM",
+    "level": null,
+    "name": "Cardinal Cloth",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F1/F3 · NW F4/F5 · SE F1 · SW F4"
+  },
+  "limbus:af1:RDM:body": {
+    "job": "RDM",
+    "level": 74,
+    "name": "Warlock's Tabard +1",
+    "slot": "Body",
+    "stats": "DEF:44 MP+34\nSpell interruption rate down 12%\nEnfeebling magic skill +15\nMP recovered while healing +5"
+  },
+  "limbus:af1:RDM:feet": {
+    "job": "RDM",
+    "level": 70,
+    "name": "Warlock's Boots +1",
+    "slot": "Feet",
+    "stats": "DEF:15 HP+14 VIT-2 Attack+6\nRanged Attack+6"
+  },
+  "limbus:af1:RDM:hands": {
+    "job": "RDM",
+    "level": 70,
+    "name": "Warlock's Gloves +1",
+    "slot": "Hands",
+    "stats": "DEF:16 HP+15 VIT-3 Accuracy+6 \nEvasion+6"
+  },
+  "limbus:af1:RDM:head": {
+    "job": "RDM",
+    "level": 74,
+    "name": "Warlock's Chapeau +1",
+    "slot": "Head",
+    "stats": "DEF:24 MP+25 INT+5\nElemental magic skill +10 \nEnhances \"Fast Cast\" effect"
+  },
+  "limbus:af1:RDM:legs": {
+    "job": "RDM",
+    "level": 74,
+    "name": "Warlock's Tights +1",
+    "slot": "Legs",
+    "stats": "DEF:33 MP+18 MND+5\nHealing magic skill +10 \nEnhancing magic skill +15"
+  },
+  "limbus:af1:RDM:temenos": {
+    "job": "RDM",
+    "level": null,
+    "name": "Ruby Silk Thread",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: West F1/F2/F4-F7 · East F2/F3/F5"
+  },
+  "limbus:af1:RNG:apollyon": {
+    "job": "RNG",
+    "level": null,
+    "name": "Charcoal Cotton",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F4 · NW F2/F5 · SE F1-F3 · SW F2"
+  },
+  "limbus:af1:RNG:body": {
+    "job": "RNG",
+    "level": 74,
+    "name": "Hunter's Jerkin +1",
+    "slot": "Body",
+    "stats": "DEF:45 HP+20 VIT+4 AGI+4\nRanged Accuracy+10 \nEnhances \"Camouflage\" effect"
+  },
+  "limbus:af1:RNG:feet": {
+    "job": "RNG",
+    "level": 74,
+    "name": "Hunter's Socks +1",
+    "slot": "Feet",
+    "stats": "DEF:16 HP+10 DEX+6 AGI+6 Evasion+5 \nEnhances \"Scavenge\" effect"
+  },
+  "limbus:af1:RNG:hands": {
+    "job": "RNG",
+    "level": 74,
+    "name": "Hunter's Bracers +1",
+    "slot": "Hands",
+    "stats": "DEF:14 HP+10 DEX+6 AGI+6 \nEnhances \"Barrage\" effect\nEnhances \"Shadowbind\" effect"
+  },
+  "limbus:af1:RNG:head": {
+    "job": "RNG",
+    "level": 74,
+    "name": "Hunter's Beret +1",
+    "slot": "Head",
+    "stats": "DEF:24 HP+13 AGI+4 INT+4\nRanged Attack+5 \nIncreases \"Rapid Shot\" activation rate"
+  },
+  "limbus:af1:RNG:legs": {
+    "job": "RNG",
+    "level": 74,
+    "name": "Hunter's Braccae +1",
+    "slot": "Legs",
+    "stats": "DEF:32 HP+15 AGI+5 MND+5 \nEnmity-3\nEnhances \"Sharpshot\" effect"
+  },
+  "limbus:af1:RNG:temenos": {
+    "job": "RNG",
+    "level": null,
+    "name": "Chameleon Yarn",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F2/F6 · East F1/F3-F5/F7"
+  },
+  "limbus:af1:SAM:apollyon": {
+    "job": "SAM",
+    "level": null,
+    "name": "Kurogane",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F1/F5 · NW F1/F5 · SE F4 · SW F2/F3"
+  },
+  "limbus:af1:SAM:body": {
+    "job": "SAM",
+    "level": 74,
+    "name": "Myochin Domaru +1",
+    "slot": "Body",
+    "stats": "DEF:50 HP+10 STR+6\nVIT+6 Accuracy+12 \nOccasionally boosts TP when damaged"
+  },
+  "limbus:af1:SAM:feet": {
+    "job": "SAM",
+    "level": 74,
+    "name": "Myochin Sune-Ate +1",
+    "slot": "Feet",
+    "stats": "DEF:18 HP+20 Attack+8 Enmity+5\nEnhances \"Zanshin\" effect"
+  },
+  "limbus:af1:SAM:hands": {
+    "job": "SAM",
+    "level": 74,
+    "name": "Myochin Kote +1",
+    "slot": "Hands",
+    "stats": "DEF:21 HP+15 STR+7 DEX+7 \nEnmity+2\nEnhances effects of rice balls"
+  },
+  "limbus:af1:SAM:head": {
+    "job": "SAM",
+    "level": 74,
+    "name": "Myochin Kabuto +1",
+    "slot": "Head",
+    "stats": "DEF:25 HP+13 STR+5 MND+5 \nEnhances \"Warding Circle\" effect\nEnhances \"Meditate\" effect"
+  },
+  "limbus:af1:SAM:legs": {
+    "job": "SAM",
+    "level": 74,
+    "name": "Myochin Haidate +1",
+    "slot": "Legs",
+    "stats": "DEF:40 HP+15 STR+5 VIT+5 \nParrying skill +10\n\"Store TP\"+4"
+  },
+  "limbus:af1:SAM:temenos": {
+    "job": "SAM",
+    "level": null,
+    "name": "Scarlet Odoshi",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: West F1-F4/F6/F7 · East F3/F4"
+  },
+  "limbus:af1:SMN:apollyon": {
+    "job": "SMN",
+    "level": null,
+    "name": "Astral Leather",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F4 · NW F2/F4/F5 · SE F1-F3 · SW F2"
+  },
+  "limbus:af1:SMN:body": {
+    "job": "SMN",
+    "level": 74,
+    "name": "Evoker's Doublet +1",
+    "slot": "Body",
+    "stats": "DEF:35 MP+45\nResistance to current\navatar's element +25\n\"Blood Pact\" ability delay -4\nMP recovered while healing +5"
+  },
+  "limbus:af1:SMN:feet": {
+    "job": "SMN",
+    "level": 74,
+    "name": "Evoker's Pigaches +1",
+    "slot": "Feet",
+    "stats": "DEF:10 MP+25\nAvatar perpetuation cost -1 \nAvatar: Enhances evasion\nAvatar: Enmity-4"
+  },
+  "limbus:af1:SMN:hands": {
+    "job": "SMN",
+    "level": 74,
+    "name": "Evoker's Bracers +1",
+    "slot": "Hands",
+    "stats": "DEF:11 MP+19\n\"Blood Pact\" ability delay -1 \nOccasionally converts damage taken\nof avatar's element to MP\nAvatar: Enmity-2 "
+  },
+  "limbus:af1:SMN:head": {
+    "job": "SMN",
+    "level": 74,
+    "name": "Evoker's Horn +1",
+    "slot": "Head",
+    "stats": "DEF:15 MP+25 INT+6 MND+6 \nSummoning magic skill +5\nAvatar: Enmity-3 "
+  },
+  "limbus:af1:SMN:legs": {
+    "job": "SMN",
+    "level": 74,
+    "name": "Evoker's Spats +1",
+    "slot": "Legs",
+    "stats": "DEF:25 MP+22 Enmity-3 \nAvatar: Enhances accuracy Enmity-2 "
+  },
+  "limbus:af1:SMN:temenos": {
+    "job": "SMN",
+    "level": null,
+    "name": "Glittering Yarn",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F3-F5 · West F1/F4-F7"
+  },
+  "limbus:af1:THF:apollyon": {
+    "job": "THF",
+    "level": null,
+    "name": "Light Filament",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F2/F3 · NW F3-F5 · SE F1/F4 · SW F4"
+  },
+  "limbus:af1:THF:body": {
+    "job": "THF",
+    "level": 74,
+    "name": "Rogue's Vest +1",
+    "slot": "Body",
+    "stats": "DEF:45 HP+20 STR+6 Accuracy+10 \nExtends duration of \"Hide\""
+  },
+  "limbus:af1:THF:feet": {
+    "job": "THF",
+    "level": 74,
+    "name": "Rogue's Poulaines +1",
+    "slot": "Feet",
+    "stats": "DEF:15 DEX+3 Ranged Accuracy+5 \nExtends duration of \"Flee\"\n\"Steal\"+2"
+  },
+  "limbus:af1:THF:hands": {
+    "job": "THF",
+    "level": 74,
+    "name": "Rogue's Armlets +1",
+    "slot": "Hands",
+    "stats": "DEF:16 HP+10 DEX+3\n\"Steal\"+1\nIncreases \"Trick Attack\" damage"
+  },
+  "limbus:af1:THF:head": {
+    "job": "THF",
+    "level": 74,
+    "name": "Rogue's Bonnet +1",
+    "slot": "Head",
+    "stats": "DEF:24 HP+13 DEX+3\nRanged Accuracy+8 Evasion+10"
+  },
+  "limbus:af1:THF:legs": {
+    "job": "THF",
+    "level": 74,
+    "name": "Rogue's Culottes +1",
+    "slot": "Legs",
+    "stats": "DEF:34 HP+15 DEX+2 AGI+4\n\"Steal\"+1"
+  },
+  "limbus:af1:THF:temenos": {
+    "job": "THF",
+    "level": null,
+    "name": "Supple Skin",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F1/F3-F5/F7 · East F3-F6"
+  },
+  "limbus:af1:WAR:apollyon": {
+    "job": "WAR",
+    "level": null,
+    "name": "Argyro Rivet",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F3 · NW F1/F4/F5 · SE F4 · SW F2/F3"
+  },
+  "limbus:af1:WAR:body": {
+    "job": "WAR",
+    "level": 74,
+    "name": "Fighter's Lorica +1",
+    "slot": "Body",
+    "stats": "DEF:50 HP+20 VIT+7 Attack+10\nEnmity+8"
+  },
+  "limbus:af1:WAR:feet": {
+    "job": "WAR",
+    "level": 74,
+    "name": "Fighter's Calligae +1",
+    "slot": "Feet",
+    "stats": "DEF:19 HP+12 VIT+3 AGI+3 \nEnhances \"Double Attack\" effect\nEnmity+1"
+  },
+  "limbus:af1:WAR:hands": {
+    "job": "WAR",
+    "level": 74,
+    "name": "Fighter's Mufflers +1",
+    "slot": "Hands",
+    "stats": "DEF:22 HP+13 STR+6\nShield skill +15\nEnmity+3"
+  },
+  "limbus:af1:WAR:head": {
+    "job": "WAR",
+    "level": 74,
+    "name": "Fighter's Mask +1",
+    "slot": "Head",
+    "stats": "DEF:28 HP+15 DEX+5 VIT+5 Enmity+1 \nHP recovered while healing +1"
+  },
+  "limbus:af1:WAR:legs": {
+    "job": "WAR",
+    "level": 74,
+    "name": "Fighter's Cuisses +1",
+    "slot": "Legs",
+    "stats": "DEF:39 HP+15 Accuracy+5\nEvasion+5 Enmity+3 \nHP recovered while healing +2"
+  },
+  "limbus:af1:WAR:temenos": {
+    "job": "WAR",
+    "level": null,
+    "name": "Ecarlate Cloth",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F2/F4 · West F1/F2/F4/F5/F7"
+  },
+  "limbus:af1:WHM:apollyon": {
+    "job": "WHM",
+    "level": null,
+    "name": "Benedict Yarn",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Apollyon upgrade material",
+    "stats": "Known original Limbus sources: NE F1 · NW F1/F4/F5 · SE F4 · SW F1/F3"
+  },
+  "limbus:af1:WHM:body": {
+    "job": "WHM",
+    "level": 119,
+    "name": "Healer's Bliaut +1",
+    "slot": "Body",
+    "stats": "DEF:125 HP+107 MP+119 STR+20\nDEX+20 VIT+20 AGI+20 INT+30 MND+33\nCHR+29\nEvasion+41 Magic Evasion+80\n\"Magic Def. Bonus\"+7 Haste+3%\nHealing magic skill +24\n\"Refresh\"+2 \"Afflatus Solace\"+14\n\nSet: Augments elemental resistance\nspells"
+  },
+  "limbus:af1:WHM:feet": {
+    "job": "WHM",
+    "level": 119,
+    "name": "Healer's Duckbills +1",
+    "slot": "Feet",
+    "stats": "DEF:66 HP+51 MP+60 STR+10 DEX+11\nVIT+10 AGI+33 INT+17 MND+23 CHR+34\nEvasion+55 Magic Evasion+107\n\"Magic Def. Bonus\"+5\nEnhancing magic skill +25\nHaste+3% \"Auspice\"+15 \nSet:\nAugments elemental resistance spells"
+  },
+  "limbus:af1:WHM:hands": {
+    "job": "WHM",
+    "level": 29,
+    "name": "Healer's Mitts +1",
+    "slot": "Hands",
+    "stats": "DEF:6 INT+2 MND+2"
+  },
+  "limbus:af1:WHM:head": {
+    "job": "WHM",
+    "level": 119,
+    "name": "Healer's Cap +1",
+    "slot": "Head",
+    "stats": "DEF:94 HP+34 MP+88 STR+13 DEX+16\nVIT+16 AGI+16 INT+21 MND+29 CHR+21\nEvasion+36 Magic Evasion+75\n\"Magic Def. Bonus\"+6 Haste+6%\n\"Divine Veil\"+22% \"Cure\" potency +16%\nSet: Augments elemental resistance\nspells"
+  },
+  "limbus:af1:WHM:legs": {
+    "job": "WHM",
+    "level": 74,
+    "name": "Healer's Pantaloons +1",
+    "slot": "Legs",
+    "stats": "DEF:28 MP+30 VIT+5\nDivine magic skill +15 \nEnmity-2"
+  },
+  "limbus:af1:WHM:temenos": {
+    "job": "WHM",
+    "level": null,
+    "name": "Benedict Silk",
+    "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
+    "slot": "Temenos upgrade material",
+    "stats": "Known original Limbus sources: North F1/F3/F4/F5/F7 · West F2/F6"
+  },
+  "limbus:proto-omega:body": {
+    "job": "BLU · DRG · DRK · PLD · THF",
+    "level": 75,
+    "name": "Homam Corazza",
+    "slot": "Body",
+    "stats": "DEF:49 HP+28 MP+28 Accuracy+15 \nEnhances \"Triple Attack\" effect"
+  },
+  "limbus:proto-omega:feet": {
+    "job": "BLU · DRG · DRK · PLD · THF",
+    "level": 75,
+    "name": "Homam Gambieras",
+    "slot": "Feet",
+    "stats": "DEF:16 HP+31 MP+31 Accuracy+6\nRanged Accuracy+6 Haste+3%\nWyvern: HP+50"
+  },
+  "limbus:proto-omega:hands": {
+    "job": "BLU · DRG · DRK · PLD · THF",
+    "level": 75,
+    "name": "Homam Manopolas",
+    "slot": "Hands",
+    "stats": "DEF:20 HP+20 MP+20 Accuracy+4\nEnmity+3 Haste+3%"
+  },
+  "limbus:proto-omega:head": {
+    "job": "BLU · DRG · DRK · PLD · THF",
+    "level": 75,
+    "name": "Homam Zucchetto",
+    "slot": "Head",
+    "stats": "DEF:26 HP+22 MP+22 Accuracy+4\nMagic Accuracy+4 Haste+3%"
+  },
+  "limbus:proto-omega:legs": {
+    "job": "BLU · DRG · DRK · PLD · THF",
+    "level": 75,
+    "name": "Homam Cosciales",
+    "slot": "Legs",
+    "stats": "DEF:35 HP+26 MP+26 Accuracy+3 \nEnhances \"Fast Cast\" effect\nHaste+3%"
+  },
+  "limbus:proto-ultima:body": {
+    "job": "BLU · BLM · BRD · RDM · SMN · WHM",
+    "level": 75,
+    "name": "Nashira Manteel",
+    "slot": "Body",
+    "stats": "DEF:41 Magic Accuracy+5 \nHealing magic skill +5\nDark magic skill +5\nHaste+3%"
+  },
+  "limbus:proto-ultima:feet": {
+    "job": "BLU · BLM · BRD · RDM · SMN · WHM",
+    "level": 75,
+    "name": "Nashira Crackows",
+    "slot": "Feet",
+    "stats": "DEF:13 Magic Accuracy+2\nElemental magic skill +5\nSummoning magic skill +5 \nHaste+1%"
+  },
+  "limbus:proto-ultima:hands": {
+    "job": "BLU · BLM · BRD · RDM · SMN · WHM",
+    "level": 75,
+    "name": "Nashira Gages",
+    "slot": "Hands",
+    "stats": "DEF:18 Magic Accuracy+3 Enmity-4\nAvatar perpetuation cost -1\nHaste+1% "
+  },
+  "limbus:proto-ultima:head": {
+    "job": "BLU · BLM · BRD · RDM · SMN · WHM",
+    "level": 75,
+    "name": "Nashira Turban",
+    "slot": "Head",
+    "stats": "DEF:19 Magic Accuracy+5  Enmity-5\nHaste+2%\nSpell interruption rate down 10%"
+  },
+  "limbus:proto-ultima:legs": {
+    "job": "BLU · BLM · BRD · RDM · SMN · WHM",
+    "level": 75,
+    "name": "Nashira Seraweels",
+    "slot": "Legs",
+    "stats": "DEF:30 Magic Accuracy+3\nDivine magic skill +5\nEnfeebling magic skill +5\nHaste+2% "
+  }
+}
