@@ -1,5 +1,35 @@
 {% extends 'base.html' %}
 {% block content %}
+{% if not is_editor() %}
+<link rel="stylesheet" href="{{ url_for('static', filename='public_landing.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='public_landing_controls.css') }}">
+<section class="public-landing" aria-label="Hokuten Knights linkshell welcome">
+  <div class="landing-scenes" aria-hidden="true">
+    <div class="landing-scene" data-name="The Celestial Ruins" style="--scene:url('{{ url_for('static', filename='landing/tulia-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Valkurm Dunes" style="--scene:url('{{ url_for('static', filename='landing/valkurm-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="The Celestial Sea" style="--scene:url('{{ url_for('static', filename='landing/altaieu-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Ronfaure" style="--scene:url('{{ url_for('static', filename='landing/ronfaure-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Jeuno" style="--scene:url('{{ url_for('static', filename='landing/jeuno-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Xarcabard" style="--scene:url('{{ url_for('static', filename='landing/xarcabard-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Kazham" style="--scene:url('{{ url_for('static', filename='landing/kazham-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Norg" style="--scene:url('{{ url_for('static', filename='landing/norg-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="The Sanctuary of Zi'Tah" style="--scene:url('{{ url_for('static', filename='landing/zitah-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Tavnazia" style="--scene:url('{{ url_for('static', filename='landing/tavnazia-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Selbina" style="--scene:url('{{ url_for('static', filename='landing/selbina-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="The Boyahda Tree" style="--scene:url('{{ url_for('static', filename='landing/boyahda-pencil.png') }}')"></div>
+    <div class="landing-scene" data-name="Delkfutt's Tower" style="--scene:url('{{ url_for('static', filename='landing/delkfutt-pencil.png') }}')"></div>
+  </div>
+  <div class="landing-blue-wash" aria-hidden="true"></div><div class="landing-pencil-pass" aria-hidden="true"></div>
+  <div class="landing-copy"><p class="landing-kicker">A HorizonXI Linkshell</p><h1>Adventure is better<br>when shared.</h1><p>Mission progress, event planning, and linkshell support—built for the journey ahead.</p></div>
+  <div class="landing-soundtrack">
+    <div class="landing-location show" id="landing-location">The Celestial Ruins</div>
+    <div class="soundtrack-credit">We Depart For Distant Shores — iMaven</div>
+    <div class="soundtrack-controls"><button type="button" id="soundtrack-toggle" aria-label="Play We Depart For Distant Shores">▶</button><label for="soundtrack-volume">Volume</label><input id="soundtrack-volume" type="range" min="0" max="1" step="0.01" value="0.35"></div>
+    <audio id="landing-audio" loop preload="metadata"><source src="{{ url_for('static', filename='landing/we-depart-for-distant-shores.mp3') }}" type="audio/mpeg"></audio>
+  </div>
+  <div class="landing-script">Hokuten Knights</div>
+</section>
+<script src="{{ url_for('static', filename='public_landing.js') }}"></script>
+{% else %}
 <section class="hero">
   <div>
     <p class="eyebrow">Linkshell command board</p>
@@ -48,4 +78,5 @@
   </section>
   {% endfor %}
 </div>
+{% endif %}
 {% endblock %}
