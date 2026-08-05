@@ -1,0 +1,42 @@
+.map-modal-open { overflow: hidden; }
+.spawn-image-wrap {
+  position: relative;
+  width: min(100%, calc(100vh - 190px));
+  aspect-ratio: 1;
+}
+.spawn-image-wrap[hidden] { display: none; }
+.spawn-image-wrap img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+}
+.spawn-pin {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  transform: translate(-50%, -50%);
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #e63838;
+  box-shadow: 0 0 0 2px #641010cc, 0 1px 5px #000;
+  pointer-events: auto;
+}
+.spawn-pin::after {
+  content: '';
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  background: #fff;
+}
+.spawn-dialog > header { cursor: move; touch-action: none; }
+.spawn-dialog > header button { cursor: pointer; }
+.spawn-map-stage {
+  align-items: start;
+  max-height: calc(100vh - 190px);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.spawn-image-wrap { flex: 0 0 auto; }
+.spawn-map-stage:has(.spawn-image-wrap:not([hidden])) { cursor: grab; }
+.spawn-map-stage.is-panning { cursor: grabbing; user-select: none; }
+.spawn-map-stage img { user-select: none; -webkit-user-drag: none; }

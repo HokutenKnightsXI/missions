@@ -3,3 +3,7 @@ __pycache__/
 .venv/
 instance/*.db
 .env
+
+# Local Remapster FFXI map DAT pack and extracted artwork. These files are
+# large and may not be redistributed with the application repository.
+map-dats/

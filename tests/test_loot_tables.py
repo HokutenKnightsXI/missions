@@ -37,3 +37,6 @@ def test_loot_table_page_and_generated_index(client):
     assert payload["th_max"] == 4 and len(payload["rows"]) > 10_000
     zones = {row[0] for row in payload["rows"]}
     assert not any("Abyssea" in zone or "[S]" in zone for zone in zones)
+    dark_stalker = payload["spawns"]["The Eldieme Necropolis\tdarkstalker"]
+    assert len(dark_stalker["p"]) == 16
+    assert dark_stalker["l"] == [57, 59]

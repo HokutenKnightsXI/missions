@@ -13,7 +13,7 @@ from urllib.request import Request, urlopen
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-from flask import Flask, abort, flash, g, jsonify, redirect, render_template, request, session, url_for
+from flask import Flask, abort, flash, g, jsonify, redirect, render_template, request, send_from_directory, session, url_for
 
 
 JOBS = (
@@ -840,6 +840,89 @@ def create_app(test_config=None):
     @app.get("/loot-tables")
     def loot_tables():
         return render_template("loot_tables.html")
+
+    @app.get("/api/map-assets")
+    def map_assets():
+        requested_zone = request.args.get("zone", "").strip().casefold()
+        requested_mob = request.args.get("mob", "").strip().casefold()
+        calibration_path = Path(app.root_path) / "static" / "map_calibrations.json"
+        loot_path = Path(app.root_path) / "static" / "loot_tables.json"
+        if requested_zone and calibration_path.exists() and loot_path.exists():
+            calibrations = json.loads(calibration_path.read_text(encoding="utf-8"))
+            zone_name = next((name for name in calibrations if name.casefold() == requested_zone), None)
+            if zone_name:
+                map_rows = [row for row in calibrations[zone_name] if row.get("image")]
+                normalized = re.sub(r"[^a-z0-9]", "", requested_mob)
+                normalized = re.sub(r"(?:war|mnk|whm|blm|rdm|thf|pld|drk|bst|brd|rng|sam|nin|drg|smn)$", "", normalized)
+                loot = json.loads(loot_path.read_text(encoding="utf-8"))
+                points = loot.get("spawns", {}).get(f"{zone_name}\t{normalized}", {}).get("p", [])
+                markers = []
+                for x, map_y, elevation in points:
+                    for map_row in map_rows:
+                        if any(box[0] <= x <= box[3] and box[1] <= map_y <= box[4]
+                               and box[2] <= elevation <= box[5] for box in map_row["boxes"]):
+                            markers.append({"map_id": map_row["id"],
+                                            "left": round((x * map_row["mult"] + map_row["xoff"]) / 512 * 100, 3),
+                                            "top": round((-map_y * map_row["mult"] + map_row["yoff"]) / 512 * 100, 3)})
+                            break
+                maps = [{"map_id": row["id"], "label": f"Map {row['id']}",
+                         "url": url_for("calibrated_map_asset", zone_id=loot["zone_ids"][zone_name],
+                                        filename=f"map_{row['id']:02d}.png")}
+                        for row in map_rows]
+                return jsonify({"maps": maps, "preferred_map": markers[0]["map_id"] if markers else maps[0]["map_id"],
+                                "markers": markers})
+        wiki_root = Path(app.root_path) / "map-dats" / "wiki-packs"
+        slug = re.sub(r"[^a-z0-9]+", "_", requested_zone).strip("_")
+        wiki_maps = []
+        for image_path in wiki_root.rglob(f"{slug}*.png") if wiki_root.exists() else ():
+            stem = image_path.stem
+            match = re.fullmatch(rf"{re.escape(slug)}(?:_(\d+))?", stem)
+            if not match:
+                continue
+            page = int(match.group(1) or 1)
+            pack = image_path.parent.name
+            wiki_maps.append({"map_id": page, "label": f"Map {page}",
+                              "url": url_for("wiki_map_asset", pack=pack, filename=image_path.name)})
+        if wiki_maps:
+            map_key = (requested_zone, requested_mob)
+            preferred = {("maze of shakhrami", "argus"): 2,
+                         ("maze of shakhrami", "leech king"): 2,
+                         ("sea serpent grotto", "charybdis"): 4,
+                         ("the boyahda tree", "ancient goobbue"): 3}.get(map_key, 1)
+            marker = {
+                ("maze of shakhrami", "argus"): {"map_id": 2, "left": 66.35, "top": 51.25},
+                ("maze of shakhrami", "leech king"): {"map_id": 2, "left": 66.35, "top": 51.25},
+                ("sea serpent grotto", "charybdis"): {"map_id": 4, "left": 50, "top": 68.75},
+                ("the boyahda tree", "ancient goobbue"): {"map_id": 3, "left": 43.75, "top": 56.25},
+            }.get(map_key)
+            return jsonify({"maps": sorted(wiki_maps, key=lambda row: row["map_id"]),
+                            "preferred_map": preferred, "marker": marker})
+        manifest_path = Path(app.root_path) / "map-dats" / "map_manifest.json"
+        if not requested_zone or not manifest_path.exists():
+            return jsonify({"maps": []})
+        records = json.loads(manifest_path.read_text(encoding="utf-8"))
+        maps = [{"map_id": row["map_id"],
+                 "url": url_for("map_asset", zone_id=row["zone_id"], filename=Path(row["image"]).name)}
+                for row in records
+                if row.get("zone", "").casefold() == requested_zone and row.get("image")]
+        return jsonify({"maps": sorted(maps, key=lambda row: row["map_id"])})
+
+    @app.get("/wiki-map-assets/<pack>/<path:filename>")
+    def wiki_map_asset(pack, filename):
+        if not re.fullmatch(r"remapster-wiki-pack-[12]-1024", pack):
+            abort(404)
+        directory = Path(app.root_path) / "map-dats" / "wiki-packs" / pack
+        return send_from_directory(directory, filename, mimetype="image/png")
+
+    @app.get("/calibrated-map-assets/<int:zone_id>/<path:filename>")
+    def calibrated_map_asset(zone_id, filename):
+        directory = Path(app.root_path) / "static" / "calibrated_maps" / str(zone_id)
+        return send_from_directory(directory, filename, mimetype="image/png")
+
+    @app.get("/map-assets/<int:zone_id>/<path:filename>")
+    def map_asset(zone_id, filename):
+        directory = Path(app.root_path) / "map-dats" / "extracted" / str(zone_id)
+        return send_from_directory(directory, filename, mimetype="image/webp")
 
     def require_member_identity():
         member_id = current_member_id()
