@@ -6,7 +6,7 @@
     <h1>Find your next mission party.</h1>
     <p>See who needs the same fight, which jobs they can bring, and when they are ready to go.</p>
   </div>
-  <a class="button primary" href="{{ url_for('member_form', member_id=current_member_id()) if current_member_id() else url_for('member_form') }}">{{ 'Add or Update Progress' if is_editor() else 'Sign in to update' }}</a>
+  {% if is_editor() %}<a class="button primary" href="{{ url_for('member_form', member_id=current_member_id()) if current_member_id() else url_for('member_form') }}">Add or Update Progress</a>{% endif %}
 </section>
 
 <section class="stats">

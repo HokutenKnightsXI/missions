@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='loot_tables.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='spawn_maps.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='spawn_markers.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='header_layout.css') }}">
+  {% block head %}{% endblock %}
 </head>
 <body>
   <header class="site-header">
@@ -24,13 +26,14 @@
       <a href="{{ url_for('help_board') }}">Help Requests</a>
       <a href="{{ url_for('job_roster') }}">Job Roster</a>
       <a href="{{ url_for('loot_tables') }}">Loot Tables</a>
-      {% if is_admin() %}<a href="{{ url_for('members_admin') }}">Members</a>{% endif %}
+      {% if is_admin() %}<a class="admin-nav-link" href="{{ url_for('alliance_builder') }}">Alliance Builder</a>{% endif %}
+      {% if is_admin() %}<a class="admin-nav-link" href="{{ url_for('members_admin') }}">Members</a>{% endif %}
       {% if is_editor() and current_member_id() %}<a href="{{ url_for('my_help_requests') }}">My Requests</a>{% endif %}
     </nav>
     {% if is_editor() %}
-      <form method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button" type="submit">Sign out</button></form>
+      <form class="account-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button account-button" type="submit">Sign Out ({{ current_member_name() }})</button></form>
     {% else %}
-      <a class="button" href="{{ url_for('login') }}">Linkshell sign in</a>
+      <a class="button account-button" href="{{ url_for('login') }}">Sign In</a>
     {% endif %}
   </header>
   <main>

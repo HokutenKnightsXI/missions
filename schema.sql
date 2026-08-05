@@ -91,3 +91,34 @@ CREATE INDEX IF NOT EXISTS idx_help_requests_status ON help_requests(status);
 CREATE INDEX IF NOT EXISTS idx_help_requests_dates ON help_requests(start_at, end_at, expires_at);
 CREATE INDEX IF NOT EXISTS idx_help_requests_requester ON help_requests(requester_id);
 CREATE INDEX IF NOT EXISTS idx_help_volunteers_request ON help_volunteers(request_id, selected);
+
+CREATE TABLE IF NOT EXISTS loot_ownership (
+    member_id INTEGER NOT NULL,
+    item_key TEXT NOT NULL,
+    acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (member_id, item_key),
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS alliance_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    event_at TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS alliance_slots (
+    event_id INTEGER NOT NULL,
+    party_number INTEGER NOT NULL CHECK(party_number BETWEEN 1 AND 3),
+    slot_number INTEGER NOT NULL CHECK(slot_number BETWEEN 1 AND 6),
+    member_id INTEGER NOT NULL,
+    job TEXT NOT NULL,
+    PRIMARY KEY (event_id, party_number, slot_number),
+    UNIQUE (event_id, member_id),
+    FOREIGN KEY (event_id) REFERENCES alliance_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_alliance_events_date ON alliance_events(event_at, updated_at);

@@ -1,0 +1,44 @@
+@media (min-width: 801px) {
+  .site-header,
+  .site-header .brand,
+  .site-header .subtitle,
+  .site-nav,
+  .site-nav a {
+    flex-wrap: nowrap;
+    white-space: nowrap;
+  }
+
+  .site-nav {
+    min-width: max-content;
+  }
+}
+
+.account-form {
+  margin: 0;
+}
+
+.account-button {
+  border-color: #ffd229 !important;
+  background: linear-gradient(180deg, #ffe85a, #ffc400) !important;
+  color: #211600 !important;
+  font-weight: 900 !important;
+  white-space: nowrap;
+  box-shadow: 0 0 0 1px #fff17666, 0 0 18px #ffd22955, inset 0 1px #fff8bd;
+}
+
+.account-button:hover,
+.account-button:focus-visible {
+  background: linear-gradient(180deg, #fff28a, #ffd229) !important;
+  box-shadow: 0 0 0 2px #fff3a0aa, 0 0 24px #ffd22988;
+}
+
+.site-nav .admin-nav-link {
+  color: #ff5d68;
+  font-weight: 900;
+  text-shadow: 0 0 10px rgba(255, 50, 65, .4);
+}
+
+.site-nav .admin-nav-link:hover,
+.site-nav .admin-nav-link:focus-visible {
+  color: #ff9aa2;
+}

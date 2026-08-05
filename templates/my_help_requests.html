@@ -1,1 +1,71 @@
-{% extends 'base.html' %}{% block title %}My Requests · Missions{% endblock %}{% block content %}<section class="help-hero"><div><p class="eyebrow">{{ member.name }}</p><h1>My Help Activity</h1><p>Requests you created and requests you volunteered for.</p></div><a class="button primary" href="{{ url_for('create_help_request') }}">+ Request Help</a></section><section class="help-panel"><div class="request-list">{% for item in help_requests %}<a href="{{ url_for('help_request_detail',request_id=item.id) }}"><div><b>{{ item.title }}</b><small>{{ 'Created by you' if item.requester_id == member.id else 'Volunteered' }} · {{ item.category }}</small></div><span class="help-badge {{ item.status|lower }}">{{ item.status }}</span></a>{% else %}<p class="help-empty">You have no help-request activity yet.</p>{% endfor %}</div></section>{% endblock %}
+{% extends 'base.html' %}
+{% block title %}My Requests · Hokuten Knights{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='my_requests.css') }}">{% endblock %}
+{% block content %}
+<section class="help-hero my-requests-hero">
+  <div>
+    <p class="eyebrow">{{ member.name }}</p>
+    <h1>My Help Activity</h1>
+    <p>Your own requests and the runs you volunteered to help are organized separately below.</p>
+  </div>
+  <a class="button primary" href="{{ url_for('create_help_request') }}">+ Request Help</a>
+</section>
+
+<div class="my-requests-grid">
+  <section class="help-panel my-request-panel" id="created-requests">
+    <header class="my-request-heading">
+      <div>
+        <p class="eyebrow">Organizer</p>
+        <h2>Requests You Made</h2>
+      </div>
+      <span class="my-request-count" aria-label="{{ created_requests|length }} requests">{{ created_requests|length }}</span>
+    </header>
+    <div class="request-list">
+      {% for item in created_requests %}
+      <a href="{{ url_for('help_request_detail', request_id=item.id) }}">
+        <div>
+          <b>{{ item.title }}</b>
+          <small>{{ item.category }} · {{ item.volunteer_count }} interested helper{{ '' if item.volunteer_count == 1 else 's' }}</small>
+        </div>
+        <span class="help-badge {{ item.status|lower }}">{{ item.status }}</span>
+      </a>
+      {% else %}
+      <div class="my-request-empty">
+        <b>You haven’t created a help request yet.</b>
+        <a href="{{ url_for('create_help_request') }}">Create your first request</a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <section class="help-panel my-request-panel" id="volunteered-requests">
+    <header class="my-request-heading">
+      <div>
+        <p class="eyebrow">Helper</p>
+        <h2>Requests You Volunteered For</h2>
+      </div>
+      <span class="my-request-count helper" aria-label="{{ volunteered_requests|length }} requests">{{ volunteered_requests|length }}</span>
+    </header>
+    <div class="request-list">
+      {% for item in volunteered_requests %}
+      <a href="{{ url_for('help_request_detail', request_id=item.id) }}">
+        <div>
+          <b>{{ item.title }}</b>
+          <small>Requested by {{ item.requester_name }} · {{ item.category }}</small>
+          {% if item.volunteer_jobs %}<small class="my-volunteer-jobs">Helping as {{ item.volunteer_jobs|replace(',', ', ') }}</small>{% endif %}
+        </div>
+        <div class="my-request-status">
+          {% if item.volunteer_selected %}<span class="my-selected-badge">Selected</span>{% endif %}
+          <span class="help-badge {{ item.status|lower }}">{{ item.status }}</span>
+        </div>
+      </a>
+      {% else %}
+      <div class="my-request-empty">
+        <b>You haven’t volunteered for a request yet.</b>
+        <a href="{{ url_for('help_board') }}">Browse open help requests</a>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+</div>
+{% endblock %}
