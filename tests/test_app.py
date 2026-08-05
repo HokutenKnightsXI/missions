@@ -53,6 +53,50 @@ def test_non_login_post_still_rejects_missing_csrf_token(tmp_path):
     assert app.test_client().post("/identity", data={"member_id": "1"}).status_code == 400
 
 
+def test_roster_refresh_api_requires_machine_token_and_updates_only_valid_members(tmp_path):
+    app = create_app({
+        "TESTING": True, "DATABASE": str(tmp_path / "refresh-api.db"),
+        "SECRET_KEY": "test", "ROSTER_REFRESH_TOKEN": "daily-refresh-secret",
+    })
+    client = app.test_client()
+    with app.app_context():
+        database = missions.sqlite3.connect(app.config["DATABASE"])
+        database.execute("INSERT INTO member_jobs(member_id,job,level) VALUES (1,'WAR',10)")
+        database.commit()
+        database.close()
+
+    assert client.post("/api/job-roster/refresh", json={"players": {}}).status_code == 401
+    response = client.post(
+        "/api/job-roster/refresh",
+        headers={"Authorization": "Bearer daily-refresh-secret"},
+        json={"players": {
+            "Imaven": {"WAR": 75, "PLD": 24},
+            "NotRegistered": {"RDM": 75},
+            "Vlathgar": {"RDM": 99},
+        }},
+    )
+    assert response.status_code == 200
+    assert response.get_json()["updated"] == 1
+    assert set(response.get_json()["skipped"]) == {"NotRegistered", "Vlathgar"}
+    with app.app_context():
+        database = missions.sqlite3.connect(app.config["DATABASE"])
+        assert database.execute(
+            "SELECT job,level FROM member_jobs WHERE member_id=1 ORDER BY job"
+        ).fetchall() == [("PLD", 24), ("WAR", 75)]
+        database.close()
+
+
+def test_roster_member_feed_returns_every_registered_character(tmp_path):
+    app = create_app({
+        "TESTING": True, "DATABASE": str(tmp_path / "member-feed.db"),
+        "SECRET_KEY": "test",
+    })
+    response = app.test_client().get("/api/job-roster/members")
+    assert response.status_code == 200
+    assert "Imaven" in response.get_json()["members"]
+    assert response.headers["Cache-Control"] == "no-store"
+
+
 def test_empty_board_loads(client):
     response = client.get("/")
     assert response.status_code == 200

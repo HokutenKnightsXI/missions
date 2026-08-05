@@ -355,6 +355,7 @@ def create_app(test_config=None):
         DATABASE=os.path.join(app.instance_path, "missions.db"),
         EDIT_PASSWORD=os.environ.get("EDIT_PASSWORD", "Hokuten"),
         ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD", "Idonthave1"),
+        ROSTER_REFRESH_TOKEN=os.environ.get("ROSTER_REFRESH_TOKEN", ""),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "").lower() in {"1", "true", "yes"},
@@ -403,7 +404,8 @@ def create_app(test_config=None):
 
     @app.before_request
     def protect_posts():
-        if request.method == "POST" and not app.config.get("AUTH_DISABLED"):
+        if (request.method == "POST" and request.endpoint != "refresh_job_roster_api"
+                and not app.config.get("AUTH_DISABLED")):
             supplied = request.form.get("csrf_token", "")
             expected = session.get("csrf_token", "")
             if not expected or not hmac.compare_digest(supplied, expected):
@@ -836,6 +838,80 @@ def create_app(test_config=None):
             jobs=JOBS, filter_job=filter_job, min_level=min_level,
             sort_job=sort_job, direction=direction, level_75_counts=level_75_counts,
         )
+
+    @app.get("/api/job-roster/members")
+    def job_roster_members_api():
+        """Return registered character names for the external refresh worker."""
+        names = [row["name"] for row in get_db().execute(
+            "SELECT name FROM members ORDER BY name COLLATE NOCASE"
+        ).fetchall()]
+        response = jsonify({"members": names})
+        response.headers["Cache-Control"] = "no-store"
+        return response
+
+    @app.post("/api/job-roster/refresh")
+    def refresh_job_roster_api():
+        """Apply validated HorizonXI job results from the scheduled GitHub worker."""
+        expected = app.config.get("ROSTER_REFRESH_TOKEN", "")
+        supplied = request.headers.get("Authorization", "")
+        if not expected:
+            return jsonify({"error": "Roster refresh is not configured."}), 503
+        if not supplied.startswith("Bearer ") or not hmac.compare_digest(
+                supplied.removeprefix("Bearer "), expected):
+            return jsonify({"error": "Unauthorized."}), 401
+        if request.content_length and request.content_length > 256 * 1024:
+            return jsonify({"error": "Refresh payload is too large."}), 413
+
+        payload = request.get_json(silent=True)
+        players = payload.get("players") if isinstance(payload, dict) else None
+        if not isinstance(players, dict) or len(players) > 250:
+            return jsonify({"error": "Expected a players object."}), 400
+
+        db = get_db()
+        registered = {
+            row["name"].casefold(): (row["id"], row["name"])
+            for row in db.execute("SELECT id, name FROM members").fetchall()
+        }
+        updates = []
+        skipped = []
+        for submitted_name, submitted_jobs in players.items():
+            member = registered.get(str(submitted_name).casefold())
+            if not member or not isinstance(submitted_jobs, dict):
+                skipped.append(str(submitted_name))
+                continue
+            jobs = {}
+            invalid = False
+            for job, level in submitted_jobs.items():
+                if (job not in JOBS or isinstance(level, bool)
+                        or not isinstance(level, (int, float))
+                        or int(level) != level or not 1 <= int(level) <= 75):
+                    invalid = True
+                    break
+                jobs[job] = int(level)
+            if invalid or not jobs:
+                skipped.append(member[1])
+                continue
+            updates.append((member[0], member[1], jobs))
+
+        try:
+            for member_id, _name, jobs in updates:
+                db.execute("DELETE FROM member_jobs WHERE member_id=?", (member_id,))
+                db.executemany(
+                    "INSERT INTO member_jobs(member_id,job,level) VALUES (?,?,?)",
+                    [(member_id, job, level) for job, level in jobs.items()],
+                )
+                db.execute(
+                    "UPDATE members SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (member_id,)
+                )
+            db.commit()
+        except sqlite3.DatabaseError:
+            db.rollback()
+            raise
+        return jsonify({
+            "updated": len(updates),
+            "updated_members": [name for _member_id, name, _jobs in updates],
+            "skipped": skipped,
+        })
 
     @app.get("/loot-tables")
     def loot_tables():
