@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}HorizonXI Loot Tables · Hokuten Knights{% endblock %}
+{% block content %}
+<section class="loot-hero">
+  <div><p class="eyebrow">Original · Zilart · Promathia · Treasures</p><h1>HorizonXI Loot Tables</h1><p>Search item, monster, and zone drops with Treasure Hunter projections through TH4.</p></div>
+  <div class="loot-source"><span>Dataset</span><b>LandSandBoat SQL</b><small>Wings, Abyssea, and later zones excluded</small></div>
+</section>
+<section class="loot-filters" aria-label="Loot filters">
+  <label>Search items<input id="loot-item" type="search" placeholder="e.g. Peacock Charm"></label>
+  <label>Search monsters<input id="loot-mob" type="search" placeholder="e.g. Argus"></label>
+  <label>Zone<select id="loot-zone"><option value="">All eligible zones</option></select></label>
+  <label>Highlight<select id="loot-th">{% for th in range(5) %}<option value="{{ th }}" {{ 'selected' if th == 4 }}>TH{{ th }}</option>{% endfor %}</select></label>
+  <button class="button" id="loot-clear" type="button">Clear</button>
+</section>
+<section class="th-strip" id="th-strip" aria-label="Treasure Hunter rarity rates"></section>
+<section class="loot-panel">
+  <header><div><h2>Drop matrix</h2><span id="loot-count">Loading loot data…</span></div><div class="loot-legend"><i></i> Selected TH column</div></header>
+  <div class="loot-table-wrap"><table class="loot-table"><thead><tr><th>Item</th><th>Monster</th><th>Zone</th><th data-th="0">TH0</th><th data-th="1">TH1</th><th data-th="2">TH2</th><th data-th="3">TH3</th><th data-th="4">TH4</th></tr></thead><tbody id="loot-body"><tr><td colspan="8" class="help-empty">Loading…</td></tr></tbody></table></div>
+  <footer><button class="button" id="loot-prev" type="button">← Previous</button><span id="loot-page"></span><button class="button" id="loot-next" type="button">Next →</button></footer>
+</section>
+<p class="loot-footnote">Rates are projections from the supplied TH rarity matrix. Grouped drops apply TH to the group roll and then the item’s conditional group weight. Duplicate independent rolls are combined as the chance of receiving at least one.</p>
+<script>window.LOOT_DATA_URL={{ url_for('static',filename='loot_tables.json')|tojson }};</script><script src="{{ url_for('static',filename='loot_tables.js') }}"></script>
+{% endblock %}
