@@ -1,6 +1,6 @@
-# Missions
+# HK XI
 
-A lightweight linkshell command board for coordinating HorizonXI **Chains of Promathia** and **Rise of the Zilart** mission progress. Members record their current mission, jobs, availability, and where they need help; the roster can then be filtered to find a party.
+A linkshell command board for coordinating HorizonXI **Chains of Promathia** and **Rise of the Zilart** mission progress. Members record their current mission, jobs, availability, and where they need help; the roster can then be filtered to find a party.
 
 ## Run locally
 
