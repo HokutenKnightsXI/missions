@@ -651,6 +651,14 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE help_request_roles ADD COLUMN kind TEXT NOT NULL DEFAULT 'job'")
         if "quantity" not in role_columns:
             get_db().execute("ALTER TABLE help_request_roles ADD COLUMN quantity INTEGER")
+        alliance_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(alliance_events)")
+        }
+        if "owner_member_id" not in alliance_columns:
+            get_db().execute("ALTER TABLE alliance_events ADD COLUMN owner_member_id INTEGER")
+        get_db().execute(
+            "CREATE INDEX IF NOT EXISTS idx_alliance_events_owner ON alliance_events(owner_member_id, updated_at)"
+        )
         get_db().executemany(
             "INSERT OR IGNORE INTO members(name) VALUES (?)",
             [(name,) for name in LOGIN_CHARACTERS],
@@ -884,18 +892,24 @@ def create_app(test_config=None):
         return render_template("members_admin.html", members=members)
 
     @app.get("/alliance-builder")
-    @admin_required
+    @editor_required
     def alliance_builder():
+        owner = require_member_identity()
         db = get_db()
         events = db.execute(
             """SELECT e.*, COUNT(s.member_id) member_count
                FROM alliance_events e LEFT JOIN alliance_slots s ON s.event_id=e.id
+               WHERE e.owner_member_id=?
                GROUP BY e.id ORDER BY COALESCE(e.event_at, e.created_at) DESC, e.id DESC"""
+            , (owner["id"],)
         ).fetchall()
         event = None
         event_id = request.args.get("event", "")
         if event_id.isdigit():
-            event = db.execute("SELECT * FROM alliance_events WHERE id=?", (event_id,)).fetchone()
+            event = db.execute(
+                "SELECT * FROM alliance_events WHERE id=? AND owner_member_id=?",
+                (event_id, owner["id"]),
+            ).fetchone()
             if not event:
                 abort(404)
         slot_rows = db.execute(
@@ -920,12 +934,13 @@ def create_app(test_config=None):
         return render_template(
             "alliance_builder.html", events=events, event=event,
             assignments=assignments, roster=list(roster.values()), jobs=JOBS,
-            role_jobs=ALLIANCE_ROLE_JOBS,
+            role_jobs=ALLIANCE_ROLE_JOBS, owner=owner,
         )
 
     @app.post("/alliance-builder/save")
-    @admin_required
+    @editor_required
     def save_alliance():
+        owner = require_member_identity()
         name = request.form.get("name", "").strip()
         if not name or len(name) > 80:
             abort(400, description="Enter an event name up to 80 characters.")
@@ -938,17 +953,19 @@ def create_app(test_config=None):
         event_id = request.form.get("event_id", "")
         if event_id:
             if not event_id.isdigit() or not db.execute(
-                    "SELECT 1 FROM alliance_events WHERE id=?", (event_id,)).fetchone():
+                    "SELECT 1 FROM alliance_events WHERE id=? AND owner_member_id=?",
+                    (event_id, owner["id"])).fetchone():
                 abort(404)
             db.execute(
-                "UPDATE alliance_events SET name=?,event_at=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
-                (name, event_at.isoformat(timespec="minutes") if event_at else None, notes, event_id),
+                "UPDATE alliance_events SET name=?,event_at=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_member_id=?",
+                (name, event_at.isoformat(timespec="minutes") if event_at else None, notes,
+                 event_id, owner["id"]),
             )
             event_id = int(event_id)
         else:
             event_id = db.execute(
-                "INSERT INTO alliance_events(name,event_at,notes) VALUES(?,?,?)",
-                (name, event_at.isoformat(timespec="minutes") if event_at else None, notes),
+                "INSERT INTO alliance_events(owner_member_id,name,event_at,notes) VALUES(?,?,?,?)",
+                (owner["id"], name, event_at.isoformat(timespec="minutes") if event_at else None, notes),
             ).lastrowid
 
         roster_jobs = {
@@ -986,13 +1003,18 @@ def create_app(test_config=None):
         return redirect(url_for("alliance_builder", event=event_id))
 
     @app.post("/alliance-builder/<int:event_id>/delete")
-    @admin_required
+    @editor_required
     def delete_alliance(event_id):
+        owner = require_member_identity()
         db = get_db()
-        event = db.execute("SELECT name FROM alliance_events WHERE id=?", (event_id,)).fetchone()
+        event = db.execute(
+            "SELECT name FROM alliance_events WHERE id=? AND owner_member_id=?",
+            (event_id, owner["id"]),
+        ).fetchone()
         if not event:
             abort(404)
-        db.execute("DELETE FROM alliance_events WHERE id=?", (event_id,))
+        db.execute("DELETE FROM alliance_events WHERE id=? AND owner_member_id=?",
+                   (event_id, owner["id"]))
         db.commit()
         flash(f"Deleted alliance layout for {event['name']}.", "success")
         return redirect(url_for("alliance_builder"))
