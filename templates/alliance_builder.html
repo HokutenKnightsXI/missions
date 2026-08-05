@@ -1,15 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Alliance Builder · Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_refined.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_readability.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_compact_filters.css') }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_refined.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_readability.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_compact_filters.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='alliance_builder_ownership.css') }}">{% endblock %}
 {% block content %}
 <section class="alliance-hero">
-  <div><p class="eyebrow">Leader Tools</p><h1>Alliance Party Maker</h1><p>Build three six-person parties directly from the current HorizonXI job roster.</p></div>
+  <div><p class="eyebrow">{{ owner.name }}'s layouts</p><h1>Alliance Party Maker</h1><p>Build three six-person parties directly from the current HorizonXI job roster.</p></div>
   <div class="alliance-hero-actions"><a class="button primary" href="{{ url_for('alliance_builder') }}">+ New Alliance</a><button class="button saved-alliance-button" id="open-saved-alliances" type="button">+ Load Saved Alliance</button></div>
 </section>
 
 <dialog class="saved-alliance-dialog" id="saved-alliance-dialog">
   <header><div><p class="eyebrow">Leader layouts</p><h2>Load Saved Alliance</h2></div><button type="button" id="close-saved-alliances" aria-label="Close">×</button></header>
-  <div class="saved-alliance-list">{% for saved in events %}<a class="{{ 'active' if event and event.id == saved.id }}" href="{{ url_for('alliance_builder', event=saved.id) }}"><span><b>{{ saved.name }}</b><small>{{ saved.event_at|replace('T',' ') if saved.event_at else 'Date not set' }}</small></span><strong>{{ saved.member_count }}/18</strong></a>{% else %}<p>No saved alliance layouts yet.</p>{% endfor %}</div>
+  <div class="saved-alliance-list">{% for saved in events %}<div class="saved-alliance-row"><a class="{{ 'active' if event and event.id == saved.id }}" href="{{ url_for('alliance_builder', event=saved.id) }}"><span><b>{{ saved.name }}</b><small>{{ saved.event_at|replace('T',' ') if saved.event_at else 'Date not set' }}</small></span><strong>{{ saved.member_count }}/18</strong></a><form method="post" action="{{ url_for('delete_alliance', event_id=saved.id) }}" onsubmit="return confirm('Delete {{ saved.name|e }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" aria-label="Delete {{ saved.name }}" title="Delete saved layout">×</button></form></div>{% else %}<p>No saved alliance layouts yet.</p>{% endfor %}</div>
 </dialog>
 
 <form class="alliance-builder" method="post" action="{{ url_for('save_alliance') }}" id="alliance-form">

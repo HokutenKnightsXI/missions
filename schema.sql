@@ -102,11 +102,13 @@ CREATE TABLE IF NOT EXISTS loot_ownership (
 
 CREATE TABLE IF NOT EXISTS alliance_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_member_id INTEGER,
     name TEXT NOT NULL,
     event_at TEXT,
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_member_id) REFERENCES members(id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS alliance_slots (
