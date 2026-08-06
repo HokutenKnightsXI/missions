@@ -251,15 +251,18 @@ MISSION_OPTIONS = {
             ("Ulmia's Path", "Chapter 5 – The Return Home to Jeuno"),
             ("Tenzen's Path", "Chapter 5 – The Return Home to Jeuno"),
         ]),
-        ("Chapter 6 – Eternal Transgression", [
-            ("CoP 6-1 – For Whom the Verse Is Sung", "Chapter 6 – Eternal Transgression"),
-            ("CoP 6-2 – A Place to Return", "Chapter 6 – Eternal Transgression"),
-            ("CoP 6-3 – More Questions Than Answers", "Chapter 6 – Eternal Transgression"),
+        ("Chapter 6 – Echoes of Time", [
+            ("CoP 6-1 – For Whom the Verse Is Sung", "Chapter 6 – Echoes of Time"),
+            ("CoP 6-2 – A Place to Return", "Chapter 6 – Echoes of Time"),
+            ("CoP 6-3 – More Questions Than Answers", "Chapter 6 – Echoes of Time"),
+            ("CoP 6-4 – One to Be Feared", "Chapter 6 – Echoes of Time"),
         ]),
-        ("Chapter 7 – The Destiny Destroyers", [
-            ("CoP 7-1 – One to Be Feared", "Chapter 7 – The Destiny Destroyers"),
-            ("CoP 7-2 – Chains and Bonds", "Chapter 7 – The Destiny Destroyers"),
-            ("CoP 7-3 – Flames in the Darkness", "Chapter 7 – The Destiny Destroyers"),
+        ("Chapter 7 – In the Light of the Crystal", [
+            ("CoP 7-1 – Chains and Bonds", "Chapter 7 – In the Light of the Crystal"),
+            ("CoP 7-2 – Flames in the Darkness", "Chapter 7 – In the Light of the Crystal"),
+            ("CoP 7-3 – Fire in the Eyes of Men", "Chapter 7 – In the Light of the Crystal"),
+            ("CoP 7-4 – Calm Before the Storm", "Chapter 7 – In the Light of the Crystal"),
+            ("CoP 7-5 – The Warrior's Path", "Chapter 7 – In the Light of the Crystal"),
         ]),
         ("Chapter 8 – Emptiness Bleeds", [
             ("CoP 8-1 – Garden of Antiquity", "Chapter 8 – Emptiness Bleeds"),
@@ -346,6 +349,15 @@ ZILART_MISSION_MIGRATIONS = {
     "ZM12 – Awakening": "ZM17 – Awakening",
     "ZM13 – The Last Verse (epilogue shared with CoP after Apocalypse Nigh)":
         "ZM18 – The Last Verse (epilogue shared with CoP after Apocalypse Nigh)",
+}
+
+COP_MISSION_MIGRATIONS = {
+    "CoP 7-1 – One to Be Feared":
+        ("CoP 6-4 – One to Be Feared", "Chapter 6 – Echoes of Time"),
+    "CoP 7-2 – Chains and Bonds":
+        ("CoP 7-1 – Chains and Bonds", "Chapter 7 – In the Light of the Crystal"),
+    "CoP 7-3 – Flames in the Darkness":
+        ("CoP 7-2 – Flames in the Darkness", "Chapter 7 – In the Light of the Crystal"),
 }
 
 
@@ -569,7 +581,6 @@ def create_app(test_config=None):
     @app.post("/logout")
     def logout():
         session.clear()
-        flash("You are signed out.", "success")
         return redirect(url_for("index"))
 
     def get_db():
@@ -667,6 +678,11 @@ def create_app(test_config=None):
             get_db().execute(
                 "UPDATE progress SET mission=?, chapter=? WHERE campaign='ZILART' AND mission=?",
                 (new_mission, new_mission.split(" – ", 1)[0], old_mission),
+            )
+        for old_mission, (new_mission, chapter) in COP_MISSION_MIGRATIONS.items():
+            get_db().execute(
+                "UPDATE progress SET mission=?, chapter=? WHERE campaign='COP' AND mission=?",
+                (new_mission, chapter, old_mission),
             )
         for campaign in CAMPAIGNS:
             get_db().execute(

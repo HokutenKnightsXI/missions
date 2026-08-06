@@ -3,7 +3,7 @@ import json
 import re
 
 import missions
-from missions import create_app
+from missions import MISSION_OPTIONS, create_app
 
 
 @pytest.fixture()
@@ -35,6 +35,22 @@ def test_updates_require_shared_password(tmp_path):
     assert client.get("/members/new").status_code == 200
 
 
+def test_cop_chapters_six_and_seven_follow_horizon_mission_order():
+    cop_missions = [mission for _chapter, entries in MISSION_OPTIONS["COP"] for mission, _ in entries]
+    start = cop_missions.index("CoP 6-1 – For Whom the Verse Is Sung")
+    assert cop_missions[start:start + 9] == [
+        "CoP 6-1 – For Whom the Verse Is Sung",
+        "CoP 6-2 – A Place to Return",
+        "CoP 6-3 – More Questions Than Answers",
+        "CoP 6-4 – One to Be Feared",
+        "CoP 7-1 – Chains and Bonds",
+        "CoP 7-2 – Flames in the Darkness",
+        "CoP 7-3 – Fire in the Eyes of Men",
+        "CoP 7-4 – Calm Before the Storm",
+        "CoP 7-5 – The Warrior's Path",
+    ]
+
+
 def test_header_uses_single_yellow_account_control(tmp_path):
     app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "account-header.db"),
                       "SECRET_KEY": "test", "AUTH_DISABLED": False})
@@ -63,6 +79,16 @@ def test_header_uses_single_yellow_account_control(tmp_path):
     signed_in = client.get("/")
     assert b"Sign Out (Imaven)" in signed_in.data
     assert b"Add or Update Progress" in signed_in.data
+
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+    signed_out_again = client.post(
+        "/logout", data={"csrf_token": csrf}, follow_redirects=True,
+    )
+    assert b'class="public-landing"' in signed_out_again.data
+    assert b">Sign In</a>" in signed_out_again.data
+    assert b"Add or Update Progress" not in signed_out_again.data
+    assert b"You are signed out" not in signed_out_again.data
 
 
 def test_post_rejects_missing_csrf_token(tmp_path):
