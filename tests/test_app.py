@@ -3,7 +3,7 @@ import json
 import re
 
 import missions
-from missions import create_app
+from missions import MISSION_OPTIONS, create_app
 
 
 @pytest.fixture()
@@ -33,6 +33,22 @@ def test_updates_require_shared_password(tmp_path):
     assert signed_in.status_code == 302
     assert signed_in.location == "/members/new"
     assert client.get("/members/new").status_code == 200
+
+
+def test_cop_chapters_six_and_seven_follow_horizon_mission_order():
+    cop_missions = [mission for _chapter, entries in MISSION_OPTIONS["COP"] for mission, _ in entries]
+    start = cop_missions.index("CoP 6-1 – For Whom the Verse Is Sung")
+    assert cop_missions[start:start + 9] == [
+        "CoP 6-1 – For Whom the Verse Is Sung",
+        "CoP 6-2 – A Place to Return",
+        "CoP 6-3 – More Questions Than Answers",
+        "CoP 6-4 – One to Be Feared",
+        "CoP 7-1 – Chains and Bonds",
+        "CoP 7-2 – Flames in the Darkness",
+        "CoP 7-3 – Fire in the Eyes of Men",
+        "CoP 7-4 – Calm Before the Storm",
+        "CoP 7-5 – The Warrior's Path",
+    ]
 
 
 def test_header_uses_single_yellow_account_control(tmp_path):
