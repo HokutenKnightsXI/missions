@@ -66,7 +66,8 @@ def parse_zones(sql):
 
 
 def parse_drops(sql, zones):
-    current_zone = current_mob = None
+    current_mobs = []
+    block_has_drops = False
     rolls = defaultdict(list)
     block = re.compile(r"-- ZoneID:\s*(\d+)\s*-\s*(.+)$")
     insert = re.compile(
@@ -75,11 +76,15 @@ def parse_drops(sql, zones):
     for line in sql.splitlines():
         heading = block.search(line)
         if heading:
-            current_zone, current_mob = int(heading.group(1)), heading.group(2).strip()
+            if block_has_drops:
+                current_mobs = []
+            current_mobs.append((int(heading.group(1)), heading.group(2).strip()))
+            block_has_drops = False
             continue
         match = insert.search(line)
-        if not match or current_zone is None or not allowed_zone(current_zone, zones.get(current_zone, "")):
+        if not match or not current_mobs:
             continue
+        block_has_drops = True
         _drop_id, drop_type, _group_id, group_rate, _item_id, item_rate, item_name = match.groups()
         drop_type = int(drop_type)
         if drop_type not in (0, 1):
@@ -89,8 +94,12 @@ def parse_drops(sql, zones):
         for th in range(5):
             chance = th_rate(item_rate, th) if drop_type == 0 else th_rate(group_rate, th) * item_rate / 1000
             rates.append(min(100.0, chance))
-        key = (zones[current_zone].replace("_", " "), current_mob.replace("_", " "), item_name.strip())
-        rolls[key].append(rates)
+        for current_zone, current_mob in current_mobs:
+            zone_name = zones.get(current_zone, "")
+            if not allowed_zone(current_zone, zone_name):
+                continue
+            key = (zone_name.replace("_", " "), current_mob.replace("_", " "), item_name.strip())
+            rolls[key].append(rates)
     rows = []
     for (zone, mob, item), chances in rolls.items():
         combined = [100 * (1 - math.prod(1 - roll[th] / 100 for roll in chances)) for th in range(5)]

@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from build_loot_tables import allowed_zone, th_rate
+from build_loot_tables import allowed_zone, parse_drops, th_rate
 from missions import create_app, dynamis_catalog
 
 
@@ -27,6 +27,18 @@ def test_zone_filter_excludes_later_expansions():
     assert not allowed_zone(81, "East_Ronfaure_[S]")
     assert not allowed_zone(15, "Abyssea-Konschtat")
     assert not allowed_zone(256, "Western_Adoulin")
+
+
+def test_shared_drop_block_is_applied_to_every_consecutive_mob_heading():
+    sql = """-- ZoneID: 124 - Tonberry Jinxer
+-- ZoneID: 160 - Tonberry Imprecator
+INSERT INTO `mob_droplist` VALUES (2438,0,0,1000,1429,@UNCOMMON); -- Black Mages Testimony (Uncommon, 10%)
+"""
+    rows = parse_drops(sql, {124: "Yhoator_Jungle", 160: "Den_of_Rancor"})
+    assert [row[:3] for row in rows] == [
+        ["Den of Rancor", "Tonberry Imprecator", "Black Mages Testimony"],
+        ["Yhoator Jungle", "Tonberry Jinxer", "Black Mages Testimony"],
+    ]
 
 
 def test_loot_table_page_and_generated_index(client):

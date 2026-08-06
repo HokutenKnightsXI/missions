@@ -64,6 +64,16 @@ def test_header_uses_single_yellow_account_control(tmp_path):
     assert b"Sign Out (Imaven)" in signed_in.data
     assert b"Add or Update Progress" in signed_in.data
 
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+    signed_out_again = client.post(
+        "/logout", data={"csrf_token": csrf}, follow_redirects=True,
+    )
+    assert b'class="public-landing"' in signed_out_again.data
+    assert b">Sign In</a>" in signed_out_again.data
+    assert b"Add or Update Progress" not in signed_out_again.data
+    assert b"You are signed out" not in signed_out_again.data
+
 
 def test_post_rejects_missing_csrf_token(tmp_path):
     app = create_app({

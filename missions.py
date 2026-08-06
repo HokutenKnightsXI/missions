@@ -569,7 +569,6 @@ def create_app(test_config=None):
     @app.post("/logout")
     def logout():
         session.clear()
-        flash("You are signed out.", "success")
         return redirect(url_for("index"))
 
     def get_db():
