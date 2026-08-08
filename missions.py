@@ -697,7 +697,12 @@ def create_app(test_config=None):
             return redirect(url_for("discord_connect"))
 
         discord_user_id = str(discord_user.get("id", ""))
-        nickname = (guild_member.get("nick") or "").strip()
+        nickname = (
+            guild_member.get("nick")
+            or discord_user.get("global_name")
+            or discord_user.get("username")
+            or ""
+        ).strip()
         if not discord_user_id:
             flash("Discord did not return a valid account ID.", "error")
             return redirect(url_for("discord_connect"))
@@ -734,7 +739,7 @@ def create_app(test_config=None):
         if member is None:
             if not re.fullmatch(r"[A-Za-z]{2,15}", nickname):
                 flash(
-                    "Set your Hokuten Discord server nickname to your exact HorizonXI character name "
+                    "Set your Hokuten server nickname or Discord display name to your exact HorizonXI character name "
                     "(2–15 letters only), then try again.", "error",
                 )
                 return redirect(url_for("discord_connect"))

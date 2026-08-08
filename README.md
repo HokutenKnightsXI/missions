@@ -29,8 +29,9 @@ DISCORD_REDIRECT_URI=https://example.com/discord/callback
 DISCORD_ADMIN_USER_ID=your_permanent_discord_user_id
 ```
 
-Members must set their nickname in the Hokuten Discord server to their exact HorizonXI
-character name before linking. The OAuth application requests only `identify` and
+Members should set their nickname in the Hokuten Discord server to their exact HorizonXI
+character name before linking. If no server nickname is set, the Discord display name or
+username is used. The OAuth application requests only `identify` and
 `guilds.members.read`. An existing unlinked roster entry is matched case-insensitively;
 otherwise a new member is created. The permanent Discord user ID is stored so later
 nickname changes cannot transfer the character. The `Imaven` character is reserved for
