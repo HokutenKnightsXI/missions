@@ -35,6 +35,13 @@ def test_updates_require_shared_password(tmp_path):
     assert client.get("/members/new").status_code == 200
 
 
+def test_login_asks_for_character_before_password(tmp_path):
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "login-order.db"),
+                      "SECRET_KEY": "test", "AUTH_DISABLED": False})
+    page = app.test_client().get("/login").data
+    assert page.index(b'name="member_id"') < page.index(b'name="password"')
+
+
 def test_cop_chapters_six_and_seven_follow_horizon_mission_order():
     cop_missions = [mission for _chapter, entries in MISSION_OPTIONS["COP"] for mission, _ in entries]
     start = cop_missions.index("CoP 6-1 – For Whom the Verse Is Sung")
@@ -56,8 +63,9 @@ def test_header_uses_single_yellow_account_control(tmp_path):
                       "SECRET_KEY": "test", "AUTH_DISABLED": False})
     client = app.test_client()
     signed_out = client.get("/")
-    assert b'class="button account-button public-signin"' in signed_out.data
-    assert b">Sign In</a>" in signed_out.data
+    assert b'class="button account-button public-signin"' not in signed_out.data
+    assert b'class="landing-discord-signin"' in signed_out.data
+    assert b"Sign in with Discord</a>" in signed_out.data
     assert b"Sign in to update" not in signed_out.data
     assert b'class="site-nav"' not in signed_out.data
     assert b'class="brand"' not in signed_out.data
@@ -79,6 +87,15 @@ def test_header_uses_single_yellow_account_control(tmp_path):
     signed_in = client.get("/")
     assert b"Sign Out (Imaven)" in signed_in.data
     assert b"Add or Update Progress" in signed_in.data
+    nav = signed_in.data.split(b'<nav class="site-nav">', 1)[1].split(b"</nav>", 1)[0]
+    assert [nav.index(label) for label in (
+        b"Missions", b"Help Requests", b"My Requests", b"Loot Tables",
+        b"Job Roster", b"Alliance Builder",
+    )] == sorted(nav.index(label) for label in (
+        b"Missions", b"Help Requests", b"My Requests", b"Loot Tables",
+        b"Job Roster", b"Alliance Builder",
+    ))
+    assert b">Members</a>" not in nav
 
     with client.session_transaction() as session:
         csrf = session["csrf_token"]
@@ -86,7 +103,7 @@ def test_header_uses_single_yellow_account_control(tmp_path):
         "/logout", data={"csrf_token": csrf}, follow_redirects=True,
     )
     assert b'class="public-landing"' in signed_out_again.data
-    assert b">Sign In</a>" in signed_out_again.data
+    assert b"Sign in with Discord</a>" in signed_out_again.data
     assert b"Add or Update Progress" not in signed_out_again.data
     assert b"You are signed out" not in signed_out_again.data
 

@@ -1,0 +1,9 @@
+body:has(.discord-connect-card) .public-header {
+  display: none;
+}
+
+.disabled-discord-signin {
+  cursor: not-allowed;
+  filter: grayscale(.25);
+  opacity: .55;
+}

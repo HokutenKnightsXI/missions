@@ -8,12 +8,31 @@ import calendar
 from datetime import date, datetime, time, timedelta
 from functools import wraps
 from urllib.error import HTTPError, URLError
-from urllib.parse import quote
+from urllib.parse import quote, urlencode
 from urllib.request import Request, urlopen
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from flask import Flask, abort, flash, g, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+
+
+def load_local_env():
+    """Load an ignored local .env file without overriding host-provided variables."""
+    env_path = Path(__file__).with_name(".env")
+    if not env_path.exists():
+        return
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        value = value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in "\"'":
+            value = value[1:-1]
+        os.environ.setdefault(key.strip(), value)
+
+
+load_local_env()
 
 
 JOBS = (
@@ -451,6 +470,31 @@ def request_occurs_on(help_request, day):
     return first_day <= day and (not expires or day <= expires.date())
 
 
+def discord_exchange_code(client_id, client_secret, code, redirect_uri):
+    payload = urlencode({
+        "client_id": client_id, "client_secret": client_secret,
+        "grant_type": "authorization_code", "code": code,
+        "redirect_uri": redirect_uri,
+    }).encode("utf-8")
+    oauth_request = Request(
+        "https://discord.com/api/v10/oauth2/token", data=payload,
+        headers={"Content-Type": "application/x-www-form-urlencoded",
+                 "User-Agent": "HokutenKnightsDashboard/1.0"},
+    )
+    with urlopen(oauth_request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
+def discord_get(access_token, path):
+    api_request = Request(
+        f"https://discord.com/api/v10{path}",
+        headers={"Authorization": f"Bearer {access_token}",
+                 "User-Agent": "HokutenKnightsDashboard/1.0"},
+    )
+    with urlopen(api_request, timeout=20) as response:
+        return json.loads(response.read().decode("utf-8"))
+
+
 def create_app(test_config=None):
     app = Flask(__name__, instance_relative_config=True)
     app.config.from_mapping(
@@ -458,6 +502,10 @@ def create_app(test_config=None):
         DATABASE=os.path.join(app.instance_path, "missions.db"),
         EDIT_PASSWORD=os.environ.get("EDIT_PASSWORD", "Hokuten"),
         ADMIN_PASSWORD=os.environ.get("ADMIN_PASSWORD", "Idonthave1"),
+        DISCORD_CLIENT_ID=os.environ.get("DISCORD_CLIENT_ID", ""),
+        DISCORD_CLIENT_SECRET=os.environ.get("DISCORD_CLIENT_SECRET", ""),
+        DISCORD_GUILD_ID=os.environ.get("DISCORD_GUILD_ID", ""),
+        DISCORD_REDIRECT_URI=os.environ.get("DISCORD_REDIRECT_URI", ""),
         ROSTER_REFRESH_TOKEN=os.environ.get("ROSTER_REFRESH_TOKEN", ""),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
@@ -465,6 +513,10 @@ def create_app(test_config=None):
     )
     if test_config:
         app.config.update(test_config)
+        if test_config.get("TESTING"):
+            for key in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID", "DISCORD_REDIRECT_URI"):
+                if key not in test_config:
+                    app.config[key] = ""
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
 
     def is_editor():
@@ -473,6 +525,11 @@ def create_app(test_config=None):
     def is_admin():
         return bool(session.get("is_admin") or (
             app.config.get("AUTH_DISABLED") and current_member_id() is None
+        ))
+
+    def discord_ready():
+        return all(app.config.get(key) for key in (
+            "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID",
         ))
 
     def current_member_id():
@@ -510,6 +567,7 @@ def create_app(test_config=None):
     app.jinja_env.globals.update(
         csrf_token=csrf_token, is_editor=is_editor, is_admin=is_admin,
         current_member_id=current_member_id, current_member_name=current_member_name,
+        discord_ready=discord_ready,
     )
 
     @app.before_request
@@ -533,10 +591,10 @@ def create_app(test_config=None):
             admin_password = app.config.get("ADMIN_PASSWORD", "")
             supplied = request.form.get("password", "")
             admin_login = bool(admin_password and hmac.compare_digest(supplied, admin_password))
-            member_login = bool(
+            member_login = bool(not discord_ready() and (
                 hmac.compare_digest(supplied, "Hokuten")
                 or (configured and hmac.compare_digest(supplied, configured))
-            )
+            ))
             if admin_login or member_login:
                 session.clear()
                 session["is_admin"] = admin_login
@@ -576,7 +634,117 @@ def create_app(test_config=None):
                 ELSE {len(LOGIN_CHARACTERS)} END, name COLLATE NOCASE""",
             LOGIN_CHARACTERS,
         ).fetchall()
-        return render_template("login.html", next=request.args.get("next", ""), members=members)
+        return render_template(
+            "login.html", next=request.args.get("next", ""), members=members,
+            discord_enabled=discord_ready(),
+        )
+
+    @app.get("/discord/connect")
+    def discord_connect():
+        administrators = get_db().execute(
+            "SELECT name FROM members WHERE discord_admin=1 ORDER BY name COLLATE NOCASE"
+        ).fetchall()
+        return render_template(
+            "discord_connect.html", next=request.args.get("next", ""),
+            oauth_available=discord_ready(), administrators=administrators,
+        )
+
+    @app.post("/discord/login")
+    def discord_login():
+        if not discord_ready():
+            flash("Discord sign-in has not been configured yet.", "error")
+            return redirect(url_for("discord_connect"))
+        state = secrets.token_urlsafe(32)
+        session["discord_oauth_state"] = state
+        destination = request.form.get("next", "")
+        session["discord_oauth_next"] = destination if destination.startswith("/") and not destination.startswith("//") else ""
+        redirect_uri = app.config.get("DISCORD_REDIRECT_URI") or url_for("discord_callback", _external=True)
+        query = urlencode({
+            "response_type": "code",
+            "client_id": app.config["DISCORD_CLIENT_ID"],
+            "scope": "identify guilds.members.read",
+            "state": state,
+            "redirect_uri": redirect_uri,
+            "prompt": "consent",
+        })
+        return redirect(f"https://discord.com/oauth2/authorize?{query}")
+
+    @app.get("/discord/callback")
+    def discord_callback():
+        supplied_state = request.args.get("state", "")
+        expected_state = session.pop("discord_oauth_state", "")
+        if not supplied_state or not expected_state or not hmac.compare_digest(supplied_state, expected_state):
+            abort(400, description="Invalid or expired Discord sign-in state. Please try again.")
+        code = request.args.get("code", "")
+        if not code:
+            flash("Discord sign-in was cancelled.", "error")
+            return redirect(url_for("discord_connect"))
+        redirect_uri = app.config.get("DISCORD_REDIRECT_URI") or url_for("discord_callback", _external=True)
+        try:
+            token = discord_exchange_code(
+                app.config["DISCORD_CLIENT_ID"], app.config["DISCORD_CLIENT_SECRET"],
+                code, redirect_uri,
+            )
+            access_token = token["access_token"]
+            discord_user = discord_get(access_token, "/users/@me")
+            guild_member = discord_get(
+                access_token,
+                f"/users/@me/guilds/{app.config['DISCORD_GUILD_ID']}/member",
+            )
+        except (HTTPError, URLError, KeyError, ValueError, json.JSONDecodeError):
+            flash("Discord could not verify your Hokuten membership. Make sure you joined the server and try again.", "error")
+            return redirect(url_for("discord_connect"))
+
+        discord_user_id = str(discord_user.get("id", ""))
+        nickname = (guild_member.get("nick") or "").strip()
+        if not discord_user_id:
+            flash("Discord did not return a valid account ID.", "error")
+            return redirect(url_for("discord_connect"))
+        db = get_db()
+        member = db.execute(
+            "SELECT * FROM members WHERE discord_user_id=?", (discord_user_id,)
+        ).fetchone()
+        created = False
+        if member is None:
+            if not re.fullmatch(r"[A-Za-z]{2,15}", nickname):
+                flash(
+                    "Set your Hokuten Discord server nickname to your exact HorizonXI character name "
+                    "(2–15 letters only), then try again.", "error",
+                )
+                return redirect(url_for("discord_connect"))
+            member = db.execute(
+                "SELECT * FROM members WHERE name=? COLLATE NOCASE", (nickname,)
+            ).fetchone()
+            if member and member["discord_user_id"]:
+                flash("That character is already linked to another Discord account.", "error")
+                return redirect(url_for("discord_connect"))
+            discord_label = discord_user.get("global_name") or discord_user.get("username") or nickname
+            if member:
+                db.execute(
+                    "UPDATE members SET discord_user_id=?, discord_name=?, updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (discord_user_id, discord_label, member["id"]),
+                )
+            else:
+                cursor = db.execute(
+                    "INSERT INTO members(name,discord_name,discord_user_id) VALUES(?,?,?)",
+                    (nickname, discord_label, discord_user_id),
+                )
+                member = db.execute("SELECT * FROM members WHERE id=?", (cursor.lastrowid,)).fetchone()
+                created = True
+            db.commit()
+            member = db.execute("SELECT * FROM members WHERE id=?", (member["id"],)).fetchone()
+
+        destination = session.pop("discord_oauth_next", "")
+        session.clear()
+        session["is_editor"] = True
+        session["is_admin"] = bool(member["discord_admin"])
+        session["member_id"] = member["id"]
+        csrf_token()
+        if created:
+            flash(f"Welcome, {member['name']}! Your roster entry was created. Add your jobs and progress.", "success")
+            return redirect(url_for("member_form", member_id=member["id"]))
+        flash(f"Signed in with Discord as {member['name']}.", "success")
+        return redirect(destination or url_for("index"))
 
     @app.post("/logout")
     def logout():
@@ -635,6 +803,17 @@ def create_app(test_config=None):
     def init_db():
         with app.open_resource("schema.sql") as schema:
             get_db().executescript(schema.read().decode("utf8"))
+        member_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(members)")
+        }
+        if "discord_user_id" not in member_columns:
+            get_db().execute("ALTER TABLE members ADD COLUMN discord_user_id TEXT NOT NULL DEFAULT ''")
+        if "discord_admin" not in member_columns:
+            get_db().execute("ALTER TABLE members ADD COLUMN discord_admin INTEGER NOT NULL DEFAULT 0")
+        get_db().execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_members_discord_user_id "
+            "ON members(discord_user_id) WHERE discord_user_id<>''"
+        )
         progress_sql = get_db().execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='progress'"
         ).fetchone()["sql"]
@@ -667,12 +846,37 @@ def create_app(test_config=None):
         }
         if "owner_member_id" not in alliance_columns:
             get_db().execute("ALTER TABLE alliance_events ADD COLUMN owner_member_id INTEGER")
+        slot_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(alliance_slots)")
+        }
+        if "custom_name" not in slot_columns:
+            get_db().executescript(
+                """ALTER TABLE alliance_slots RENAME TO alliance_slots_legacy;
+                   CREATE TABLE alliance_slots (
+                       event_id INTEGER NOT NULL,
+                       party_number INTEGER NOT NULL CHECK(party_number BETWEEN 1 AND 3),
+                       slot_number INTEGER NOT NULL CHECK(slot_number BETWEEN 1 AND 6),
+                       member_id INTEGER,
+                       custom_name TEXT NOT NULL DEFAULT '',
+                       job TEXT NOT NULL,
+                       PRIMARY KEY (event_id, party_number, slot_number),
+                       UNIQUE (event_id, member_id),
+                       FOREIGN KEY (event_id) REFERENCES alliance_events(id) ON DELETE CASCADE,
+                       FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+                   );
+                   INSERT INTO alliance_slots(event_id,party_number,slot_number,member_id,job)
+                   SELECT event_id,party_number,slot_number,member_id,job FROM alliance_slots_legacy;
+                   DROP TABLE alliance_slots_legacy;"""
+            )
         get_db().execute(
             "CREATE INDEX IF NOT EXISTS idx_alliance_events_owner ON alliance_events(owner_member_id, updated_at)"
         )
         get_db().executemany(
             "INSERT OR IGNORE INTO members(name) VALUES (?)",
             [(name,) for name in LOGIN_CHARACTERS],
+        )
+        get_db().execute(
+            "UPDATE members SET discord_admin=1 WHERE name='Imaven' COLLATE NOCASE"
         )
         for old_mission, new_mission in ZILART_MISSION_MIGRATIONS.items():
             get_db().execute(
@@ -838,11 +1042,13 @@ def create_app(test_config=None):
                         if target_member_id:
                             db.execute(
                                 """UPDATE members SET name=?, discord_name=?, timezone=?, availability=?,
-                                   notes=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                                   notes=?, discord_admin=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
                                 (name, request.form.get("discord_name", "").strip(),
                                  request.form.get("timezone", "").strip(),
                                  request.form.get("availability", "").strip(),
-                                 request.form.get("notes", "").strip(), target_member_id),
+                                 request.form.get("notes", "").strip(),
+                                 int(bool(request.form.get("discord_admin"))) if is_admin() else int(member["discord_admin"]),
+                                 target_member_id),
                             )
                         else:
                             cursor = db.execute(
@@ -913,7 +1119,7 @@ def create_app(test_config=None):
         owner = require_member_identity()
         db = get_db()
         events = db.execute(
-            """SELECT e.*, COUNT(s.member_id) member_count
+            """SELECT e.*, COUNT(s.event_id) member_count
                FROM alliance_events e LEFT JOIN alliance_slots s ON s.event_id=e.id
                WHERE e.owner_member_id=?
                GROUP BY e.id ORDER BY COALESCE(e.event_at, e.created_at) DESC, e.id DESC"""
@@ -929,12 +1135,13 @@ def create_app(test_config=None):
             if not event:
                 abort(404)
         slot_rows = db.execute(
-            "SELECT party_number,slot_number,member_id,job FROM alliance_slots WHERE event_id=?",
+            "SELECT party_number,slot_number,member_id,custom_name,job FROM alliance_slots WHERE event_id=?",
             (event["id"],),
         ).fetchall() if event else []
         assignments = {
             f"{row['party_number']}-{row['slot_number']}": {
-                "member_id": row["member_id"], "job": row["job"],
+                "member_id": row["member_id"] or "", "custom_name": row["custom_name"],
+                "job": row["job"],
             }
             for row in slot_rows
         }
@@ -993,8 +1200,14 @@ def create_app(test_config=None):
         for party_number in range(1, 4):
             for slot_number in range(1, 7):
                 member_value = request.form.get(f"member_{party_number}_{slot_number}", "").strip()
+                custom_name = request.form.get(f"custom_name_{party_number}_{slot_number}", "").strip()
                 job = request.form.get(f"job_{party_number}_{slot_number}", "").strip().upper()
-                if not member_value and not job:
+                if not member_value and not custom_name and not job:
+                    continue
+                if custom_name:
+                    if member_value or not job or len(custom_name) > 40 or job not in JOBS:
+                        abort(400, description="Enter a valid custom character name and job.")
+                    slots.append((event_id, party_number, slot_number, None, custom_name, job))
                     continue
                 if not member_value.isdigit():
                     abort(400, description="Choose a valid roster member for every occupied slot.")
@@ -1004,11 +1217,11 @@ def create_app(test_config=None):
                 if member_id in selected_members:
                     abort(400, description="A character can only occupy one alliance slot.")
                 selected_members.add(member_id)
-                slots.append((event_id, party_number, slot_number, member_id, job))
+                slots.append((event_id, party_number, slot_number, member_id, "", job))
         try:
             db.execute("DELETE FROM alliance_slots WHERE event_id=?", (event_id,))
             db.executemany(
-                "INSERT INTO alliance_slots(event_id,party_number,slot_number,member_id,job) VALUES(?,?,?,?,?)",
+                "INSERT INTO alliance_slots(event_id,party_number,slot_number,member_id,custom_name,job) VALUES(?,?,?,?,?,?)",
                 slots,
             )
             db.commit()
@@ -1239,6 +1452,40 @@ def create_app(test_config=None):
             dynamis_by_area=dynamis_by_area, limbus_groups=limbus_groups,
             limbus_af1=limbus_af1,
         )
+
+    @app.get("/spell-farming")
+    @editor_required
+    def spell_farming():
+        member = require_member_identity()
+        learned = [row["spell"] for row in get_db().execute(
+            "SELECT spell FROM blue_spell_ownership WHERE member_id=?",
+            (member["id"],),
+        )]
+        return render_template("spell_farming.html", learned_spells=learned, member=member)
+
+    @app.post("/spell-farming/ownership")
+    @editor_required
+    def update_spell_ownership():
+        member = require_member_identity()
+        data_path = Path(app.root_path) / "static" / "blue_spell_farming.json"
+        with data_path.open(encoding="utf-8") as spell_file:
+            valid_spells = {row["spell"] for row in json.load(spell_file)["rows"]}
+        selected = {spell.strip() for spell in request.form.getlist("spells")}
+        if not selected.issubset(valid_spells):
+            abort(400, description="Choose valid Blue Magic spells.")
+        db = get_db()
+        try:
+            db.execute("DELETE FROM blue_spell_ownership WHERE member_id=?", (member["id"],))
+            db.executemany(
+                "INSERT INTO blue_spell_ownership(member_id,spell) VALUES(?,?)",
+                [(member["id"], spell) for spell in sorted(selected)],
+            )
+            db.commit()
+        except sqlite3.DatabaseError:
+            db.rollback()
+            raise
+        flash(f"Saved {len(selected)} learned Blue Magic spells for {member['name']}.", "success")
+        return redirect(url_for("spell_farming"))
 
     @app.post("/loot-tables/ownership")
     @editor_required
@@ -1831,4 +2078,4 @@ def create_app(test_config=None):
 app = create_app()
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", debug=True)

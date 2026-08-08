@@ -3,23 +3,27 @@
 {% block content %}
 <section class="form-heading">
   <a href="{{ url_for('index') }}">← Back to command board</a>
-  <p class="eyebrow">Linkshell members</p>
-  <h1>Sign in to update progress</h1>
-  <p>The board is public to view. Enter the shared linkshell password to make changes.</p>
+  <p class="eyebrow">{{ 'Administrator access' if discord_enabled else 'Linkshell members' }}</p>
+  <h1>{{ 'Administrator password' if discord_enabled else 'Sign in to update progress' }}</h1>
+  <p>{{ 'Members now sign in securely with Discord.' if discord_enabled else 'The board is public to view. Enter the shared linkshell password to make changes.' }}</p>
 </section>
 <form class="member-form" method="post">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="next" value="{{ next }}">
-  <label>Password<input name="password" type="password" required autofocus autocomplete="current-password"></label>
+  {% if not discord_enabled %}
   <label>Your character
-    <select name="member_id">
+    <select name="member_id" autofocus>
       <option value="">Choose your character…</option>
       {% for member in members %}<option value="{{ member.id }}">{{ member.name }}</option>{% endfor %}
     </select>
   </label>
+  {% endif %}
+  <label>Password<input name="password" type="password" required autocomplete="current-password"></label>
   <div class="form-actions"><button class="button primary" type="submit" name="action" value="sign_in">Sign in</button></div>
+  {% if not discord_enabled %}
   <p class="hint">Not listed? Click Add Character After You Have Entered Password.</p>
   <label>New character name<input name="new_member_name" minlength="2" maxlength="15" pattern="[A-Za-z]+" placeholder="HorizonXI name"></label>
   <div class="form-actions"><button class="button primary" type="submit" name="action" value="add_player">Add Player</button></div>
+  {% else %}<p class="hint"><a href="{{ url_for('discord_connect', next=next) }}">← Return to Discord sign-in</a></p>{% endif %}
 </form>
 {% endblock %}

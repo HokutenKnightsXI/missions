@@ -2,6 +2,8 @@ CREATE TABLE IF NOT EXISTS members (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL COLLATE NOCASE UNIQUE,
     discord_name TEXT NOT NULL DEFAULT '',
+    discord_user_id TEXT NOT NULL DEFAULT '',
+    discord_admin INTEGER NOT NULL DEFAULT 0,
     timezone TEXT NOT NULL DEFAULT '',
     availability TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
@@ -9,7 +11,8 @@ CREATE TABLE IF NOT EXISTS members (
 );
 
 CREATE TABLE IF NOT EXISTS member_jobs (
-    member_id INTEGER NOT NULL,
+    member_id INTEGER,
+    custom_name TEXT NOT NULL DEFAULT '',
     job TEXT NOT NULL,
     level INTEGER NOT NULL CHECK(level BETWEEN 1 AND 75),
     PRIMARY KEY (member_id, job),
@@ -124,3 +127,11 @@ CREATE TABLE IF NOT EXISTS alliance_slots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_alliance_events_date ON alliance_events(event_at, updated_at);
+
+CREATE TABLE IF NOT EXISTS blue_spell_ownership (
+    member_id INTEGER NOT NULL,
+    spell TEXT NOT NULL,
+    learned_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (member_id, spell),
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);

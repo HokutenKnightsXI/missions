@@ -17,6 +17,25 @@
   margin: 0;
 }
 
+.signed-in-header {
+  /* Match the inner edges of the 1600px Missions/Help Requests layout. */
+  padding-inline: max(24px, calc((100% - 1600px) / 2 + 24px));
+}
+
+/* Keep the primary dashboards on one consistent wide content canvas. */
+main:has(.my-requests-grid),
+main:has(.loot-filters),
+main:has(.job-roster-panel),
+main:has(.alliance-builder) {
+  max-width: 1600px;
+}
+
+.job-roster-hero,
+.job-roster-panel,
+.job-roster-filters {
+  width: min(1552px, calc(100vw - 48px));
+}
+
 .account-button {
   border-color: #ffd229 !important;
   background: linear-gradient(180deg, #ffe85a, #ffc400) !important;

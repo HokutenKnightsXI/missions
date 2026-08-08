@@ -12,6 +12,14 @@
   <div class="saved-alliance-list">{% for saved in events %}<div class="saved-alliance-row"><a class="{{ 'active' if event and event.id == saved.id }}" href="{{ url_for('alliance_builder', event=saved.id) }}"><span><b>{{ saved.name }}</b><small>{{ saved.event_at|replace('T',' ') if saved.event_at else 'Date not set' }}</small></span><strong>{{ saved.member_count }}/18</strong></a><form method="post" action="{{ url_for('delete_alliance', event_id=saved.id) }}" onsubmit="return confirm('Delete {{ saved.name|e }}?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit" aria-label="Delete {{ saved.name }}" title="Delete saved layout">×</button></form></div>{% else %}<p>No saved alliance layouts yet.</p>{% endfor %}</div>
 </dialog>
 
+<dialog class="custom-alliance-dialog" id="custom-alliance-dialog">
+  <form method="dialog" id="custom-alliance-form">
+    <header><div><p class="eyebrow">Guest assignment</p><h2>Add Custom Character</h2></div><button type="button" id="close-custom-alliance" aria-label="Close">×</button></header>
+    <div class="custom-alliance-fields"><label>Character name<input id="custom-character-name" maxlength="40" required autocomplete="off" placeholder="Character name"></label><label>Job<select id="custom-character-job" required>{% for job in jobs %}<option>{{ job }}</option>{% endfor %}</select></label></div>
+    <footer><button class="button" type="button" id="cancel-custom-alliance">Cancel</button><button class="button primary" type="submit">Add to Party</button></footer>
+  </form>
+</dialog>
+
 <form class="alliance-builder" method="post" action="{{ url_for('save_alliance') }}" id="alliance-form">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">{% if event %}<input type="hidden" name="event_id" value="{{ event.id }}">{% endif %}
   <section class="alliance-event-details">
@@ -23,6 +31,7 @@
   <div class="alliance-compose">
     <section class="alliance-roster-panel">
       <div class="alliance-filter-heading"><div><p class="eyebrow">Level 75 roster</p><h2>Available Characters</h2></div><span id="available-count"></span></div>
+      <label class="alliance-name-search"><span>Search characters</span><input id="alliance-character-search" type="search" autocomplete="off" placeholder="Type a character name"></label>
       <div class="roster-inline-filters"><label>Job<select id="alliance-job"><option value="">All level-75 jobs</option>{% for job in jobs %}<option>{{ job }}</option>{% endfor %}</select></label><label>Role<select id="alliance-role"><option value="">All roles</option>{% for role in role_jobs %}<option>{{ role }}</option>{% endfor %}</select></label></div>
       <div id="selected-slot-message" hidden></div>
       <div class="available-roster-wrap"><table class="available-roster-table"><thead><tr><th>Character</th><th>Level 75 Jobs</th></tr></thead><tbody id="available-roster"></tbody></table></div>
@@ -32,14 +41,14 @@
       <div class="alliance-parties-heading"><div><p class="eyebrow">18 alliance positions</p><h2>Party Layout</h2></div><span>Click or drag into any open slot</span></div>
       <div class="alliance-party-grid">
         {% for party in range(1,4) %}<article class="alliance-party" data-party="{{ party }}"><header><div><p>Alliance group</p><h2>Party {{ party }}</h2></div><span class="party-count">0/6</span></header><div class="party-slots">
-          {% for slot in range(1,7) %}{% set current=assignments.get(party ~ '-' ~ slot) %}<div class="party-slot" tabindex="0" role="button" data-party="{{ party }}" data-slot="{{ slot }}" data-member="{{ current.member_id if current else '' }}" data-job="{{ current.job if current else '' }}"><input type="hidden" name="member_{{ party }}_{{ slot }}" value="{{ current.member_id if current else '' }}"><input type="hidden" name="job_{{ party }}_{{ slot }}" value="{{ current.job if current else '' }}"><span class="slot-number">{{ slot }}</span><div class="slot-content"><b>Open slot</b><small>Click or drop here</small></div></div>{% endfor %}
+          {% for slot in range(1,7) %}{% set current=assignments.get(party ~ '-' ~ slot) %}<div class="party-slot" tabindex="0" role="button" data-party="{{ party }}" data-slot="{{ slot }}" data-member="{{ current.member_id if current else '' }}" data-custom-name="{{ current.custom_name if current else '' }}" data-job="{{ current.job if current else '' }}"><input type="hidden" name="member_{{ party }}_{{ slot }}" value="{{ current.member_id if current else '' }}"><input type="hidden" name="custom_name_{{ party }}_{{ slot }}" value="{{ current.custom_name if current else '' }}"><input type="hidden" name="job_{{ party }}_{{ slot }}" value="{{ current.job if current else '' }}"><span class="slot-number">{{ slot }}</span><div class="slot-content"><b>Open slot</b><button class="add-custom-slot" type="button" aria-label="Add a custom character" title="Add custom character">+</button></div></div>{% endfor %}
         </div></article>{% endfor %}
       </div>
     </section>
   </div>
 
-  <footer class="alliance-actions"><div><strong id="alliance-total">0/18 assigned</strong><span id="save-name-reminder">An alliance name is required to save.</span></div><button class="button primary" type="submit">Save Alliance Layout</button></footer>
+  <footer class="alliance-actions collapsible-save-bar"><button class="save-bar-toggle" type="button" aria-expanded="true" aria-label="Collapse save bar">⌄</button><div class="save-bar-content"><div><strong id="alliance-total">0/18 assigned</strong><span id="save-name-reminder">An alliance name is required to save.</span></div><button class="button primary" type="submit">Save Alliance Layout</button></div></footer>
 </form>
 {% if event %}<form class="alliance-delete" method="post" action="{{ url_for('delete_alliance', event_id=event.id) }}" onsubmit="return confirm('Delete this saved alliance layout?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button type="submit">Delete this alliance</button></form>{% endif %}
-<script>window.ALLIANCE_ROSTER={{ roster|tojson }};window.ALLIANCE_ROLES={{ role_jobs|tojson }};</script><script src="{{ url_for('static', filename='alliance_builder.js') }}"></script>
+<script>window.ALLIANCE_ROSTER={{ roster|tojson }};window.ALLIANCE_ROLES={{ role_jobs|tojson }};</script><script src="{{ url_for('static', filename='collapsible_save_bars.js') }}"></script><script src="{{ url_for('static', filename='alliance_builder.js') }}"></script>
 {% endblock %}
