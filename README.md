@@ -26,18 +26,20 @@ DISCORD_CLIENT_ID=your_application_id
 DISCORD_CLIENT_SECRET=your_application_secret
 DISCORD_GUILD_ID=your_hokuten_server_id
 DISCORD_REDIRECT_URI=https://example.com/discord/callback
+DISCORD_ADMIN_USER_ID=your_permanent_discord_user_id
 ```
 
 Members must set their nickname in the Hokuten Discord server to their exact HorizonXI
 character name before linking. The OAuth application requests only `identify` and
 `guilds.members.read`. An existing unlinked roster entry is matched case-insensitively;
 otherwise a new member is created. The permanent Discord user ID is stored so later
-nickname changes cannot transfer the character.
+nickname changes cannot transfer the character. The `Imaven` character is reserved for
+`DISCORD_ADMIN_USER_ID`; administrator access is granted only when that permanent ID
+signs in, never from an editable nickname.
 
-Once Discord is configured, the shared member password is disabled. The administrator
-password remains available as a recovery login. To grant Discord-based administrator
-access, use the administrator password, open **Members**, edit the linked character, and
-enable **Administrator access**.
+Once Discord is configured, shared member and administrator password sign-in are
+disabled. Password recovery remains available only when Discord configuration is
+incomplete.
 
 ## Tests
 
