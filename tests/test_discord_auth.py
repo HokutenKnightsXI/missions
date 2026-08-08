@@ -30,11 +30,11 @@ def begin_discord_login(client):
     return query["state"][0]
 
 
-def mock_discord(monkeypatch, nickname, user_id="discord-123"):
+def mock_discord(monkeypatch, nickname, user_id="discord-123", global_name="Discord User"):
     monkeypatch.setattr(missions, "discord_exchange_code", lambda *_args: {"access_token": "token"})
     monkeypatch.setattr(
         missions, "discord_get",
-        lambda _token, path: ({"id": user_id, "username": "discord-user", "global_name": "Discord User"}
+        lambda _token, path: ({"id": user_id, "username": "discord-user", "global_name": global_name}
                               if path == "/users/@me" else {"nick": nickname}),
     )
 
@@ -104,6 +104,25 @@ def test_existing_non_admin_character_is_linked_without_admin(monkeypatch, tmp_p
     assert members[0][1:] == ("discord-friend", 0)
     with client.session_transaction() as session:
         assert session["member_id"] == members[0][0]
+        assert session["is_admin"] is False
+
+
+def test_display_name_is_used_when_server_nickname_is_missing(monkeypatch, tmp_path):
+    app = discord_app(tmp_path)
+    client = app.test_client()
+    state = begin_discord_login(client)
+    mock_discord(
+        monkeypatch, None, "discord-no-server-nick", global_name="Sexualpotato"
+    )
+    response = client.get(f"/discord/callback?code=valid&state={state}")
+    assert response.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    member = database.execute(
+        "SELECT discord_user_id FROM members WHERE name='Sexualpotato' COLLATE NOCASE"
+    ).fetchone()
+    database.close()
+    assert member == ("discord-no-server-nick",)
+    with client.session_transaction() as session:
         assert session["is_admin"] is False
 
 
