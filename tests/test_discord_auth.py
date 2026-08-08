@@ -44,6 +44,8 @@ def test_discord_confirmation_requires_exact_server_nickname(tmp_path):
     assert b"Match your character name" in page.data
     assert b"exactly matches my HorizonXI character" in page.data
     assert b"Sign in with Discord" in page.data
+    assert b"Your exact character name" in page.data
+    assert b"Discord server nickname must be" in page.data
     assert b"2\xe2\x80\x9315 letters" not in page.data
     assert b"password sign-in" not in page.data
     assert b"Administrator access" in page.data and b"Imaven" in page.data
