@@ -26,7 +26,6 @@
       <label>Discord name<input name="discord_name" value="{{ request.form.get('discord_name', member.discord_name if member else '') }}"></label>
       <label>Timezone<input name="timezone" placeholder="Central / GMT-5" value="{{ request.form.get('timezone', member.timezone if member else '') }}"></label>
       <label>Typical availability<input name="availability" placeholder="Tue/Thu after 7 PM" value="{{ request.form.get('availability', member.availability if member else '') }}"></label>
-      {% if is_admin() and member %}<label class="admin-access-toggle"><span>Dashboard permissions</span><span><input type="checkbox" name="discord_admin" value="1" {{ 'checked' if member.discord_admin }}> Administrator access</span></label>{% endif %}
     </div>
   </fieldset>
   <fieldset>

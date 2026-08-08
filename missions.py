@@ -506,6 +506,7 @@ def create_app(test_config=None):
         DISCORD_CLIENT_SECRET=os.environ.get("DISCORD_CLIENT_SECRET", ""),
         DISCORD_GUILD_ID=os.environ.get("DISCORD_GUILD_ID", ""),
         DISCORD_REDIRECT_URI=os.environ.get("DISCORD_REDIRECT_URI", ""),
+        DISCORD_ADMIN_USER_ID=os.environ.get("DISCORD_ADMIN_USER_ID", ""),
         ROSTER_REFRESH_TOKEN=os.environ.get("ROSTER_REFRESH_TOKEN", ""),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
@@ -514,7 +515,7 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
         if test_config.get("TESTING"):
-            for key in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID", "DISCORD_REDIRECT_URI"):
+            for key in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID", "DISCORD_REDIRECT_URI", "DISCORD_ADMIN_USER_ID"):
                 if key not in test_config:
                     app.config[key] = ""
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
@@ -530,6 +531,7 @@ def create_app(test_config=None):
     def discord_ready():
         return all(app.config.get(key) for key in (
             "DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID",
+            "DISCORD_ADMIN_USER_ID",
         ))
 
     def current_member_id():
@@ -586,6 +588,8 @@ def create_app(test_config=None):
 
     @app.route("/login", methods=("GET", "POST"))
     def login():
+        if discord_ready():
+            return redirect(url_for("discord_connect", next=request.values.get("next", "")))
         if request.method == "POST":
             configured = app.config.get("EDIT_PASSWORD", "")
             admin_password = app.config.get("ADMIN_PASSWORD", "")
@@ -641,12 +645,9 @@ def create_app(test_config=None):
 
     @app.get("/discord/connect")
     def discord_connect():
-        administrators = get_db().execute(
-            "SELECT name FROM members WHERE discord_admin=1 ORDER BY name COLLATE NOCASE"
-        ).fetchall()
         return render_template(
             "discord_connect.html", next=request.args.get("next", ""),
-            oauth_available=discord_ready(), administrators=administrators,
+            oauth_available=discord_ready(),
         )
 
     @app.post("/discord/login")
@@ -700,11 +701,36 @@ def create_app(test_config=None):
         if not discord_user_id:
             flash("Discord did not return a valid account ID.", "error")
             return redirect(url_for("discord_connect"))
+        admin_discord_user_id = str(app.config["DISCORD_ADMIN_USER_ID"])
+        is_discord_admin = discord_user_id == admin_discord_user_id
+        if nickname.casefold() == "imaven" and not is_discord_admin:
+            flash("The Imaven character is reserved for its verified Discord account.", "error")
+            return redirect(url_for("discord_connect"))
         db = get_db()
         member = db.execute(
             "SELECT * FROM members WHERE discord_user_id=?", (discord_user_id,)
         ).fetchone()
+        if member and member["name"].casefold() == "imaven" and not is_discord_admin:
+            flash("The Imaven character is reserved for its verified Discord account.", "error")
+            return redirect(url_for("discord_connect"))
         created = False
+        if is_discord_admin:
+            imaven = db.execute(
+                "SELECT * FROM members WHERE name='Imaven' COLLATE NOCASE"
+            ).fetchone()
+            if member and member["id"] != imaven["id"]:
+                db.execute(
+                    "UPDATE members SET discord_user_id='', discord_admin=0 WHERE id=?",
+                    (member["id"],),
+                )
+            discord_label = discord_user.get("global_name") or discord_user.get("username") or "Imaven"
+            db.execute(
+                "UPDATE members SET discord_user_id=?, discord_name=?, discord_admin=1, "
+                "updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                (discord_user_id, discord_label, imaven["id"]),
+            )
+            db.commit()
+            member = db.execute("SELECT * FROM members WHERE id=?", (imaven["id"],)).fetchone()
         if member is None:
             if not re.fullmatch(r"[A-Za-z]{2,15}", nickname):
                 flash(
@@ -737,7 +763,7 @@ def create_app(test_config=None):
         destination = session.pop("discord_oauth_next", "")
         session.clear()
         session["is_editor"] = True
-        session["is_admin"] = bool(member["discord_admin"])
+        session["is_admin"] = is_discord_admin
         session["member_id"] = member["id"]
         csrf_token()
         if created:
@@ -876,7 +902,9 @@ def create_app(test_config=None):
             [(name,) for name in LOGIN_CHARACTERS],
         )
         get_db().execute(
-            "UPDATE members SET discord_admin=1 WHERE name='Imaven' COLLATE NOCASE"
+            "UPDATE members SET discord_admin=CASE "
+            "WHEN name='Imaven' COLLATE NOCASE AND discord_user_id=? THEN 1 ELSE 0 END",
+            (str(app.config.get("DISCORD_ADMIN_USER_ID", "")),),
         )
         for old_mission, new_mission in ZILART_MISSION_MIGRATIONS.items():
             get_db().execute(
@@ -1047,7 +1075,11 @@ def create_app(test_config=None):
                                  request.form.get("timezone", "").strip(),
                                  request.form.get("availability", "").strip(),
                                  request.form.get("notes", "").strip(),
-                                 int(bool(request.form.get("discord_admin"))) if is_admin() else int(member["discord_admin"]),
+                                 int(
+                                     name.casefold() == "imaven"
+                                     and member["discord_user_id"]
+                                     == str(app.config.get("DISCORD_ADMIN_USER_ID", ""))
+                                 ),
                                  target_member_id),
                             )
                         else:
