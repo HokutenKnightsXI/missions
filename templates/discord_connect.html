@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block title %}Connect Discord · Hokuten Knights{% endblock %}
+{% block content %}
+<section class="discord-connect-card">
+  <p class="eyebrow">Before you link your account</p>
+  <h1>Match your character name</h1>
+  <p>Set your nickname in the <strong>Hokuten Discord server</strong> to your exact HorizonXI character name before continuing.</p>
+  <ul>
+    <li>If that character is already on the roster, your Discord account will link to it without changing its progress.</li>
+    <li>If it is not on the roster, a new character record will be created automatically.</li>
+    <li>After linking, nobody else can sign in as that character.</li>
+  </ul>
+  {% if oauth_available %}
+  <form method="post" action="{{ url_for('discord_login') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="discord-name-example"><span>Discord server nickname</span><strong>Imaven</strong><button class="landing-discord-signin" type="submit"><span aria-hidden="true">◉</span> Sign in with Discord</button></div>
+    <label class="discord-confirm"><input type="checkbox" required> My Hokuten server nickname exactly matches my HorizonXI character.</label>
+  </form>
+  {% else %}
+  <div class="discord-name-example"><span>Discord server nickname</span><strong>Imaven</strong><span class="landing-discord-signin disabled-discord-signin" aria-disabled="true"><span aria-hidden="true">◉</span> Sign in with Discord</span></div>
+  <div class="flash error">Discord sign-in is not configured on this server yet.</div>
+  {% endif %}
+  <p class="discord-admin-list"><span>Administrator access</span><strong>{% for administrator in administrators %}{{ administrator.name }}{{ ', ' if not loop.last }}{% else %}None designated{% endfor %}</strong></p>
+</section>
+<link rel="stylesheet" href="{{ url_for('static', filename='public_landing_alignment.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='discord_login.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='discord_login_header.css') }}">
+{% endblock %}

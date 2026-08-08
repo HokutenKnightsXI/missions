@@ -13,7 +13,7 @@
         {% for member in members %}
         <tr>
           <td><span class="avatar">{{ member.name[:2]|upper }}</span><b>{{ member.name }}</b>{% if member.availability %}<small>{{ member.availability }}</small>{% endif %}</td>
-          <td>{{ member.discord_name or '—' }}<small>{{ member.timezone or 'No timezone' }}</small></td>
+          <td>{{ member.discord_name or '—' }}{% if member.discord_user_id %}<small>Discord linked{% if member.discord_admin %} · Administrator{% endif %}</small>{% else %}<small>Not linked</small>{% endif %}<small>{{ member.timezone or 'No timezone' }}</small></td>
           <td>{{ member.jobs or 'No jobs entered' }}</td>
           <td>{{ member.progress_summary or 'No mission progress' }}</td>
           <td class="member-actions"><a class="button" href="{{ url_for('member_form', member_id=member.id) }}">Edit</a><form method="post" action="{{ url_for('delete_member', member_id=member.id) }}" onsubmit="return confirm('Delete {{ member.name }} and all associated requests and progress?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-button" type="submit">Delete</button></form></td>

@@ -16,6 +16,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='spawn_markers.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='header_layout.css') }}">
   {% block head %}{% endblock %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='collapsible_save_bars.css') }}">
 </head>
 <body>
   <header class="site-header {{ 'signed-in-header' if is_editor() else 'public-header' }}">
@@ -25,14 +26,14 @@
     <nav class="site-nav">
       <a href="{{ url_for('index') }}">Missions</a>
       <a href="{{ url_for('help_board') }}">Help Requests</a>
-      <a href="{{ url_for('job_roster') }}">Job Roster</a>
-      <a href="{{ url_for('loot_tables') }}">Loot Tables</a>
-      {% if is_editor() and current_member_id() %}<a href="{{ url_for('alliance_builder') }}">Alliance Builder</a>{% endif %}
-      {% if is_admin() %}<a class="admin-nav-link" href="{{ url_for('members_admin') }}">Members</a>{% endif %}
       {% if is_editor() and current_member_id() %}<a href="{{ url_for('my_help_requests') }}">My Requests</a>{% endif %}
+      <a href="{{ url_for('loot_tables') }}">Loot Tables</a>
+      <a href="{{ url_for('spell_farming') }}">Spell Farming</a>
+      <a href="{{ url_for('job_roster') }}">Job Roster</a>
+      {% if is_editor() and current_member_id() %}<a href="{{ url_for('alliance_builder') }}">Alliance Builder</a>{% endif %}
     </nav>
     <form class="account-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button account-button" type="submit">Sign Out ({{ current_member_name() }})</button></form>
-    {% else %}<a class="button account-button public-signin" href="{{ url_for('login') }}">Sign In</a>{% endif %}
+    {% elif request.endpoint not in ('index', 'discord_connect') %}<a class="button account-button public-signin" href="{{ url_for('discord_connect') }}">Sign In</a>{% endif %}
   </header>
   <main>
     {% for category, message in get_flashed_messages(with_categories=true) %}

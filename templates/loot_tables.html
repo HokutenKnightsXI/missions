@@ -46,7 +46,7 @@
     {% endfor %}
   </div>
   {% endif %}
-  {% if editable %}<div class="tracker-save"><button class="button primary" type="submit">Save {{ mode|title }} ownership</button><span>Both views update from the same saved selections.</span></div>{% elif not target_member %}<div class="tracker-signin"><a class="button primary" href="{{ url_for('login',next=request.full_path) }}">Sign in to track your loot</a></div>{% endif %}
+  {% if editable %}<div class="tracker-save collapsible-save-bar"><button class="save-bar-toggle" type="button" aria-expanded="true" aria-label="Collapse save bar">⌄</button><div class="save-bar-content"><button class="button primary" type="submit">Save {{ mode|title }} ownership</button><span>Both views update from the same saved selections.</span></div></div><script src="{{ url_for('static', filename='collapsible_save_bars.js') }}"></script>{% elif not target_member %}<div class="tracker-signin"><a class="button primary" href="{{ url_for('login',next=request.full_path) }}">Sign in to track your loot</a></div>{% endif %}
 </form>
 {% endif %}
 <aside class="item-stat-tooltip" id="item-stat-tooltip" hidden role="tooltip"><header><span id="tooltip-job"></span><b id="tooltip-name"></b></header><div id="tooltip-meta"></div><p id="tooltip-stats"></p></aside>

@@ -48,6 +48,9 @@ def test_alliance_builder_uses_job_roster_and_three_parties(app):
     assert b"Find Characters" not in page.data
     assert b"Character search" not in page.data
     assert b'class="roster-inline-filters"' in page.data
+    assert b'id="alliance-character-search"' in page.data
+    assert page.data.count(b'class="add-custom-slot"') == 18
+    assert b'id="custom-alliance-dialog"' in page.data
     assert b"Alliance name <i>Required</i>" in page.data
     assert b'id="pick-event-date"' in page.data
     assert b'class="native-date-input"' in page.data
@@ -69,12 +72,31 @@ def test_member_can_save_and_reopen_own_alliance_layout(app):
     }, follow_redirects=True)
     assert response.status_code == 200
     assert b"Saved alliance layout for Dynamis - Xarcabard" in response.data
-    assert f'data-member="{maven}" data-job="PLD"'.encode() in response.data
-    assert f'data-member="{lion}" data-job="WHM"'.encode() in response.data
+    assert f'data-member="{maven}"'.encode() in response.data and b'data-job="PLD"' in response.data
+    assert f'data-member="{lion}"'.encode() in response.data and b'data-job="WHM"' in response.data
     with app.app_context():
         database = sqlite3.connect(app.config["DATABASE"])
         assert database.execute("SELECT COUNT(*) FROM alliance_events").fetchone()[0] == 1
         assert database.execute("SELECT COUNT(*) FROM alliance_slots").fetchone()[0] == 2
+        database.close()
+
+
+def test_custom_character_assignment_is_saved_and_reopened(app):
+    maven, _lion = add_roster(app)
+    client = app.test_client()
+    identify(client, maven)
+    response = client.post("/alliance-builder/save", data={
+        "name": "Guest Layout", "custom_name_3_6": "Guestplayer", "job_3_6": "BRD",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b'data-custom-name="Guestplayer"' in response.data
+    assert b'data-job="BRD"' in response.data
+    with app.app_context():
+        database = sqlite3.connect(app.config["DATABASE"])
+        slot = database.execute(
+            "SELECT member_id,custom_name,job FROM alliance_slots"
+        ).fetchone()
+        assert slot == (None, "Guestplayer", "BRD")
         database.close()
 
 

@@ -15,6 +15,30 @@ python missions.py
 
 Open <http://127.0.0.1:5000>. The SQLite database is created automatically at `instance/missions.db`.
 
+## Discord sign-in
+
+Create an application in the Discord Developer Portal and register the deployment callback
+URL, for example `https://example.com/discord/callback`. Configure these environment
+variables on the host:
+
+```text
+DISCORD_CLIENT_ID=your_application_id
+DISCORD_CLIENT_SECRET=your_application_secret
+DISCORD_GUILD_ID=your_hokuten_server_id
+DISCORD_REDIRECT_URI=https://example.com/discord/callback
+```
+
+Members must set their nickname in the Hokuten Discord server to their exact HorizonXI
+character name before linking. The OAuth application requests only `identify` and
+`guilds.members.read`. An existing unlinked roster entry is matched case-insensitively;
+otherwise a new member is created. The permanent Discord user ID is stored so later
+nickname changes cannot transfer the character.
+
+Once Discord is configured, the shared member password is disabled. The administrator
+password remains available as a recovery login. To grant Discord-based administrator
+access, use the administrator password, open **Members**, edit the linked character, and
+enable **Administrator access**.
+
 ## Tests
 
 ```powershell
@@ -89,6 +113,7 @@ timestamp.
 - Browse rolling and fixed-date requests on a monthly calendar
 - Volunteer jobs, form a party roster, and track requests through completion
 
-The board is public to view. Adding, updating, and deleting records requires the shared
-linkshell password configured with `EDIT_PASSWORD`; the password is never stored in GitHub.
+The board is public to view. When Discord OAuth is configured, members authenticate through
+the Hokuten server and only linked administrators can manage other characters. Without
+Discord configuration, the legacy shared password remains available for compatibility.
 
