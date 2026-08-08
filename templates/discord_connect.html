@@ -14,11 +14,11 @@
   <form method="post" action="{{ url_for('discord_login') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <input type="hidden" name="next" value="{{ next }}">
-    <div class="discord-name-example"><span>Discord server nickname</span><strong>Imaven</strong><button class="landing-discord-signin" type="submit"><span aria-hidden="true">◉</span> Sign in with Discord</button></div>
+    <div class="discord-name-example"><span>Discord server nickname must be</span><strong>Your exact character name</strong><button class="landing-discord-signin" type="submit"><span aria-hidden="true">◉</span> Sign in with Discord</button></div>
     <label class="discord-confirm"><input type="checkbox" required> My Hokuten server nickname exactly matches my HorizonXI character.</label>
   </form>
   {% else %}
-  <div class="discord-name-example"><span>Discord server nickname</span><strong>Imaven</strong><span class="landing-discord-signin disabled-discord-signin" aria-disabled="true"><span aria-hidden="true">◉</span> Sign in with Discord</span></div>
+  <div class="discord-name-example"><span>Discord server nickname must be</span><strong>Your exact character name</strong><span class="landing-discord-signin disabled-discord-signin" aria-disabled="true"><span aria-hidden="true">◉</span> Sign in with Discord</span></div>
   <div class="flash error">Discord sign-in is not configured on this server yet.</div>
   {% endif %}
   <p class="discord-admin-list"><span>Administrator access</span><strong>{% for administrator in administrators %}{{ administrator.name }}{{ ', ' if not loop.last }}{% else %}None designated{% endfor %}</strong></p>
