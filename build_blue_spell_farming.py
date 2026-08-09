@@ -12,6 +12,10 @@ from pathlib import Path
 from urllib.request import urlopen
 
 SOURCE = "https://ffxibluemage.com/blue_magic_data.json"
+LSB_SQL_BASE = "https://raw.githubusercontent.com/LandSandBoat/server/base/sql"
+BLUE_SPELL_LIST_SOURCE = f"{LSB_SQL_BASE}/blue_spell_list.sql"
+BLUE_SPELL_MODS_SOURCE = f"{LSB_SQL_BASE}/blue_spell_mods.sql"
+BLUE_TRAITS_SOURCE = f"{LSB_SQL_BASE}/blue_traits.sql"
 OUTPUT = Path("static/blue_spell_farming.json")
 
 DENIED_ZONE_PARTS = (
@@ -60,7 +64,46 @@ def clean_zone(value: object) -> str | None:
     return ZONE_FIXES.get(zone, zone)
 
 
-def build(rows: list[dict]) -> dict:
+def parse_blue_metadata(spell_list_sql: str, spell_mods_sql: str,
+                        blue_traits_sql: str) -> dict[str, dict]:
+    """Parse set cost, equipped stats, and trait categories from LSB SQL."""
+    trait_names = {}
+    for match in re.finditer(
+        r"INSERT INTO `blue_traits` VALUES \((\d+),[^;]+;\s*--\s*(.+?)\s*\(\d+\)",
+        blue_traits_sql,
+    ):
+        trait_names.setdefault(int(match.group(1)), match.group(2).strip())
+
+    modifiers: dict[int, list[str]] = {}
+    for match in re.finditer(
+        r"INSERT INTO `blue_spell_mods` VALUES \((\d+),\d+,-?\d+\);\s*--\s*(.+)",
+        spell_mods_sql,
+    ):
+        modifier = match.group(2).strip()
+        modifiers.setdefault(int(match.group(1)), []).append(modifier)
+
+    metadata = {}
+    for match in re.finditer(
+        r"INSERT INTO `blue_spell_list` VALUES "
+        r"\((\d+),\d+,(\d+),(\d+),(\d+),[^;]+;\s*--\s*(.+)",
+        spell_list_sql,
+    ):
+        spell_id, set_points, trait_category, trait_weight = map(
+            int, match.groups()[:4]
+        )
+        spell = match.group(5).strip()
+        stats = [value for value in modifiers.get(spell_id, []) if value != "No Stats"]
+        metadata[spell.casefold()] = {
+            "set_points": set_points,
+            "set_stats": stats,
+            "trait": trait_names.get(trait_category),
+            "trait_weight": trait_weight if trait_category else 0,
+        }
+    return metadata
+
+
+def build(rows: list[dict], metadata: dict[str, dict] | None = None) -> dict:
+    metadata = metadata or {}
     catalog = []
     seen = set()
     for row in rows:
@@ -77,6 +120,7 @@ def build(rows: list[dict]) -> dict:
             continue
         seen.add(key)
         cap = blue_magic_cap(spell_level)
+        spell_metadata = metadata.get(spell.casefold(), {})
         catalog.append({
             "spell": spell,
             "spell_level": spell_level,
@@ -87,11 +131,16 @@ def build(rows: list[dict]) -> dict:
             "monster_min": minimum,
             "monster_max": maximum,
             "source": row.get("link") or "",
+            "set_points": spell_metadata.get("set_points"),
+            "set_stats": spell_metadata.get("set_stats", []),
+            "trait": spell_metadata.get("trait"),
+            "trait_weight": spell_metadata.get("trait_weight", 0),
         })
     catalog.sort(key=lambda item: (item["spell_level"], item["spell"], item["zone"], item["monster"]))
     return {
         "source": SOURCE,
         "horizon_rule_source": "https://horizonffxi.wiki/Category:Blue_Magic",
+        "blue_metadata_source": BLUE_SPELL_LIST_SOURCE,
         "era": "Original through Treasures of Aht Urhgan; level cap 75",
         "rows": catalog,
     }
@@ -100,7 +149,14 @@ def build(rows: list[dict]) -> dict:
 def main() -> None:
     with urlopen(SOURCE, timeout=30) as response:
         rows = json.load(response)
-    payload = build(rows)
+    with urlopen(BLUE_SPELL_LIST_SOURCE, timeout=30) as response:
+        spell_list_sql = response.read().decode("utf-8")
+    with urlopen(BLUE_SPELL_MODS_SOURCE, timeout=30) as response:
+        spell_mods_sql = response.read().decode("utf-8")
+    with urlopen(BLUE_TRAITS_SOURCE, timeout=30) as response:
+        blue_traits_sql = response.read().decode("utf-8")
+    metadata = parse_blue_metadata(spell_list_sql, spell_mods_sql, blue_traits_sql)
+    payload = build(rows, metadata)
     OUTPUT.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     spells = {row["spell"] for row in payload["rows"]}
     print(f"Wrote {len(payload['rows'])} farming targets for {len(spells)} spells to {OUTPUT}")
