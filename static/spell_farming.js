@@ -1,15 +1,183 @@
-(()=>{
-  const body=document.querySelector('#spell-results');if(!body)return;
-  const learned=new Set(window.LEARNED_BLUE_SPELLS||[]);
-  const controls={search:document.querySelector('#spell-search'),zone:document.querySelector('#spell-zone'),level:document.querySelector('#spell-max-level'),skill:document.querySelector('#spell-current-skill'),hide:document.querySelector('#spell-hide-learned')};
-  let rows=[],sortKey='spell_level',sortDirection=1;
-  const number=value=>value===null||value===''?null:Number(value);
-  const mobLevel=row=>row.monster_min===null?'—':row.monster_min===row.monster_max?String(row.monster_min):`${row.monster_min}–${row.monster_max??'?'}`;
-  const syncHiddenValues=()=>{const container=document.querySelector('#learned-spell-values');container.replaceChildren(...[...learned].sort().map(spell=>{const input=document.createElement('input');input.type='hidden';input.name='spells';input.value=spell;return input}))};
+(() => {
+  const body = document.querySelector("#spell-results");
+  if (!body) return;
+
+  const form = document.querySelector("#spell-ownership-form");
+  const learned = new Set(window.LEARNED_BLUE_SPELLS || []);
+  const learnedList = document.querySelector("#learned-spells-list");
+  const learnedEmpty = document.querySelector("#learned-spells-empty");
+  const saveStatus = document.querySelector("#spell-save-status");
+  const controls = {
+    search: document.querySelector("#spell-search"),
+    zone: document.querySelector("#spell-zone"),
+    level: document.querySelector("#spell-max-level"),
+    skill: document.querySelector("#spell-current-skill"),
+    hide: document.querySelector("#spell-hide-learned"),
+  };
+  let rows = [];
+  let sortKey = "spell_level";
+  let sortDirection = 1;
+  let saveTimer;
+  let saveVersion = 0;
+
+  const number = value => value === null || value === "" ? null : Number(value);
+  const mobLevel = row => row.monster_min === null
+    ? "-"
+    : row.monster_min === row.monster_max
+      ? String(row.monster_min)
+      : `${row.monster_min}-${row.monster_max ?? "?"}`;
+
+  const syncHiddenValues = () => {
+    const container = document.querySelector("#learned-spell-values");
+    container.replaceChildren(...[...learned].sort().map(spell => {
+      const input = document.createElement("input");
+      input.type = "hidden";
+      input.name = "spells";
+      input.value = spell;
+      return input;
+    }));
+  };
+
+  const setSaveStatus = (message, state = "") => {
+    saveStatus.textContent = message;
+    saveStatus.className = state;
+  };
+
+  const saveLearned = async version => {
+    setSaveStatus("Saving...", "saving");
+    try {
+      const response = await fetch(form.action, {
+        method: "POST",
+        body: new FormData(form),
+        credentials: "same-origin",
+        headers: { "X-Requested-With": "fetch" },
+      });
+      const destination = new URL(response.url, window.location.href).pathname;
+      if (!response.ok || destination !== "/spell-farming") throw new Error("Save failed");
+      if (version === saveVersion) setSaveStatus("Saved", "");
+    } catch (_error) {
+      if (version === saveVersion) setSaveStatus("Could not save - use Save Learned Spells", "error");
+    }
+  };
+
+  const scheduleSave = () => {
+    window.clearTimeout(saveTimer);
+    const version = ++saveVersion;
+    setSaveStatus("Unsaved changes", "saving");
+    saveTimer = window.setTimeout(() => saveLearned(version), 450);
+  };
+
+  const renderLearnedList = () => {
+    const spells = [...learned].sort((a, b) => a.localeCompare(b));
+    learnedList.replaceChildren(...spells.map(spell => {
+      const chip = document.createElement("span");
+      chip.className = "learned-spell-chip";
+      const label = document.createElement("span");
+      label.textContent = spell;
+      const remove = document.createElement("button");
+      remove.type = "button";
+      remove.textContent = "x";
+      remove.setAttribute("aria-label", `Remove ${spell} from learned spells`);
+      remove.addEventListener("click", () => setLearned(spell, false));
+      chip.append(label, remove);
+      return chip;
+    }));
+    learnedEmpty.hidden = spells.length > 0;
+  };
+
+  const updateProgress = () => {
+    const allSpells = new Set(rows.map(row => row.spell));
+    const count = [...learned].filter(spell => allSpells.has(spell)).length;
+    const total = allSpells.size;
+    document.querySelector("#learned-count").textContent = `${count}/${total} learned`;
+    document.querySelector("#spell-save-count").textContent = `${count} spell${count === 1 ? "" : "s"} learned`;
+    renderLearnedList();
+  };
+
+  const setLearned = (spell, value) => {
+    if (value) learned.add(spell);
+    else learned.delete(spell);
+    syncHiddenValues();
+    document.querySelectorAll(".spell-learned-check").forEach(box => {
+      if (box.value === spell) {
+        box.checked = value;
+        box.closest("tr").classList.toggle("learned", value);
+      }
+    });
+    updateProgress();
+    scheduleSave();
+    if (controls.hide.checked) render();
+  };
+
+  const render = () => {
+    const query = controls.search.value.trim().toLowerCase();
+    const zone = controls.zone.value;
+    const maxLevel = Math.min(75, Math.max(1, number(controls.level.value) || 75));
+    const skill = number(controls.skill.value);
+    const matches = rows.filter(row =>
+      (!query || `${row.spell} ${row.monster}`.toLowerCase().includes(query)) &&
+      (!zone || row.zone === zone) && row.spell_level <= maxLevel &&
+      (!controls.hide.checked || !learned.has(row.spell))
+    ).sort((a, b) => {
+      const av = a[sortKey] ?? 9999;
+      const bv = b[sortKey] ?? 9999;
+      return (typeof av === "string" ? av.localeCompare(bv) : av - bv) * sortDirection;
+    });
+    const spells = new Set(matches.map(row => row.spell));
+    document.querySelector("#spell-count").textContent = spells.size;
+    document.querySelector("#target-count").textContent = `${matches.length} targets across ${spells.size} spells`;
+    body.replaceChildren(...matches.map(row => {
+      const tr = document.createElement("tr");
+      const ready = skill === null ? null : skill >= row.minimum_skill;
+      const isLearned = learned.has(row.spell);
+      tr.classList.toggle("learned", isLearned);
+      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${row.spell}" ${isLearned ? "checked" : ""} aria-label="Mark ${row.spell} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${row.spell}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${row.monster}</td><td>${row.zone}</td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
+      tr.querySelector("input").addEventListener("change", event => setLearned(row.spell, event.target.checked));
+      return tr;
+    }));
+    if (!matches.length) {
+      const tr = document.createElement("tr");
+      tr.innerHTML = '<td colspan="8" class="spell-empty">No farming targets match these filters.</td>';
+      body.append(tr);
+    }
+    updateProgress();
+  };
+
   syncHiddenValues();
-  const updateProgress=()=>{const allSpells=new Set(rows.map(row=>row.spell)),count=[...learned].filter(spell=>allSpells.has(spell)).length,total=allSpells.size;document.querySelector('#learned-count').textContent=`${count}/${total} learned`;document.querySelector('#spell-save-count').textContent=`${count} spell${count===1?'':'s'} learned`};
-  const setLearned=(spell,value)=>{if(value)learned.add(spell);else learned.delete(spell);syncHiddenValues();document.querySelectorAll('.spell-learned-check').forEach(box=>{if(box.value===spell){box.checked=value;box.closest('tr').classList.toggle('learned',value)}});updateProgress();if(controls.hide.checked)render()};
-  const render=()=>{const query=controls.search.value.trim().toLowerCase(),zone=controls.zone.value,maxLevel=Math.min(75,Math.max(1,number(controls.level.value)||75)),skill=number(controls.skill.value);const matches=rows.filter(row=>(!query||`${row.spell} ${row.monster}`.toLowerCase().includes(query))&&(!zone||row.zone===zone)&&row.spell_level<=maxLevel&&(!controls.hide.checked||!learned.has(row.spell))).sort((a,b)=>{const av=a[sortKey]??9999,bv=b[sortKey]??9999;return(typeof av==='string'?av.localeCompare(bv):av-bv)*sortDirection});const spells=new Set(matches.map(row=>row.spell));document.querySelector('#spell-count').textContent=spells.size;document.querySelector('#target-count').textContent=`${matches.length} targets across ${spells.size} spells`;body.replaceChildren(...matches.map(row=>{const tr=document.createElement('tr'),ready=skill===null?null:skill>=row.minimum_skill,isLearned=learned.has(row.spell);tr.classList.toggle('learned',isLearned);tr.innerHTML=`<td><input class="spell-learned-check" type="checkbox" name="spells" value="${row.spell}" ${isLearned?'checked':''} aria-label="Mark ${row.spell} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${row.spell}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${row.monster}</td><td>${row.zone}</td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready===null?'':ready?'ready':'locked'}">${ready===null?'Enter skill':ready?'Learnable':'Skill low'}</span></td>`;tr.querySelector('input').addEventListener('change',event=>setLearned(row.spell,event.target.checked));return tr}));if(!matches.length){const tr=document.createElement('tr');tr.innerHTML='<td colspan="8" class="spell-empty">No farming targets match these filters.</td>';body.append(tr)}updateProgress()};
-  fetch('/static/blue_spell_farming.json').then(response=>{if(!response.ok)throw new Error('Spell data unavailable');return response.json()}).then(payload=>{rows=payload.rows;[...new Set(rows.map(row=>row.zone))].sort().forEach(zone=>controls.zone.add(new Option(zone,zone)));render()}).catch(error=>{body.innerHTML=`<tr><td colspan="8" class="spell-empty">${error.message}</td></tr>`});
-  Object.values(controls).forEach(control=>control.addEventListener(control.tagName==='SELECT'||control.type==='checkbox'?'change':'input',render));document.querySelector('#spell-clear').addEventListener('click',()=>{controls.search.value='';controls.zone.value='';controls.level.value='75';controls.skill.value='';controls.hide.checked=false;render()});document.querySelectorAll('.spell-table th[data-sort]').forEach(th=>th.addEventListener('click',()=>{const key=th.dataset.sort;if(sortKey===key)sortDirection*=-1;else{sortKey=key;sortDirection=1}render()}));
+  renderLearnedList();
+  fetch("/static/blue_spell_farming.json")
+    .then(response => {
+      if (!response.ok) throw new Error("Spell data unavailable");
+      return response.json();
+    })
+    .then(payload => {
+      rows = payload.rows;
+      [...new Set(rows.map(row => row.zone))].sort().forEach(zone => controls.zone.add(new Option(zone, zone)));
+      render();
+    })
+    .catch(error => {
+      body.innerHTML = `<tr><td colspan="8" class="spell-empty">${error.message}</td></tr>`;
+    });
+
+  Object.values(controls).forEach(control => control.addEventListener(
+    control.tagName === "SELECT" || control.type === "checkbox" ? "change" : "input",
+    render,
+  ));
+  document.querySelector("#spell-clear").addEventListener("click", () => {
+    controls.search.value = "";
+    controls.zone.value = "";
+    controls.level.value = "75";
+    controls.skill.value = "";
+    controls.hide.checked = false;
+    render();
+  });
+  document.querySelectorAll(".spell-table th[data-sort]").forEach(th => th.addEventListener("click", () => {
+    const key = th.dataset.sort;
+    if (sortKey === key) sortDirection *= -1;
+    else {
+      sortKey = key;
+      sortDirection = 1;
+    }
+    render();
+  }));
 })();

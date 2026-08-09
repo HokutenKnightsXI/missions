@@ -36,6 +36,8 @@ def test_spell_farming_page_and_generated_catalog(tmp_path):
     assert b"Spell Farming" in page.data
     assert b'id="spell-current-skill"' in page.data
     assert b"Spell Farming</a>" in page.data
+    assert b"My Learned Spells" in page.data
+    assert b"Changes automatically save to Imaven" in page.data
 
     payload = json.loads(Path("static/blue_spell_farming.json").read_text(encoding="utf-8"))
     assert len(payload["rows"]) > 500
@@ -74,3 +76,28 @@ def test_spell_ownership_rejects_unknown_spells(tmp_path):
         session["member_id"] = 1
         session["is_editor"] = True
     assert client.post("/spell-farming/ownership", data={"spells": "Meteor II"}).status_code == 400
+
+
+def test_learned_spells_are_isolated_to_signed_in_character(tmp_path):
+    database_path = tmp_path / "per-member.db"
+    app = create_app({"TESTING": True, "DATABASE": str(database_path),
+                      "SECRET_KEY": "test", "AUTH_DISABLED": True})
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["member_id"] = 1
+        session["is_editor"] = True
+    client.post("/spell-farming/ownership", data={"spells": ["Pollen", "Head Butt"]})
+
+    with client.session_transaction() as session:
+        session["member_id"] = 2
+    second_member_page = client.get("/spell-farming")
+    assert b"Changes automatically save to Sexualpotato" in second_member_page.data
+    assert b"window.LEARNED_BLUE_SPELLS=[]" in second_member_page.data
+
+    client.post("/spell-farming/ownership", data={"spells": "Cocoon"})
+    database = sqlite3.connect(database_path)
+    ownership = database.execute(
+        "SELECT member_id,spell FROM blue_spell_ownership ORDER BY member_id,spell"
+    ).fetchall()
+    database.close()
+    assert ownership == [(1, "Head Butt"), (1, "Pollen"), (2, "Cocoon")]
