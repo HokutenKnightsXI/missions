@@ -2,7 +2,7 @@ import json
 import sqlite3
 from pathlib import Path
 
-from build_blue_spell_farming import blue_magic_cap, build
+from build_blue_spell_farming import blue_magic_cap, build, parse_blue_metadata
 from missions import create_app
 
 
@@ -24,6 +24,28 @@ def test_catalog_excludes_post_toau_zones_and_derives_minimum_skill():
     assert payload["rows"][0]["minimum_skill"] == 247
 
 
+def test_blue_metadata_parser_adds_set_cost_stats_and_trait():
+    spell_list = (
+        "INSERT INTO `blue_spell_list` VALUES "
+        "(524,426,2,6,1,0,0,0,NULL); -- Sandspin"
+    )
+    spell_mods = (
+        "INSERT INTO `blue_spell_mods` VALUES (524,12,1); -- VIT+1\n"
+        "INSERT INTO `blue_spell_mods` VALUES (524,13,-1); -- MND-1"
+    )
+    traits = (
+        "INSERT INTO `blue_traits` VALUES (6,2,30,28,10,1,0); "
+        "-- Magic Attack Bonus (1)"
+    )
+    metadata = parse_blue_metadata(spell_list, spell_mods, traits)
+    assert metadata["sandspin"] == {
+        "set_points": 2,
+        "set_stats": ["VIT+1", "MND-1"],
+        "trait": "Magic Attack Bonus",
+        "trait_weight": 1,
+    }
+
+
 def test_spell_farming_page_and_generated_catalog(tmp_path):
     app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "spell.db"),
                       "SECRET_KEY": "test", "AUTH_DISABLED": True})
@@ -43,6 +65,11 @@ def test_spell_farming_page_and_generated_catalog(tmp_path):
     assert len(payload["rows"]) > 500
     assert len({row["spell"] for row in payload["rows"]}) == 100
     assert all(row["spell_level"] <= 75 for row in payload["rows"])
+    assert all(row["set_points"] is not None for row in payload["rows"])
+    foot_kick = next(row for row in payload["rows"] if row["spell"] == "Foot Kick")
+    assert foot_kick["set_points"] == 2
+    assert foot_kick["set_stats"] == ["AGI+1"]
+    assert foot_kick["trait"] == "Lizard Killer"
     assert not any("Abyssea" in row["zone"] or " (S)" in row["zone"]
                    for row in payload["rows"])
 

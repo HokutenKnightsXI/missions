@@ -115,7 +115,7 @@
     const maxLevel = Math.min(75, Math.max(1, number(controls.level.value) || 75));
     const skill = number(controls.skill.value);
     const matches = rows.filter(row =>
-      (!query || `${row.spell} ${row.monster}`.toLowerCase().includes(query)) &&
+      (!query || `${row.spell} ${row.monster} ${row.trait || ""} ${(row.set_stats || []).join(" ")}`.toLowerCase().includes(query)) &&
       (!zone || row.zone === zone) && row.spell_level <= maxLevel &&
       (!controls.hide.checked || !learned.has(row.spell))
     ).sort((a, b) => {
@@ -131,13 +131,17 @@
       const ready = skill === null ? null : skill >= row.minimum_skill;
       const isLearned = learned.has(row.spell);
       tr.classList.toggle("learned", isLearned);
-      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${row.spell}" ${isLearned ? "checked" : ""} aria-label="Mark ${row.spell} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${row.spell}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${row.monster}</td><td>${row.zone}</td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
+      const setStats = (row.set_stats || []).join(" / ") || "&mdash;";
+      const trait = row.trait
+        ? `${row.trait}<small>Trait weight ${row.trait_weight}</small>`
+        : "&mdash;";
+      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${row.spell}" ${isLearned ? "checked" : ""} aria-label="Mark ${row.spell} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${row.spell}</span></td><td><span class="spell-set-cost">${row.set_points ?? "-"}</span></td><td><span class="spell-set-stats">${setStats}</span></td><td><span class="spell-trait">${trait}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${row.monster}</td><td>${row.zone}</td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
       tr.querySelector("input").addEventListener("change", event => setLearned(row.spell, event.target.checked));
       return tr;
     }));
     if (!matches.length) {
       const tr = document.createElement("tr");
-      tr.innerHTML = '<td colspan="8" class="spell-empty">No farming targets match these filters.</td>';
+      tr.innerHTML = '<td colspan="11" class="spell-empty">No farming targets match these filters.</td>';
       body.append(tr);
     }
     updateProgress();
@@ -156,7 +160,7 @@
       render();
     })
     .catch(error => {
-      body.innerHTML = `<tr><td colspan="8" class="spell-empty">${error.message}</td></tr>`;
+      body.innerHTML = `<tr><td colspan="11" class="spell-empty">${error.message}</td></tr>`;
     });
 
   Object.values(controls).forEach(control => control.addEventListener(
