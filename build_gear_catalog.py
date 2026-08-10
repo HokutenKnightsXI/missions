@@ -33,6 +33,18 @@ ELEMENT_GLYPHS = {
     "\ue004": "Lightning Resistance", "\ue005": "Water Resistance",
     "\ue006": "Light Resistance", "\ue007": "Dark Resistance",
 }
+WEAPON_AH_CATEGORIES = {
+    1: "hand-to-hand", 2: "daggers", 3: "swords", 4: "great-swords",
+    5: "axes", 6: "great-axes", 7: "scythes", 8: "polearms",
+    9: "katana", 10: "great-katana", 11: "clubs", 12: "staves",
+    25: "ranged", 26: "ranged", 27: "ammo-misc",
+    40: "instruments", 41: "instruments", 42: "instruments",
+}
+ARMOR_AH_CATEGORIES = {
+    "Sub": "shields", "Ammo": "ammo-misc", "Head": "head", "Body": "body",
+    "Hands": "hands", "Legs": "legs", "Feet": "feet", "Neck": "neck",
+    "Waist": "waist", "Ear": "earrings", "Ring": "rings", "Back": "back",
+}
 
 
 def fetch_text(url: str) -> str:
@@ -63,6 +75,16 @@ def classic_era_item(item_id: int) -> bool:
     return 12416 <= item_id <= 19199
 
 
+def auction_house_category(category: str, slots: list[str], skill: int) -> str:
+    if category == "Weapon":
+        if "Ammo" in slots:
+            return "ammo-misc"
+        if "Sub" in slots and skill == 0:
+            return "grips"
+        return WEAPON_AH_CATEGORIES.get(skill, "ranged" if "Ranged" in slots else "")
+    return next((ARMOR_AH_CATEGORIES[slot] for slot in slots if slot in ARMOR_AH_CATEGORIES), "")
+
+
 def lsb_keys(*sql_sources: str) -> dict[int, str]:
     keys = {}
     for sql in sql_sources:
@@ -91,6 +113,7 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str]) -> dict:
         if not jobs or not races or not slots:
             continue
         description = descriptions.get(item_id, "")
+        flags = lua_int(record, "flags")
         for glyph, label in ELEMENT_GLYPHS.items():
             description = description.replace(glyph, label)
         rows.append({
@@ -101,7 +124,10 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str]) -> dict:
             "jobs": jobs,
             "races": races,
             "slots": slots,
+            "ah_category": auction_house_category(category, slots, lua_int(record, "skill")),
             "description": description,
+            "rare": bool(flags & 32768),
+            "ex": bool(flags & 16384),
             "stats": parse_gear_stats(description),
         })
     rows.sort(key=lambda item: (item["level"], item["name"].casefold(), item["item_id"]))

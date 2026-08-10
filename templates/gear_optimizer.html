@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Gear Optimizer &middot; Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=16) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=16) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=18) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=18) }}">{% endblock %}
 {% block content %}
 <section class="gear-hero">
   <div><p class="eyebrow">HorizonXI &middot; Level 75 &middot; Treasures era</p><h1>Gear Optimizer</h1><p>Choose a job, level, race, and stat to build the strongest eligible set and browse every matching item by slot.</p></div>
@@ -63,5 +63,5 @@ window.GEAR_OPTIMIZER={{ {
   'csrf': csrf_token()
 }|tojson }};
 </script>
-<script src="{{ url_for('static', filename='gear_optimizer.js', v=16) }}"></script>
+<script src="{{ url_for('static', filename='gear_optimizer.js', v=18) }}"></script>
 {% endblock %}
