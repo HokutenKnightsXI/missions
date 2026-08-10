@@ -70,11 +70,11 @@ def test_activity_filter_supports_parent_sections(app):
     assert b"All \xf0\x9f\x91\xb9 Notorious Monsters" in parent.data
 
 
-def test_request_form_offers_all_cop_era_jobs(app):
+def test_request_form_offers_all_toau_era_jobs(app):
     client = app.test_client(); member = add_member(client, "Maven", RDM=75); identify(client, member)
     form = client.get("/help-requests/new")
     for job in ("WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK",
-                "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR"):
+                "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP"):
         assert f'name="requested_jobs" value="{job}"'.encode() in form.data
     for role in ("Tank", "DD", "Healer", "Support"):
         assert f'name="requested_party_roles" value="{role}"'.encode() in form.data
@@ -303,15 +303,16 @@ def test_public_job_roster_shows_job_matrix_and_horizon_profile(app):
     assert response.status_code == 200
     assert b"Job Level Roster" in response.data
     for job in ("WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK",
-                "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN"):
+                "BST", "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP"):
         assert f"<b>{job}</b>".encode() in response.data
     assert b"https://horizonxi.com/players/Maven" in response.data
     assert b'max-level">75' in response.data
     assert b'subjob-level">37' in response.data
-    assert b'/static/job-icons.svg?v=2#war' in response.data
-    assert b'/static/job-icons.svg?v=2#blu' in response.data
-    assert b'/static/job-icons.svg?v=2#cor' in response.data
-    assert response.data.count(b'class="level-75-count"') == 17
+    assert b'/static/job-icons.svg?v=3#war' in response.data
+    assert b'/static/job-icons.svg?v=3#blu' in response.data
+    assert b'/static/job-icons.svg?v=3#cor' in response.data
+    assert b'/static/job-icons.svg?v=3#pup' in response.data
+    assert response.data.count(b'class="level-75-count"') == 18
 
 
 def test_job_roster_filters_by_level_and_sorts_job_columns(app):
