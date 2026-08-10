@@ -1016,6 +1016,13 @@ def create_app(test_config=None):
                    SELECT event_id,party_number,slot_number,member_id,job FROM alliance_slots_legacy;
                    DROP TABLE alliance_slots_legacy;"""
             )
+        gear_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(gear_ownership)")
+        }
+        if "quantity" not in gear_columns:
+            get_db().execute(
+                "ALTER TABLE gear_ownership ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1"
+            )
         get_db().execute(
             "CREATE INDEX IF NOT EXISTS idx_alliance_events_owner ON alliance_events(owner_member_id, updated_at)"
         )
@@ -1612,13 +1619,61 @@ def create_app(test_config=None):
     def gear_optimizer():
         member = require_member_identity()
         profile_jobs = member_jobs(member["id"])
+        archived_gear = {
+            str(row["item_id"]): row["quantity"]
+            for row in get_db().execute(
+                "SELECT item_id,quantity FROM gear_ownership WHERE member_id=?",
+                (member["id"],),
+            )
+        }
         default_job = max(profile_jobs, key=profile_jobs.get) if profile_jobs else "WAR"
         return render_template(
             "gear_optimizer.html", member=member, jobs=GEAR_JOBS,
             gear_slots=GEAR_SLOTS, gear_stats=tuple(dict.fromkeys(GEAR_STAT_ALIASES.values())),
             default_job=default_job,
             default_race="",
+            archived_gear=archived_gear,
         )
+
+    @app.post("/api/gear/inventory")
+    @editor_required
+    def archive_gear_inventory():
+        member = require_member_identity()
+        try:
+            submitted = json.loads(request.form.get("inventory", "{}"))
+        except json.JSONDecodeError:
+            abort(400, description="The imported inventory is not valid.")
+        if not isinstance(submitted, dict) or len(submitted) > 7000:
+            abort(400, description="The imported inventory is too large.")
+        catalog_path = Path(app.root_path) / "static" / "gear_catalog.json"
+        catalog = json.loads(catalog_path.read_text(encoding="utf-8"))["rows"]
+        by_id = {str(item["item_id"]): item for item in catalog}
+        rows = []
+        for item_id, raw_quantity in submitted.items():
+            item = by_id.get(str(item_id))
+            if not item or isinstance(raw_quantity, bool):
+                continue
+            try:
+                quantity = int(raw_quantity)
+            except (TypeError, ValueError):
+                continue
+            if not 1 <= quantity <= 9999:
+                continue
+            rows.append((
+                member["id"], item["item_id"], item.get("item_key", ""), item["name"],
+                "/".join(item.get("slots", [])), item.get("description", ""),
+                "/".join(item.get("jobs", [])), item.get("level", 0), quantity,
+            ))
+        db = get_db()
+        db.execute("DELETE FROM gear_ownership WHERE member_id=?", (member["id"],))
+        db.executemany(
+            """INSERT INTO gear_ownership
+               (member_id,item_id,item_key,name,slot,description,jobs,level,quantity)
+               VALUES (?,?,?,?,?,?,?,?,?)""",
+            rows,
+        )
+        db.commit()
+        return jsonify(saved=len(rows), quantity=sum(row[-1] for row in rows))
 
     @app.get("/api/gear/items")
     @editor_required
