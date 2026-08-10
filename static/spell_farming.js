@@ -21,6 +21,7 @@
   let saveVersion = 0;
 
   const number = value => value === null || value === "" ? null : Number(value);
+  const escapeHtml = value => String(value).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
   const mobLevel = row => row.monster_min === null
     ? "-"
     : row.monster_min === row.monster_max
@@ -135,8 +136,9 @@
       const trait = row.trait
         ? `${row.trait}<small>Trait weight ${row.trait_weight}</small>`
         : "&mdash;";
-      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${row.spell}" ${isLearned ? "checked" : ""} aria-label="Mark ${row.spell} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${row.spell}</span></td><td><span class="spell-set-cost">${row.set_points ?? "-"}</span></td><td><span class="spell-set-stats">${setStats}</span></td><td><span class="spell-trait">${trait}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${row.monster}</td><td>${row.zone}</td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
+      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${escapeHtml(row.spell)}" ${isLearned ? "checked" : ""} aria-label="Mark ${escapeHtml(row.spell)} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${escapeHtml(row.spell)}</span></td><td><span class="spell-set-cost">${row.set_points ?? "-"}</span></td><td><span class="spell-set-stats">${setStats}</span></td><td><span class="spell-trait">${trait}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${escapeHtml(row.monster)}</td><td><button type="button" class="spell-zone-map" data-zone="${escapeHtml(row.zone)}" data-monsters="${escapeHtml(row.monster)}">${escapeHtml(row.zone)}</button></td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
       tr.querySelector("input").addEventListener("change", event => setLearned(row.spell, event.target.checked));
+      tr.querySelector(".spell-zone-map").addEventListener("click", event => window.openSpellTargetMap(event.currentTarget.dataset.zone, event.currentTarget.dataset.monsters));
       return tr;
     }));
     if (!matches.length) {

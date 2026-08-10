@@ -61,3 +61,13 @@ main:has(.alliance-builder) {
 .site-nav .admin-nav-link:focus-visible {
   color: #ff9aa2;
 }
+
+.site-nav a.active,
+.site-nav a.active:hover,
+.site-nav a.active:focus-visible {
+  border: 1px solid rgba(199, 174, 255, .75);
+  background: linear-gradient(180deg, rgba(181, 148, 255, .3), rgba(126, 91, 205, .2));
+  color: #e6d8ff;
+  box-shadow: inset 0 0 12px rgba(207, 185, 255, .12), 0 0 12px rgba(166, 126, 255, .18);
+  text-shadow: 0 0 8px rgba(221, 205, 255, .45);
+}

@@ -71,6 +71,43 @@ def test_catalog_builds_job_race_slot_and_resistance_filters():
         "Tarutaru Male", "Tarutaru Female", "Mithra", "Galka",
     ]
     assert item["stats"]["Lightning Resistance"] == 7
+    assert item["ah_category"] == "rings"
+    assert item["rare"] is False
+    assert item["ex"] is False
+
+
+def test_catalog_decodes_rare_and_ex_item_flags():
+    items = (
+        '[13014] = {id=13014,en="Leaping Boots",category="Armor",flags=34820,'
+        'jobs=8388606,level=7,races=510,slots=256,type=5},\n'
+        '[13939] = {id=13939,en="Optical Hat",category="Armor",flags=63572,'
+        'jobs=8388606,level=70,races=510,slots=16,type=5},\n'
+    )
+    descriptions = (
+        '[13014] = {id=13014,en="DEF:3"},\n'
+        '[13939] = {id=13939,en="Accuracy+10"},\n'
+    )
+    rows = {item["name"]: item for item in build_catalog(items, descriptions, {}).get("rows", [])}
+    assert rows["Leaping Boots"]["rare"] is True
+    assert rows["Leaping Boots"]["ex"] is False
+    assert rows["Optical Hat"]["rare"] is True
+    assert rows["Optical Hat"]["ex"] is True
+
+
+def test_catalog_assigns_psxi_auction_house_categories():
+    items = (
+        '[18254] = {id=18254,en="Tiphia Sting",category="Weapon",flags=34820,'
+        'jobs=8388606,level=58,races=510,skill=0,slots=8,type=4},\n'
+        '[17440] = {id=17440,en="Kraken Club",category="Weapon",flags=34816,'
+        'jobs=65534,level=63,races=510,skill=11,slots=3,type=4},\n'
+    )
+    descriptions = (
+        '[18254] = {id=18254,en="HP-25 Accuracy+2"},\n'
+        '[17440] = {id=17440,en="Occasionally attacks 2 to 8 times"},\n'
+    )
+    rows = {item["name"]: item for item in build_catalog(items, descriptions, {}).get("rows", [])}
+    assert rows["Tiphia Sting"]["ah_category"] == "ammo-misc"
+    assert rows["Kraken Club"]["ah_category"] == "clubs"
 
 
 def test_bundled_catalog_has_level_75_gear_and_searchable_stats():

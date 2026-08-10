@@ -22,6 +22,7 @@
     "back", "waist", "legs", "feet",
   ];
   const labels = { main: "Main", sub: "Sub", ranged: "Ranged", ammo: "Ammo", head: "Head", body: "Body", hands: "Hands", legs: "Legs", feet: "Feet", neck: "Neck", waist: "Waist", ear1: "Left Ear", ear2: "Right Ear", ring1: "Left Ring", ring2: "Right Ring", back: "Back" };
+  const pairedSlots = { ear1: "ear2", ear2: "ear1", ring1: "ring2", ring2: "ring1" };
 
   const element = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -39,6 +40,26 @@
     link.addEventListener("click", event => event.stopPropagation());
     link.addEventListener("keydown", event => event.stopPropagation());
     return link;
+  };
+  const auctionHouseLink = item => {
+    if (item.ex) return null;
+    const link = element("a", "gear-ah-link", "$");
+    const slug = item.name.toLowerCase().replace(/[.'’]/g, "").replace(/\+/g, "-plus-").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    link.href = item.ah_category
+      ? `https://www.psxi.gg/s/horizonxi/ah/${item.ah_category}/${slug}`
+      : "https://www.psxi.gg/s/horizonxi/ah";
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.title = `Find ${item.name} on the HorizonXI Auction House`;
+    link.setAttribute("aria-label", link.title);
+    link.addEventListener("click", event => event.stopPropagation());
+    link.addEventListener("keydown", event => event.stopPropagation());
+    return link;
+  };
+  const rarityLabel = item => item.rare && item.ex ? "Rare/Ex" : item.rare ? "Rare" : item.ex ? "Ex" : "";
+  const rarityBadge = item => {
+    const label = rarityLabel(item);
+    return label ? element("span", `gear-rarity${item.rare ? " rare" : ""}${item.ex ? " ex" : ""}`, label) : null;
   };
 
   const tooltip = element("aside", "gear-item-tooltip");
@@ -61,8 +82,10 @@
     const itemSlots = Array.isArray(item.slots) ? item.slots : [item.slot].filter(Boolean);
     const itemJobs = Array.isArray(item.jobs) ? item.jobs.join(" / ") : item.jobs || "All Jobs";
     const itemRaces = Array.isArray(item.races) ? item.races.join(" / ") : item.races || "All Races";
+    const tooltipRarity = rarityBadge(item);
     copy.append(
       element("strong", "", item.name),
+      ...(tooltipRarity ? [tooltipRarity] : []),
       element("span", "", `Lv. ${item.level || 0} | ${itemSlots.join(" / ")}`),
       element("p", "gear-tooltip-description", item.description || "No item description available."),
       element("small", "", `${itemJobs}\n${itemRaces}`),
@@ -104,6 +127,18 @@
     if (slot === "ring") return ["ring1", "ring2"];
     const match = slotOrder.find(candidate => candidate.replace(/[12]$/, "") === slot);
     return match ? [match] : [];
+  };
+  const duplicateInPairedSlot = (item, slot, gear = equipmentSet) => {
+    const paired = pairedSlots[slot];
+    return Boolean(paired && gear[paired] && Number(gear[paired].item_id) === Number(item.item_id));
+  };
+  const equipItem = (item, slot) => {
+    const paired = pairedSlots[slot];
+    if (paired && equipmentSet[paired] && Number(equipmentSet[paired].item_id) === Number(item.item_id)) {
+      equipmentSet[paired] = null;
+    }
+    equipmentSet[slot] = item;
+    setInitialized = true;
   };
 
   const isCompatible = item => {
@@ -167,7 +202,10 @@
       icon.src = `https://static.ffxiah.com/images/icon/${item.item_id}.png`;
       icon.alt = item.name;
       icon.addEventListener("error", () => icon.classList.add("missing"), { once: true });
-      card.append(clearButton, icon, wikiStar(item));
+      card.append(clearButton, icon);
+      const ahLink = auctionHouseLink(item);
+      if (ahLink) card.append(ahLink);
+      card.append(wikiStar(item));
       bindTooltip(card, item);
       return card;
     });
@@ -197,12 +235,17 @@
       icon.src = `https://static.ffxiah.com/images/icon/${item.item_id}.png`;
       icon.alt = "";
       const copy = element("span", "");
-      copy.append(element("strong", "", item.name), element("small", "", `Lv. ${item.level}`));
+      copy.append(element("strong", "", item.name));
+      const badge = rarityBadge(item);
+      if (badge) copy.append(badge);
+      copy.append(element("small", "", `Lv. ${item.level}`));
       const value = Number(itemStats(item)[stat] || 0);
-      row.append(icon, copy, element("b", "", `${value >= 0 ? "+" : ""}${value}`), wikiStar(item));
+      row.append(icon, copy, element("b", "", `${value >= 0 ? "+" : ""}${value}`));
+      const ahLink = auctionHouseLink(item);
+      if (ahLink) row.append(ahLink);
+      row.append(wikiStar(item));
       row.addEventListener("click", () => {
-        equipmentSet[activeSlot] = item;
-        setInitialized = true;
+        equipItem(item, activeSlot);
         renderEquipmentSet();
         renderTotals();
         renderCatalog();
@@ -275,15 +318,18 @@
           element("strong", "gear-catalog-value", `${value >= 0 ? "+" : ""}${value}`),
           element("strong", `gear-catalog-delta${improvement < 0 ? " negative" : ""}`, `${delta >= 0 ? "+" : ""}${delta}`),
           element("p", "", `Lv. ${item.level} | ${item.description || stat}`),
-          wikiStar(item),
         );
+        const ahLink = auctionHouseLink(item);
+        if (ahLink) row.append(ahLink);
+        row.append(wikiStar(item));
+        const badge = rarityBadge(item);
+        if (badge) row.querySelector("h4").append(" ", badge);
         const actions = element("div", "gear-equip-actions");
         applicableSlots(item).forEach(targetSlot => {
           const button = element("button", `gear-equip-button${equipmentSet[targetSlot] && equipmentSet[targetSlot].item_id === item.item_id ? " equipped" : ""}`, `Equip ${labels[targetSlot]}`);
           button.type = "button";
           button.addEventListener("click", () => {
-            equipmentSet[targetSlot] = item;
-            setInitialized = true;
+            equipItem(item, targetSlot);
             renderEquipmentSet();
             renderTotals();
             renderCatalog();
@@ -312,6 +358,7 @@
     const remaining = new Map(ownedCounts);
     slotOrder.forEach(slot => {
       const match = candidates.find(item => applicableSlots(item).includes(slot) &&
+        !duplicateInPairedSlot(item, slot, calculatedSet) &&
         (scopeControl.value !== "owned" || (remaining.get(Number(item.item_id)) || 0) > 0));
       calculatedSet[slot] = match || null;
       if (match && scopeControl.value === "owned") {

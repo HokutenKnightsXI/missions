@@ -135,6 +135,12 @@
   justify-self: end;
 }
 
+.gear-catalog-item > .gear-ah-link {
+  grid-column: 2;
+  grid-row: 3;
+  justify-self: end;
+}
+
 @media (max-width: 1250px) {
   .gear-controls { grid-template-columns: repeat(3, 1fr); }
   .gear-owned-stat-filter { grid-column: auto; }
