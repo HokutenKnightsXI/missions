@@ -37,7 +37,7 @@ load_local_env()
 
 JOBS = (
     "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST",
-    "BRD", "RNG", "SAM", "NIN", "DRG", "SMN",
+    "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR",
 )
 CAMPAIGNS = ("ZILART", "COP", "TOAU", "WINDURST", "SANDORIA", "BASTOK")
 CAMPAIGN_NAMES = {
@@ -130,7 +130,7 @@ GEAR_SLOTS = (
     "main", "sub", "ranged", "ammo", "head", "body", "hands", "legs",
     "feet", "neck", "waist", "ear1", "ear2", "ring1", "ring2", "back",
 )
-GEAR_JOBS = JOBS + ("BLU", "COR", "PUP")
+GEAR_JOBS = JOBS + ("PUP",)
 GEAR_STAT_ALIASES = {
     "def": "DEF", "defense": "DEF", "hp": "HP", "mp": "MP",
     "str": "STR", "dex": "DEX", "vit": "VIT", "agi": "AGI",

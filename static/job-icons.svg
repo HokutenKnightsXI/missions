@@ -14,4 +14,6 @@
   <symbol id="nin" viewBox="0 0 24 24"><path d="m12 2 3 7 7 3-7 3-3 7-3-7-7-3 7-3 3-7Z"/><circle cx="12" cy="12" r="2"/><path d="m5 5 14 14M19 5 5 19"/></symbol>
   <symbol id="drg" viewBox="0 0 24 24"><path d="M5 20c1-8 5-14 13-17l-2 5 4 2-5 2 2 5-6-2-6 5Z"/><path d="M11 15c-2-4 0-7 4-9"/><circle cx="16.5" cy="7.5" r=".7" fill="currentColor" stroke="none"/></symbol>
   <symbol id="smn" viewBox="0 0 24 24"><path d="M12 2v20M2 12h20M5 5l14 14M19 5 5 19"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/></symbol>
+  <symbol id="blu" viewBox="0 0 24 24"><path d="M4 5c5-3 11-3 16 0l-2 13c-4 4-8 4-12 0L4 5Z"/><path d="M7 9h3l2 3 2-3h3M8 16c3 2 5 2 8 0"/></symbol>
+  <symbol id="cor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><circle cx="12" cy="6" r="1" fill="currentColor" stroke="none"/><circle cx="17" cy="9" r="1" fill="currentColor" stroke="none"/><circle cx="17" cy="15" r="1" fill="currentColor" stroke="none"/><circle cx="7" cy="15" r="1" fill="currentColor" stroke="none"/><circle cx="7" cy="9" r="1" fill="currentColor" stroke="none"/></symbol>
 </svg>
