@@ -108,7 +108,11 @@ def test_gear_optimizer_uses_catalog_without_loading_character_equipment(monkeyp
     page = client.get("/gear-optimizer")
     assert page.status_code == 200
     assert b"Gear Optimizer" in page.data
-    assert b"Best Stat Set" in page.data
+    assert b"Equipment Setup" in page.data
+    assert b"Import Gear" in page.data
+    assert b'id="gear-import-collapse"' in page.data
+    assert b"Copy XML" in page.data
+    assert b"Copy Lua" in page.data
     assert b'id="gear-negative"' in page.data
     assert b">BLU</option>" in page.data
     assert b">PUP</option>" in page.data
@@ -137,7 +141,27 @@ def test_owned_gear_is_saved_per_character(monkeypatch, tmp_path):
 
     sign_in(client, 2)
     page = client.get("/gear-optimizer")
-    assert b'"owned"' not in page.data
+    assert b'"owned_gear"' not in page.data
+
+
+def test_imported_inventory_is_archived_per_character(tmp_path):
+    app = gear_app(tmp_path)
+    client = app.test_client()
+    sign_in(client)
+    response = client.post(
+        "/api/gear/inventory",
+        data={"inventory": json.dumps({"13014": 1, "13915": 2, "999999": 4})},
+    )
+    assert response.status_code == 200
+    assert response.get_json() == {"saved": 2, "quantity": 3}
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute(
+        "SELECT item_id,quantity FROM gear_ownership WHERE member_id=1 ORDER BY item_id"
+    ).fetchall() == [(13014, 1), (13915, 2)]
+    database.close()
+    page = client.get("/gear-optimizer")
+    assert b'"13014": 1' in page.data or b'"13014":1' in page.data
+    assert b"Import Successful" in page.data
 
 
 def test_horizon_item_search_returns_equipment(monkeypatch, tmp_path):

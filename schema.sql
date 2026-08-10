@@ -145,6 +145,7 @@ CREATE TABLE IF NOT EXISTS gear_ownership (
     description TEXT NOT NULL DEFAULT '',
     jobs TEXT NOT NULL DEFAULT '',
     level INTEGER NOT NULL DEFAULT 0,
+    quantity INTEGER NOT NULL DEFAULT 1,
     acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (member_id, item_id),
     FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE

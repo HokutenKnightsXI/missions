@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Gear Optimizer &middot; Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=1) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=1) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=15) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=15) }}">{% endblock %}
 {% block content %}
 <section class="gear-hero">
   <div><p class="eyebrow">HorizonXI &middot; Level 75 &middot; Treasures era</p><h1>Gear Optimizer</h1><p>Choose a job, level, race, and stat to build the strongest eligible set and browse every matching item by slot.</p></div>
@@ -14,17 +14,41 @@
   <label>Primary stat<select id="gear-primary-stat">{% for stat in gear_stats %}<option value="{{ stat }}" {{ 'selected' if stat == 'Accuracy' }}>{{ stat }}</option>{% endfor %}</select></label>
   <label>Secondary stat<select id="gear-secondary-stat"><option value="">None</option>{% for stat in gear_stats %}<option value="{{ stat }}" {{ 'selected' if stat == 'Attack' }}>{{ stat }}</option>{% endfor %}</select></label>
   <label class="gear-owned-stat-filter"><input id="gear-negative" type="checkbox"> Negative</label>
+  <label>Optimize from<select id="gear-scope"><option value="all">All available gear</option><option value="owned">My imported gear</option></select></label>
 </section>
 
+<details class="gear-import-section" id="gear-import-section">
+  <summary><span id="gear-import-summary-label">Import Gear</span><span id="gear-import-collapse" class="gear-collapse-button gear-import-collapse" aria-hidden="true">&#9656;</span><span class="gear-import-help" tabindex="0" aria-label="Show gear import instructions">?<span class="gear-import-help-popout"><img src="{{ url_for('static', filename='import.png') }}" alt="HorizonXI inventory copy instructions"></span></span></summary>
+  <div class="gear-import-body">
+    <p id="gear-import-instructions" {{ 'hidden' if archived_gear }}>Paste the copied inventory list from your HorizonXI character page. Equippable item names are matched against the optimizer catalog; materials, key items, and consumables are ignored.</p>
+    <textarea id="gear-import-text" rows="9" placeholder="Paste your copied HorizonXI inventory here..." {{ 'hidden' if archived_gear }}></textarea>
+    <div class="gear-import-actions"><button type="button" id="gear-import-button" class="gear-action-button" {{ 'hidden' if archived_gear }}>Import Gear</button><button type="button" id="gear-import-success" class="gear-import-success" disabled {{ '' if archived_gear else 'hidden' }}>&#10003; Import Successful</button><button type="button" id="gear-clear-import" class="gear-action-button secondary">Clear Imported Gear</button><strong id="gear-import-status">No gear imported</strong></div>
+  </div>
+</details>
+
 <section class="gear-section">
-  <header><div><p class="eyebrow">Calculated from the tables below</p><h2>Best Stat Set</h2></div><span id="gear-load-summary">Eligible slots</span></header>
-  <div class="gear-slots" id="gear-best-slots"></div>
-  <div class="gear-total-panel"><h3>Best Set Totals</h3><div id="gear-stat-totals" class="gear-stat-totals"></div><p>Each slot uses the highest eligible item for the selected stat priorities. Negative mode selects items with negative primary values. Conditional effects are excluded.</p></div>
+  <header class="gear-set-header">
+    <div><p class="eyebrow">Select items from the tables below</p><div class="gear-set-title"><h2>Equipment Setup</h2><button type="button" id="gear-collapse-set" class="gear-collapse-button" aria-expanded="true" aria-label="Collapse equipment setup">&#9662;</button></div></div>
+    <div class="gear-set-actions">
+      <label>Set name<input id="gear-set-name" maxlength="40" value="" placeholder="Enter a set name"></label>
+      <button type="button" id="gear-clear-set" class="gear-action-button secondary">Clear</button>
+      <button type="button" id="gear-export-xml" class="gear-action-button export">Copy XML</button>
+      <button type="button" id="gear-export-lua" class="gear-action-button export">Copy Lua</button>
+      <span id="gear-copy-status" class="gear-copy-status" role="status" aria-live="polite"></span>
+    </div>
+  </header>
+  <div id="gear-set-body">
+    <div class="gear-setup-split">
+      <div class="gear-grid-wrap"><div class="gear-preset-actions"><button type="button" id="gear-use-best" class="gear-use-best-button">Use Best Set</button><button type="button" id="gear-use-current" class="gear-use-best-button">Use Your Current Set</button></div><div class="gear-slots" id="gear-best-slots"></div></div>
+      <aside class="gear-active-picker"><header><div><p class="eyebrow">Active equipment slot</p><h3>Items for <span id="gear-active-slot">Main</span></h3></div><strong id="gear-active-count"></strong></header><div id="gear-active-items" class="gear-active-items"></div></aside>
+    </div>
+    <div class="gear-total-panel"><h3>Equipment Totals</h3><div id="gear-stat-totals" class="gear-stat-totals"></div><p id="gear-load-summary">The optimizer starts with the highest eligible items. Equip any item below to customize the set; deltas compare available gear with your current setup.</p></div>
+  </div>
 </section>
 
 <section class="gear-section gear-catalog-section">
   <header><div><p class="eyebrow">Game-wide equipment index</p><h2>Gear with <span id="catalog-stat-name">Selected Stat</span></h2></div><strong id="gear-catalog-count">Loading catalog...</strong></header>
-  <p class="gear-catalog-note">Compatible equipment is grouped by slot and ranked by the selected stat. Turn on Negative to show only items with a negative primary value.</p>
+  <p class="gear-catalog-note">Compatible equipment is grouped by slot and ranked by the selected stat. Use an Equip button to place an item in your setup. Turn on Negative to show only items with a negative primary value.</p>
   <div id="gear-catalog-results" class="gear-catalog-results"></div>
 </section>
 
@@ -33,8 +57,11 @@
 <script>
 window.GEAR_OPTIMIZER={{ {
   'character': member.name,
-  'catalogUrl': url_for('static', filename='gear_catalog.json')
+  'catalogUrl': url_for('static', filename='gear_catalog.json'),
+  'archiveUrl': url_for('archive_gear_inventory'),
+  'archived': archived_gear,
+  'csrf': csrf_token()
 }|tojson }};
 </script>
-<script src="{{ url_for('static', filename='gear_optimizer.js', v=1) }}"></script>
+<script src="{{ url_for('static', filename='gear_optimizer.js', v=15) }}"></script>
 {% endblock %}
