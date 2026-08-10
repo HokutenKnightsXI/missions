@@ -135,3 +135,20 @@ CREATE TABLE IF NOT EXISTS blue_spell_ownership (
     PRIMARY KEY (member_id, spell),
     FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS gear_ownership (
+    member_id INTEGER NOT NULL,
+    item_id INTEGER NOT NULL,
+    item_key TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slot TEXT NOT NULL DEFAULT '',
+    description TEXT NOT NULL DEFAULT '',
+    jobs TEXT NOT NULL DEFAULT '',
+    level INTEGER NOT NULL DEFAULT 0,
+    acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (member_id, item_id),
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_gear_ownership_member_slot
+ON gear_ownership(member_id, slot);

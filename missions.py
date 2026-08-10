@@ -126,6 +126,123 @@ HELP_STATUS_TRANSITIONS = {
 EASTERN_TIME = ZoneInfo("America/New_York")
 HORIZON_API = "https://api.horizonxi.com/api/v1"
 MAP_ZONE_ID_OVERRIDES = {"Ifrits Cauldron": 205}
+GEAR_SLOTS = (
+    "main", "sub", "ranged", "ammo", "head", "body", "hands", "legs",
+    "feet", "neck", "waist", "ear1", "ear2", "ring1", "ring2", "back",
+)
+GEAR_JOBS = JOBS + ("BLU", "COR", "PUP")
+GEAR_STAT_ALIASES = {
+    "def": "DEF", "defense": "DEF", "hp": "HP", "mp": "MP",
+    "str": "STR", "dex": "DEX", "vit": "VIT", "agi": "AGI",
+    "int": "INT", "mnd": "MND", "chr": "CHR", "accuracy": "Accuracy",
+    "attack": "Attack", "evasion": "Evasion", "haste": "Haste",
+    "enmity": "Enmity", "store tp": "Store TP", "double attack": "Double Attack",
+    "triple attack": "Triple Attack", "ranged accuracy": "Ranged Accuracy",
+    "ranged attack": "Ranged Attack", "magic accuracy": "Magic Accuracy",
+    "magic attack bonus": "Magic Attack Bonus", "magic defense bonus": "Magic Defense Bonus",
+    "cure potency": "Cure Potency", "refresh": "Refresh", "regen": "Regen",
+    "fire resistance": "Fire Resistance", "ice resistance": "Ice Resistance",
+    "wind resistance": "Wind Resistance", "earth resistance": "Earth Resistance",
+    "lightning resistance": "Lightning Resistance", "water resistance": "Water Resistance",
+    "light resistance": "Light Resistance", "dark resistance": "Dark Resistance",
+    "fire": "Fire Resistance", "ice": "Ice Resistance", "wind": "Wind Resistance",
+    "earth": "Earth Resistance", "lightning": "Lightning Resistance",
+    "water": "Water Resistance", "light": "Light Resistance", "dark": "Dark Resistance",
+    "critical hit rate": "Critical Hit Rate", "weapon skill accuracy": "Weapon Skill Accuracy",
+    "damage taken": "Damage Taken", "physical damage taken": "Physical Damage Taken",
+    "magic damage taken": "Magic Damage Taken", "breath damage taken": "Breath Damage Taken",
+    "hp recovered while healing": "HP Recovered While Healing",
+    "mp recovered while healing": "MP Recovered While Healing",
+    "movement speed": "Movement Speed", "avatar perpetuation cost": "Avatar Perpetuation Cost",
+    "hand-to-hand skill": "Hand-to-Hand Skill", "dagger skill": "Dagger Skill",
+    "sword skill": "Sword Skill", "great sword skill": "Great Sword Skill",
+    "axe skill": "Axe Skill", "great axe skill": "Great Axe Skill",
+    "scythe skill": "Scythe Skill", "polearm skill": "Polearm Skill",
+    "katana skill": "Katana Skill", "great katana skill": "Great Katana Skill",
+    "club skill": "Club Skill", "staff skill": "Staff Skill",
+    "archery skill": "Archery Skill", "marksmanship skill": "Marksmanship Skill",
+    "throwing skill": "Throwing Skill", "shield skill": "Shield Skill",
+    "parrying skill": "Parrying Skill", "guarding skill": "Guarding Skill",
+    "evasion skill": "Evasion Skill", "healing magic skill": "Healing Magic Skill",
+    "divine magic skill": "Divine Magic Skill", "enhancing magic skill": "Enhancing Magic Skill",
+    "enfeebling magic skill": "Enfeebling Magic Skill", "elemental magic skill": "Elemental Magic Skill",
+    "dark magic skill": "Dark Magic Skill", "summoning magic skill": "Summoning Magic Skill",
+    "ninjutsu skill": "Ninjutsu Skill", "singing skill": "Singing Skill",
+    "string instrument skill": "String Instrument Skill", "wind instrument skill": "Wind Instrument Skill",
+    "blue magic skill": "Blue Magic Skill",
+}
+HORIZON_AVATAR_RACES = {
+    "Hm": "Hume Male", "Hf": "Hume Female", "Em": "Elvaan Male",
+    "Ef": "Elvaan Female", "Tm": "Tarutaru Male", "Tf": "Tarutaru Female",
+    "Mi": "Mithra", "Ga": "Galka",
+}
+
+
+def horizon_json(path, timeout=20):
+    api_request = Request(
+        f"{HORIZON_API}/{path.lstrip('/')}",
+        headers={"Accept": "application/json", "User-Agent": "HokutenGearOptimizer/1.0"},
+    )
+    with urlopen(api_request, timeout=timeout) as response:
+        return json.load(response)
+
+
+def parse_gear_stats(description):
+    """Extract common unconditional equipment stats from a Horizon item description."""
+    text = " ".join(str(description or "").replace("\n", " ").split())
+    unconditional = re.split(
+        r"\b(?:Latent effect|Set|Assault|Salvage|Campaign|Besieged|Daytime|Nighttime):",
+        text,
+        maxsplit=1,
+        flags=re.IGNORECASE,
+    )[0]
+    names = sorted(GEAR_STAT_ALIASES, key=len, reverse=True)
+    pattern = re.compile(
+        rf"(?<![A-Za-z])({'|'.join(re.escape(name) for name in names)})\s*[: ]?\s*([+-]?\d+)(%)?",
+        re.IGNORECASE,
+    )
+    stats = {}
+    for match in pattern.finditer(unconditional):
+        name = GEAR_STAT_ALIASES[match.group(1).casefold()]
+        value = int(match.group(2))
+        if name == "DEF" and value >= 0 and match.group(1).casefold() == "def":
+            value = abs(value)
+        stats[name] = stats.get(name, 0) + value
+    return stats
+
+
+def normalize_horizon_item(item_id, metadata, *, key=""):
+    sprite = metadata.get("sprite") or metadata
+    description = sprite.get("description") or metadata.get("desc") or ""
+    return {
+        "item_id": int(item_id),
+        "item_key": key or metadata.get("key") or "",
+        "name": sprite.get("name") or metadata.get("name") or f"Item {item_id}",
+        "slot": sprite.get("slot") or "",
+        "description": description,
+        "jobs": sprite.get("jobs") or "",
+        "level": int(sprite.get("level") or 0),
+        "weapon_type": sprite.get("weaponType") or "",
+        "rare": bool(sprite.get("rare", metadata.get("rare", False))),
+        "ex": bool(sprite.get("ex", metadata.get("ex", False))),
+        "stats": parse_gear_stats(description),
+    }
+
+
+def fetch_horizon_equipment(character_name):
+    payload = horizon_json(f"chars/{quote(character_name)}/equip")
+    metadata = payload.get("itemMetadata") or {}
+    equipment = {}
+    for slot in GEAR_SLOTS:
+        equipped = (payload.get("equip") or {}).get(slot) or {}
+        item_id = equipped.get("itemid")
+        if not item_id or str(item_id) not in metadata:
+            equipment[slot] = None
+            continue
+        equipment[slot] = normalize_horizon_item(
+            item_id, metadata[str(item_id)], key=equipped.get("name", "")
+        )
+    return equipment
 
 DYNAMIS_RELIC = {
     "WAR": (("Warrior's Mask", "Head", "Dynamis - Windurst"), ("Warrior's Lorica", "Body", "Dynamis - Xarcabard"), ("Warrior's Mufflers", "Hands", "Dynamis - Jeuno"), ("Warrior's Cuisses", "Legs", "Dynamis - Beaucedine"), ("Warrior's Calligae", "Feet", "Dynamis - San d'Oria")),
@@ -1489,6 +1606,84 @@ def create_app(test_config=None):
             dynamis_by_area=dynamis_by_area, limbus_groups=limbus_groups,
             limbus_af1=limbus_af1,
         )
+
+    @app.get("/gear-optimizer")
+    @editor_required
+    def gear_optimizer():
+        member = require_member_identity()
+        profile_jobs = member_jobs(member["id"])
+        default_job = max(profile_jobs, key=profile_jobs.get) if profile_jobs else "WAR"
+        return render_template(
+            "gear_optimizer.html", member=member, jobs=GEAR_JOBS,
+            gear_slots=GEAR_SLOTS, gear_stats=tuple(dict.fromkeys(GEAR_STAT_ALIASES.values())),
+            default_job=default_job,
+            default_race="",
+        )
+
+    @app.get("/api/gear/items")
+    @editor_required
+    def gear_item_search():
+        query = request.args.get("q", "").strip()
+        if len(query) < 2 or len(query) > 60:
+            return jsonify({"items": []})
+        try:
+            matches = horizon_json(f"items?{urlencode({'search': query, 'limit': 12})}").get("items", [])
+            items = []
+            for match in matches[:10]:
+                key = match.get("key", "")
+                if not key:
+                    continue
+                try:
+                    detail = horizon_json(f"items/{quote(key)}", timeout=10)
+                except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+                    continue
+                item = normalize_horizon_item(match["id"], detail, key=key)
+                if item["slot"]:
+                    items.append(item)
+            return jsonify({"items": items})
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError):
+            return jsonify({"error": "HorizonXI item search is temporarily unavailable."}), 502
+
+    @app.post("/gear-optimizer/owned")
+    @editor_required
+    def add_owned_gear():
+        member = require_member_identity()
+        item_key = request.form.get("item_key", "").strip()
+        if not re.fullmatch(r"[A-Za-z0-9_+?'.-]{1,100}", item_key):
+            abort(400, description="Choose a valid HorizonXI item.")
+        try:
+            detail = horizon_json(f"items/{quote(item_key)}")
+            item_id = detail.get("id")
+            item = normalize_horizon_item(item_id, detail, key=item_key)
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, TypeError, ValueError):
+            abort(502, description="HorizonXI could not verify that item.")
+        if not item["slot"]:
+            abort(400, description="Choose an equippable item.")
+        get_db().execute(
+            """INSERT INTO gear_ownership
+               (member_id,item_id,item_key,name,slot,description,jobs,level)
+               VALUES (?,?,?,?,?,?,?,?)
+               ON CONFLICT(member_id,item_id) DO UPDATE SET
+               item_key=excluded.item_key,name=excluded.name,slot=excluded.slot,
+               description=excluded.description,jobs=excluded.jobs,level=excluded.level""",
+            (member["id"], item["item_id"], item["item_key"], item["name"],
+             item["slot"], item["description"], item["jobs"], item["level"]),
+        )
+        get_db().commit()
+        flash(f"Added {item['name']} to {member['name']}'s owned gear.", "success")
+        return redirect(url_for("gear_optimizer"))
+
+    @app.post("/gear-optimizer/owned/<int:item_id>/delete")
+    @editor_required
+    def delete_owned_gear(item_id):
+        member = require_member_identity()
+        get_db().execute(
+            "DELETE FROM gear_ownership WHERE member_id=? AND item_id=?",
+            (member["id"], item_id),
+        )
+        get_db().commit()
+        flash("Removed the item from your owned gear.", "success")
+        return redirect(url_for("gear_optimizer"))
 
     @app.get("/spell-farming")
     @editor_required

@@ -1,0 +1,40 @@
+{% extends 'base.html' %}
+{% block title %}Gear Optimizer &middot; Hokuten Knights{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=1) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=1) }}">{% endblock %}
+{% block content %}
+<section class="gear-hero">
+  <div><p class="eyebrow">HorizonXI &middot; Level 75 &middot; Treasures era</p><h1>Gear Optimizer</h1><p>Choose a job, level, race, and stat to build the strongest eligible set and browse every matching item by slot.</p></div>
+  <a class="button" href="https://horizonxi.com/players/{{ member.name|urlencode }}" target="_blank" rel="noopener">Open Horizon Profile</a>
+</section>
+
+<section class="gear-controls">
+  <label>Job<select id="gear-job">{% for job in jobs|sort %}<option value="{{ job }}" {{ 'selected' if job == default_job }}>{{ job }}</option>{% endfor %}</select></label>
+  <label>Level<input id="gear-level" type="number" min="1" max="75" value="75"></label>
+  <label>Race<select id="gear-race"><option value="" {{ 'selected' if not default_race }}>All Races</option>{% for race in ('Hume Male','Hume Female','Elvaan Male','Elvaan Female','Tarutaru Male','Tarutaru Female','Mithra','Galka') %}<option value="{{ race }}" {{ 'selected' if race == default_race }}>{{ race }}</option>{% endfor %}</select></label>
+  <label>Primary stat<select id="gear-primary-stat">{% for stat in gear_stats %}<option value="{{ stat }}" {{ 'selected' if stat == 'Accuracy' }}>{{ stat }}</option>{% endfor %}</select></label>
+  <label>Secondary stat<select id="gear-secondary-stat"><option value="">None</option>{% for stat in gear_stats %}<option value="{{ stat }}" {{ 'selected' if stat == 'Attack' }}>{{ stat }}</option>{% endfor %}</select></label>
+  <label class="gear-owned-stat-filter"><input id="gear-negative" type="checkbox"> Negative</label>
+</section>
+
+<section class="gear-section">
+  <header><div><p class="eyebrow">Calculated from the tables below</p><h2>Best Stat Set</h2></div><span id="gear-load-summary">Eligible slots</span></header>
+  <div class="gear-slots" id="gear-best-slots"></div>
+  <div class="gear-total-panel"><h3>Best Set Totals</h3><div id="gear-stat-totals" class="gear-stat-totals"></div><p>Each slot uses the highest eligible item for the selected stat priorities. Negative mode selects items with negative primary values. Conditional effects are excluded.</p></div>
+</section>
+
+<section class="gear-section gear-catalog-section">
+  <header><div><p class="eyebrow">Game-wide equipment index</p><h2>Gear with <span id="catalog-stat-name">Selected Stat</span></h2></div><strong id="gear-catalog-count">Loading catalog...</strong></header>
+  <p class="gear-catalog-note">Compatible equipment is grouped by slot and ranked by the selected stat. Turn on Negative to show only items with a negative primary value.</p>
+  <div id="gear-catalog-results" class="gear-catalog-results"></div>
+</section>
+
+<p class="gear-source">Best-set calculations and deltas use the bundled Treasures-era equipment catalog. A delta compares an available item with the calculated best item for that slot.</p>
+
+<script>
+window.GEAR_OPTIMIZER={{ {
+  'character': member.name,
+  'catalogUrl': url_for('static', filename='gear_catalog.json')
+}|tojson }};
+</script>
+<script src="{{ url_for('static', filename='gear_optimizer.js', v=1) }}"></script>
+{% endblock %}

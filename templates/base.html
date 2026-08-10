@@ -29,6 +29,7 @@
       {% if is_editor() and current_member_id() %}<a href="{{ url_for('my_help_requests') }}">My Requests</a>{% endif %}
       <a href="{{ url_for('loot_tables') }}">Loot Tables</a>
       <a href="{{ url_for('spell_farming') }}">Spell Farming</a>
+      <a href="{{ url_for('gear_optimizer') }}">Gear Optimizer</a>
       <a href="{{ url_for('job_roster') }}">Job Roster</a>
       {% if is_editor() and current_member_id() %}<a href="{{ url_for('alliance_builder') }}">Alliance Builder</a>{% endif %}
     </nav>
