@@ -29,6 +29,17 @@
     if (text !== undefined) node.textContent = text;
     return node;
   };
+  const wikiStar = item => {
+    const link = element("a", "gear-wiki-star", "\u2605");
+    link.href = `https://www.bg-wiki.com/ffxi/${encodeURIComponent(item.name.replace(/\s+/g, "_"))}`;
+    link.target = "_blank";
+    link.rel = "noopener";
+    link.title = `Open ${item.name} on BG Wiki`;
+    link.setAttribute("aria-label", link.title);
+    link.addEventListener("click", event => event.stopPropagation());
+    link.addEventListener("keydown", event => event.stopPropagation());
+    return link;
+  };
 
   const tooltip = element("aside", "gear-item-tooltip");
   tooltip.setAttribute("role", "tooltip");
@@ -156,7 +167,7 @@
       icon.src = `https://static.ffxiah.com/images/icon/${item.item_id}.png`;
       icon.alt = item.name;
       icon.addEventListener("error", () => icon.classList.add("missing"), { once: true });
-      card.append(clearButton, icon);
+      card.append(clearButton, icon, wikiStar(item));
       bindTooltip(card, item);
       return card;
     });
@@ -180,15 +191,15 @@
     document.querySelector("#gear-active-count").textContent = `${items.length} items`;
     const nodes = items.map(item => {
       const unowned = scopeControl.value === "owned" && !ownedCounts.has(Number(item.item_id));
-      const row = element("button", `gear-active-item${equipmentSet[activeSlot] && equipmentSet[activeSlot].item_id === item.item_id ? " equipped" : ""}${unowned ? " unowned" : ""}`);
-      row.type = "button";
+      const row = element("article", `gear-active-item${equipmentSet[activeSlot] && equipmentSet[activeSlot].item_id === item.item_id ? " equipped" : ""}${unowned ? " unowned" : ""}`);
+      row.setAttribute("role", "button");
       const icon = document.createElement("img");
       icon.src = `https://static.ffxiah.com/images/icon/${item.item_id}.png`;
       icon.alt = "";
       const copy = element("span", "");
       copy.append(element("strong", "", item.name), element("small", "", `Lv. ${item.level}`));
       const value = Number(itemStats(item)[stat] || 0);
-      row.append(icon, copy, element("b", "", `${value >= 0 ? "+" : ""}${value}`));
+      row.append(icon, copy, element("b", "", `${value >= 0 ? "+" : ""}${value}`), wikiStar(item));
       row.addEventListener("click", () => {
         equipmentSet[activeSlot] = item;
         setInitialized = true;
@@ -196,6 +207,9 @@
         renderTotals();
         renderCatalog();
         renderActiveItems();
+      });
+      row.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") { event.preventDefault(); row.click(); }
       });
       bindTooltip(row, item);
       return row;
@@ -261,6 +275,7 @@
           element("strong", "gear-catalog-value", `${value >= 0 ? "+" : ""}${value}`),
           element("strong", `gear-catalog-delta${improvement < 0 ? " negative" : ""}`, `${delta >= 0 ? "+" : ""}${delta}`),
           element("p", "", `Lv. ${item.level} | ${item.description || stat}`),
+          wikiStar(item),
         );
         const actions = element("div", "gear-equip-actions");
         applicableSlots(item).forEach(targetSlot => {

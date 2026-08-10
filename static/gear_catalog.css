@@ -130,6 +130,11 @@
   font-size: 9px;
 }
 
+.gear-catalog-item > .gear-wiki-star {
+  grid-column: 3;
+  justify-self: end;
+}
+
 @media (max-width: 1250px) {
   .gear-controls { grid-template-columns: repeat(3, 1fr); }
   .gear-owned-stat-filter { grid-column: auto; }
