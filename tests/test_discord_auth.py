@@ -51,6 +51,17 @@ def test_discord_connect_is_a_simple_direct_sign_in(tmp_path):
     assert b"Administrator access" not in page.data
 
 
+def test_www_redirects_to_canonical_host_before_discord_session_starts(tmp_path):
+    client = discord_app(tmp_path).test_client()
+    response = client.get(
+        "/discord/connect?next=/help-requests",
+        base_url="https://www.hokutenknights.com",
+    )
+    assert response.status_code == 308
+    assert response.location == "https://hokutenknights.com/discord/connect?next=/help-requests"
+    assert "session=" not in response.headers.get("Set-Cookie", "")
+
+
 def test_existing_character_is_linked_without_duplicate(monkeypatch, tmp_path):
     app = discord_app(tmp_path)
     client = app.test_client()

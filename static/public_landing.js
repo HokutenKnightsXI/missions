@@ -9,15 +9,36 @@
 
   let current=0;
   let syncFrame=0;
-  scenes[0].classList.add('active');
+  const hydrateScene=scene=>{
+    if(!scene.dataset.sceneUrl)return;
+    scene.style.setProperty('--scene',`url("${scene.dataset.sceneUrl}")`);
+    delete scene.dataset.sceneUrl;
+  };
+  const preloadScenes=()=>{
+    const pending=scenes.slice(1);
+    const loadNext=()=>{
+      const scene=pending.shift();
+      if(!scene)return;
+      const source=scene.dataset.sceneUrl;
+      if(!source){loadNext();return;}
+      const image=new Image();
+      image.onload=()=>{hydrateScene(scene);loadNext();};
+      image.onerror=loadNext;
+      image.src=source;
+    };
+    loadNext();
+  };
+  if('requestIdleCallback' in window)requestIdleCallback(preloadScenes,{timeout:1500});
+  else addEventListener('load',preloadScenes,{once:true});
 
   const showScene=index=>{
     if(index===current)return;
     const previous=scenes[current];
-    previous.classList.remove('active');
+    previous.classList.remove('active','initial');
     previous.classList.add('leaving');
     current=index;
     const next=scenes[current];
+    hydrateScene(next);
     next.classList.remove('leaving');
     next.classList.add('active');
     location.textContent=next.dataset.name;

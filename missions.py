@@ -635,6 +635,7 @@ def create_app(test_config=None):
         DISCORD_GUILD_ID=os.environ.get("DISCORD_GUILD_ID", ""),
         DISCORD_REDIRECT_URI=os.environ.get("DISCORD_REDIRECT_URI", ""),
         DISCORD_ADMIN_USER_ID=os.environ.get("DISCORD_ADMIN_USER_ID", ""),
+        CANONICAL_HOST=os.environ.get("CANONICAL_HOST", "hokutenknights.com"),
         ROSTER_REFRESH_TOKEN=os.environ.get("ROSTER_REFRESH_TOKEN", ""),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
@@ -647,6 +648,16 @@ def create_app(test_config=None):
                 if key not in test_config:
                     app.config[key] = ""
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
+
+    @app.before_request
+    def redirect_www_to_canonical_host():
+        canonical_host = str(app.config.get("CANONICAL_HOST", "")).strip().lower()
+        request_host = request.host.partition(":")[0].lower()
+        if canonical_host and request_host == f"www.{canonical_host}":
+            target = f"https://{canonical_host}{request.path}"
+            if request.query_string:
+                target += f"?{request.query_string.decode('latin-1')}"
+            return redirect(target, code=308)
 
     def is_editor():
         return bool(app.config.get("AUTH_DISABLED") or session.get("is_editor") or session.get("is_admin"))
