@@ -1,10 +1,9 @@
 {% extends 'base.html' %}
 {% block title %}Gear Optimizer &middot; Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=18) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=18) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=19) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=18) }}">{% endblock %}
 {% block content %}
 <section class="gear-hero">
   <div><p class="eyebrow">HorizonXI &middot; Level 75 &middot; Treasures era</p><h1>Gear Optimizer</h1><p>Choose a job, level, race, and stat to build the strongest eligible set and browse every matching item by slot.</p></div>
-  <a class="button" href="https://horizonxi.com/players/{{ member.name|urlencode }}" target="_blank" rel="noopener">Open Horizon Profile</a>
 </section>
 
 <section class="gear-controls">
@@ -22,7 +21,7 @@
   <div class="gear-import-body">
     <p id="gear-import-instructions" {{ 'hidden' if archived_gear }}>Paste the copied inventory list from your HorizonXI character page. Equippable item names are matched against the optimizer catalog; materials, key items, and consumables are ignored.</p>
     <textarea id="gear-import-text" rows="9" placeholder="Paste your copied HorizonXI inventory here..." {{ 'hidden' if archived_gear }}></textarea>
-    <div class="gear-import-actions"><button type="button" id="gear-import-button" class="gear-action-button" {{ 'hidden' if archived_gear }}>Import Gear</button><button type="button" id="gear-import-success" class="gear-import-success" disabled {{ '' if archived_gear else 'hidden' }}>&#10003; Import Successful</button><button type="button" id="gear-clear-import" class="gear-action-button secondary">Clear Imported Gear</button><strong id="gear-import-status">No gear imported</strong></div>
+    <div class="gear-import-actions"><a class="gear-action-button gear-profile-button" href="https://horizonxi.com/players/{{ member.name|urlencode }}" target="_blank" rel="noopener">Open Horizon Profile</a><button type="button" id="gear-import-button" class="gear-action-button" {{ 'hidden' if archived_gear }}>Import Gear</button><button type="button" id="gear-import-success" class="gear-import-success" disabled {{ '' if archived_gear else 'hidden' }}>&#10003; Import Successful</button><button type="button" id="gear-clear-import" class="gear-action-button secondary">Clear Imported Gear</button><strong id="gear-import-status">No gear imported</strong></div>
   </div>
 </details>
 

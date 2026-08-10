@@ -1,3 +1,12 @@
+.site-header {
+  position: sticky;
+  z-index: 1000;
+  top: 0;
+  isolation: isolate;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
 @media (min-width: 801px) {
   .site-header,
   .site-header .brand,

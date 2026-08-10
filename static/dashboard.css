@@ -67,6 +67,9 @@ main:has(.progress-layout) { max-width: 1600px; }
 .mission-number { width: 105px; white-space: nowrap; }
 .mission-number { color: var(--gold); font-weight: 700; }
 .mission-name { color: #c8c8c4; width: 42%; }
+.mission-wiki-link { color: #c8c8c4; text-decoration: none; border-bottom: 1px dotted #8f7bc8; }
+.mission-wiki-link span { color: #bba6ff; font-size: 10px; }
+.mission-wiki-link:hover, .mission-wiki-link:focus-visible { color: #e4d9ff; border-color: #c4adff; }
 .member-list { min-width: 220px; }
 .member-pill {
   position: relative;

@@ -3,7 +3,13 @@ import json
 import re
 
 import missions
-from missions import MISSION_OPTIONS, create_app
+from missions import MISSION_OPTIONS, create_app, mission_wiki_url
+
+
+def test_mission_wiki_url_links_directly_and_removes_display_notes():
+    assert mission_wiki_url("One to Be Feared") == "https://www.bg-wiki.com/ffxi/One_to_Be_Feared"
+    assert mission_wiki_url("Garden of Antiquity (Chapter transition)") == "https://www.bg-wiki.com/ffxi/Garden_of_Antiquity"
+    assert mission_wiki_url("Campaign complete") == ""
 
 
 @pytest.fixture()

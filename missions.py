@@ -521,6 +521,15 @@ def split_mission(campaign, mission, chapter=""):
     return chapter or campaign, mission
 
 
+def mission_wiki_url(title):
+    """Return the direct BG Wiki page for a displayed mission title."""
+    if title in {"Not selected", "Campaign complete"}:
+        return ""
+    page_title = re.sub(r"\s*\([^)]*\)\s*$", "", title).strip()
+    page_slug = quote(page_title.replace(" ", "_"), safe="()'_")
+    return f"https://www.bg-wiki.com/ffxi/{page_slug}"
+
+
 def build_progress_board(campaign, rows):
     by_mission = {}
     for row in rows:
@@ -529,6 +538,7 @@ def build_progress_board(campaign, rows):
     board = [{
         "number": "—",
         "title": "Not selected",
+        "wiki_url": "",
         "members": by_mission.get("", []),
     }]
     known = set()
@@ -539,6 +549,7 @@ def build_progress_board(campaign, rows):
             board.append({
                 "number": number,
                 "title": title,
+                "wiki_url": mission_wiki_url(title),
                 "members": by_mission.get(mission, []),
             })
 
@@ -546,7 +557,7 @@ def build_progress_board(campaign, rows):
     for mission, members in by_mission.items():
         if mission and mission not in known:
             number, title = split_mission(campaign, mission, members[0]["chapter"])
-            board.append({"number": number, "title": title, "members": members})
+            board.append({"number": number, "title": title, "wiki_url": mission_wiki_url(title), "members": members})
     return board
 
 
