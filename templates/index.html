@@ -64,7 +64,7 @@
           {% for mission in boards[campaign] %}
           <tr class="{{ 'has-members' if mission.members }}">
             <td class="mission-number">{{ mission.number }}</td>
-            <td class="mission-name">{{ mission.title }}</td>
+            <td class="mission-name">{% if mission.wiki_url %}<a class="mission-wiki-link" href="{{ mission.wiki_url }}" target="_blank" rel="noopener" title="Open {{ mission.title }} on BG Wiki">{{ mission.title }} <span aria-hidden="true">↗</span></a>{% else %}{{ mission.title }}{% endif %}</td>
             <td class="member-list">
               {% for member in mission.members %}
                 {% set may_edit = is_admin() or current_member_id() == member.id %}<{{ 'a' if may_edit else 'span' }} {% if may_edit %}href="{{ url_for('member_form', member_id=member.id) }}"{% endif %} class="member-pill {{ member.status|lower|replace(' ', '-') }}" title="Jobs: {{ member.jobs or 'None' }} | Status: {{ member.status }} | Availability: {{ member.availability or 'Not provided' }} | Extra notes: {{ member.details or member.notes or 'None' }}">{{ member.name }}<span class="member-tooltip"><span><b>Jobs:</b> {{ member.jobs or 'None' }}</span><span><b>Status:</b> {{ member.status }}</span><span class="availability"><b>Availability:</b> {{ member.availability or 'Not provided' }}</span><span><b>Extra notes:</b> {{ member.details or member.notes or 'None' }}</span></span></{{ 'a' if may_edit else 'span' }}>{% if not loop.last %}<span class="comma">,</span>{% endif %}
