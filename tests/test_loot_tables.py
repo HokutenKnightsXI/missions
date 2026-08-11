@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from build_loot_tables import allowed_zone, parse_drops, th_rate
+from build_loot_tables import allowed_zone, parse_drops, parse_item_details, th_rate
 from missions import create_app, dynamis_catalog
 
 
@@ -39,6 +39,17 @@ INSERT INTO `mob_droplist` VALUES (2438,0,0,1000,1429,@UNCOMMON); -- Black Mages
         ["Den of Rancor", "Tonberry Imprecator", "Black Mages Testimony"],
         ["Yhoator Jungle", "Tonberry Jinxer", "Black Mages Testimony"],
     ]
+    assert all(row[9] == 1429 for row in rows)
+
+
+def test_drop_item_details_include_icon_id_and_description():
+    rows = [["Yhoator Jungle", "Tonberry Jinxer", "Black Mages Testimony",
+             10, 12, 15, 16.5, 18, 1, 1429]]
+    details = parse_item_details(
+        '[1429] = {id=1429,en="A testimony from a black mage."},\n', rows
+    )
+    assert details["1429"]["name"] == "Black Mages Testimony"
+    assert details["1429"]["description"] == "A testimony from a black mage."
 
 
 def test_loot_table_page_and_generated_index(client):
@@ -48,6 +59,7 @@ def test_loot_table_page_and_generated_index(client):
     assert b"TH4" in response.data and b"Search monsters" in response.data
     payload = json.loads(Path("static/loot_tables.json").read_text(encoding="utf-8"))
     assert payload["th_max"] == 4 and len(payload["rows"]) > 10_000
+    assert payload["items"] and all(len(row) == 10 for row in payload["rows"])
     zones = {row[0] for row in payload["rows"]}
     assert not any("Abyssea" in zone or "[S]" in zone for zone in zones)
     dark_stalker = payload["spawns"]["The Eldieme Necropolis\tdarkstalker"]
@@ -191,6 +203,7 @@ def test_tracked_items_have_static_hover_stats_and_wider_layout(client):
     assert b"item_tooltips.js" in page.data
     tooltips = json.loads(Path("static/item_tooltips.json").read_text(encoding="utf-8"))
     petasos = tooltips["dynamis:BLM:head"]
+    assert petasos["item_id"] == 15075
     assert petasos["name"] == "Sorcerer's Petasos"
     assert petasos["level"] == 75
     assert "Elemental magic skill +10" in petasos["stats"]

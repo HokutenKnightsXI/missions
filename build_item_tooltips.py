@@ -26,10 +26,11 @@ def normalized(value):
 
 
 def main():
+    items_source = download("items.lua")
     item_rows = {}
     for match in re.finditer(
         r'\[(\d+)\] = \{id=\d+,en="((?:\\.|[^"\\])*)".*?category="([^"]+)".*?level=(\d+).*?slots=(\d+)',
-        download("items.lua"),
+        items_source,
     ):
         item_id, name, category, level, slots = match.groups()
         item_rows[int(item_id)] = {"name": lua_text(name), "category": category,
@@ -42,6 +43,12 @@ def main():
         )
     }
     candidates = list(item_rows.items())
+    all_items = {
+        normalized(lua_text(name)): int(item_id)
+        for item_id, name in re.findall(
+            r'\[(\d+)\] = \{id=\d+,en="((?:\\.|[^"\\])*)"', items_source
+        )
+    }
 
     def find(name):
         wanted = normalized(name)
@@ -65,14 +72,14 @@ def main():
         if piece["kind"] == "Relic armor -1":
             upgrade_name = f"{piece['item'][:-3]} +1"
             item_id, row = find(upgrade_name)
-            output[piece["key"]] = {"name": piece["item"], "job": piece["job"],
+            output[piece["key"]] = {"item_id": item_id, "name": piece["item"], "job": piece["job"],
                                     "slot": piece["slot"], "level": row["level"],
                                     "stats": (f"UPGRADE PREVIEW — {upgrade_name}\n"
                                               f"{descriptions.get(item_id, 'Equipment description unavailable.')}"),
                                     "note": "The -1 item is an upgrade material; these are the resulting +1 armor stats."}
             continue
         item_id, row = find(piece["item"])
-        output[piece["key"]] = {"name": piece["item"], "job": piece["job"],
+        output[piece["key"]] = {"item_id": item_id, "name": piece["item"], "job": piece["job"],
                                 "slot": piece["slot"], "level": row["level"],
                                 "stats": descriptions.get(item_id, "Equipment description unavailable.")}
     limbus_jobs = {
@@ -83,21 +90,22 @@ def main():
         for _component, item, slot in pieces:
             key = f"limbus:{boss.lower()}:{slot.lower()}"
             item_id, row = find(item)
-            output[key] = {"name": item, "job": limbus_jobs[boss], "slot": slot,
+            output[key] = {"item_id": item_id, "name": item, "job": limbus_jobs[boss], "slot": slot,
                            "level": row["level"],
                            "stats": descriptions.get(item_id, "Equipment description unavailable.")}
     for job, group in LIMBUS_AF1.items():
         for zone in ("apollyon", "temenos"):
             item, floors = group[zone]
+            item_id = all_items.get(normalized(item))
             output[f"limbus:af1:{job}:{zone}"] = {
-                "name": item, "job": job, "slot": f"{zone.title()} upgrade material",
+                "item_id": item_id, "name": item, "job": job, "slot": f"{zone.title()} upgrade material",
                 "level": None, "stats": f"Known original Limbus sources: {floors}",
                 "note": "Required with the matching job material from the other Limbus zone for every AF+1 piece.",
             }
         for slot, item in zip(AF1_SLOTS, group["pieces"]):
             item_id, row = find(item)
             output[f"limbus:af1:{job}:{slot.lower()}"] = {
-                "name": item, "job": job, "slot": slot, "level": row["level"],
+                "item_id": item_id, "name": item, "job": job, "slot": slot, "level": row["level"],
                 "stats": descriptions.get(item_id, "Equipment description unavailable."),
             }
     with open("static/item_tooltips.json", "w", encoding="utf-8") as output_file:
