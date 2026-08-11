@@ -86,11 +86,44 @@ body:has(.public-landing) .public-signin {
     width: 125px;
   }
 
-  .soundtrack-controls {
-    flex-wrap: wrap;
+  .landing-soundtrack {
+    right: 20px;
+    bottom: max(24px, env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: auto auto minmax(80px, 125px);
+    gap: 8px 12px;
+    align-items: center;
+  }
+
+  .landing-soundtrack .soundtrack-credit {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    margin-top: 0;
+  }
+
+  .landing-soundtrack .soundtrack-controls {
+    display: contents;
+  }
+
+  .landing-soundtrack .soundtrack-controls button {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .landing-soundtrack .soundtrack-controls label {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  .landing-soundtrack .soundtrack-controls input {
+    grid-column: 3;
+    grid-row: 3;
   }
 
   .landing-discord-signin {
-    margin-left: 0;
+    grid-column: 1 / -1;
+    grid-row: 1;
+    justify-self: start;
+    margin: 0 0 4px;
   }
 }
