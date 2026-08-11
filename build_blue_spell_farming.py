@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from urllib.request import urlopen
 
@@ -16,6 +17,7 @@ LSB_SQL_BASE = "https://raw.githubusercontent.com/LandSandBoat/server/base/sql"
 BLUE_SPELL_LIST_SOURCE = f"{LSB_SQL_BASE}/blue_spell_list.sql"
 BLUE_SPELL_MODS_SOURCE = f"{LSB_SQL_BASE}/blue_spell_mods.sql"
 BLUE_TRAITS_SOURCE = f"{LSB_SQL_BASE}/blue_traits.sql"
+BLUE_SPELL_SCRIPTS_API = "https://api.github.com/repos/LandSandBoat/server/contents/scripts/actions/spells/blue?ref=base"
 OUTPUT = Path("static/blue_spell_farming.json")
 
 DENIED_ZONE_PARTS = (
@@ -102,8 +104,93 @@ def parse_blue_metadata(spell_list_sql: str, spell_mods_sql: str,
     return metadata
 
 
-def build(rows: list[dict], metadata: dict[str, dict] | None = None) -> dict:
+def parse_combat_metadata(script: str) -> tuple[str, list[str]]:
+    """Extract spell category and damage-scaling stats from an LSB spell script."""
+    if "usePhysicalSpell" in script:
+        spell_type = "Physical"
+        modifiers = ["STR (fSTR)"]
+    elif "useBreathSpell" in script:
+        spell_type = "Magical (Breath)"
+        modifiers = ["HP"]
+    elif "useMagicalSpell" in script or "useDrainSpell" in script:
+        spell_type = "Magical"
+        modifiers = []
+    else:
+        type_comment = re.search(r"--\s*Spell Type:\s*([^\r\n]+)", script, re.I)
+        detail = type_comment.group(1).strip() if type_comment else "Support"
+        if re.search(r"physical", detail, re.I):
+            spell_type = "Physical"
+        elif re.search(r"breath", detail, re.I):
+            spell_type = "Magical (Breath)"
+        elif re.search(r"magical", detail, re.I):
+            spell_type = "Magical"
+        else:
+            spell_type = "Support"
+        modifiers = []
+
+    attribute = re.search(r"params\.attribute\s*=\s*xi\.mod\.(STR|DEX|VIT|AGI|INT|MND|CHR)", script)
+    if attribute:
+        modifiers.append(attribute.group(1))
+    for stat, coefficient in re.findall(
+        r"params\.(str|dex|vit|agi|int|mnd|chr)_wsc\s*=\s*(-?\d+(?:\.\d+)?)",
+        script,
+        re.I,
+    ):
+        value = float(coefficient)
+        if value:
+            label = f"{stat.upper()} {value * 100:g}%"
+            if label not in modifiers:
+                modifiers.append(label)
+    return spell_type, modifiers
+
+
+def parse_physical_damage_type(script: str) -> str | None:
+    """Return the physical damage family advertised or used by a spell script."""
+    comment = re.search(r"--\s*Spell Type:\s*Physical\s*\(([^)]+)\)", script, re.I)
+    if comment:
+        value = comment.group(1).strip().title()
+        if value in {"Blunt", "Slashing", "Piercing"}:
+            return value
+    damage = re.search(r"params\.damageType\s*=\s*xi\.damageType\.([A-Z_]+)", script)
+    if not damage:
+        return None
+    value = damage.group(1)
+    if value in {"HAND_TO_HAND", "BLUNT"}:
+        return "Blunt"
+    if value in {"PIERCING", "RANGED"}:
+        return "Piercing"
+    if value == "SLASHING":
+        return "Slashing"
+    return None
+
+
+def fetch_combat_metadata() -> dict[str, dict]:
+    """Download and parse the current LSB Blue Magic action scripts."""
+    with urlopen(BLUE_SPELL_SCRIPTS_API, timeout=30) as response:
+        files = [row for row in json.load(response) if row.get("name", "").endswith(".lua")]
+
+    def load(row: dict) -> tuple[str, str]:
+        with urlopen(row["download_url"], timeout=30) as response:
+            return row["name"], response.read().decode("utf-8")
+
+    metadata = {}
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        for filename, script in executor.map(load, files):
+            name_match = re.search(r"--\s*Spell:\s*([^\r\n]+)", script, re.I)
+            spell = name_match.group(1).strip() if name_match else filename[:-4].replace("_", " ")
+            spell_type, modifiers = parse_combat_metadata(script)
+            metadata[spell.casefold()] = {
+                "spell_type": spell_type,
+                "stat_modifiers": modifiers,
+                "physical_damage_type": parse_physical_damage_type(script),
+            }
+    return metadata
+
+
+def build(rows: list[dict], metadata: dict[str, dict] | None = None,
+          combat_metadata: dict[str, dict] | None = None) -> dict:
     metadata = metadata or {}
+    combat_metadata = combat_metadata or {}
     catalog = []
     seen = set()
     for row in rows:
@@ -121,6 +208,7 @@ def build(rows: list[dict], metadata: dict[str, dict] | None = None) -> dict:
         seen.add(key)
         cap = blue_magic_cap(spell_level)
         spell_metadata = metadata.get(spell.casefold(), {})
+        combat = combat_metadata.get(spell.casefold(), {})
         catalog.append({
             "spell": spell,
             "spell_level": spell_level,
@@ -135,12 +223,16 @@ def build(rows: list[dict], metadata: dict[str, dict] | None = None) -> dict:
             "set_stats": spell_metadata.get("set_stats", []),
             "trait": spell_metadata.get("trait"),
             "trait_weight": spell_metadata.get("trait_weight", 0),
+            "spell_type": combat.get("spell_type", "Support"),
+            "stat_modifiers": combat.get("stat_modifiers", []),
+            "physical_damage_type": combat.get("physical_damage_type"),
         })
     catalog.sort(key=lambda item: (item["spell_level"], item["spell"], item["zone"], item["monster"]))
     return {
         "source": SOURCE,
         "horizon_rule_source": "https://horizonffxi.wiki/Category:Blue_Magic",
         "blue_metadata_source": BLUE_SPELL_LIST_SOURCE,
+        "combat_metadata_source": BLUE_SPELL_SCRIPTS_API,
         "era": "Original through Treasures of Aht Urhgan; level cap 75",
         "rows": catalog,
     }
@@ -156,7 +248,8 @@ def main() -> None:
     with urlopen(BLUE_TRAITS_SOURCE, timeout=30) as response:
         blue_traits_sql = response.read().decode("utf-8")
     metadata = parse_blue_metadata(spell_list_sql, spell_mods_sql, blue_traits_sql)
-    payload = build(rows, metadata)
+    combat_metadata = fetch_combat_metadata()
+    payload = build(rows, metadata, combat_metadata)
     OUTPUT.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     spells = {row["spell"] for row in payload["rows"]}
     print(f"Wrote {len(payload['rows'])} farming targets for {len(spells)} spells to {OUTPUT}")
