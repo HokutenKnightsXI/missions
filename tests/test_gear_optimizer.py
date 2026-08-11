@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 import missions
-from build_gear_catalog import build as build_catalog
+from build_gear_catalog import build as build_catalog, lsb_item_stats, parse_level_scaling
 from missions import create_app, normalize_horizon_item, parse_gear_stats
 
 
@@ -53,6 +53,43 @@ def test_parse_gear_stats_supports_elemental_resistance():
     assert parse_gear_stats("Lightning Resistance+7 Water Resistance-2 Fire -3 Dark +4") == {
         "Lightning Resistance": 7, "Water Resistance": -2,
         "Fire Resistance": -3, "Dark Resistance": 4,
+    }
+
+
+def test_parse_gear_stats_supports_quoted_combat_stats():
+    assert parse_gear_stats(
+        '"Double Attack"+2% "Triple Attack"+1% '
+        '"Magic Def. Bonus"+3 "Cure" potency +10% Weapon Skill Accuracy+5'
+    ) == {
+        "Double Attack": 2,
+        "Triple Attack": 1,
+        "Magic Defense Bonus": 3,
+        "Cure Potency": 10,
+        "Weapon Skill Accuracy": 5,
+    }
+
+
+def test_lsb_item_stats_supplies_hidden_numeric_effect_values():
+    stats = lsb_item_stats(
+        "INSERT INTO `item_mods` VALUES (14813,288,5);\n"
+        "INSERT INTO `item_mods` VALUES (14813,369,1);\n"
+        "INSERT INTO `item_mods` VALUES (14813,370,2);\n"
+        "INSERT INTO `item_mods` VALUES (14813,374,10);\n"
+        "INSERT INTO `item_mods` VALUES (14813,48,7);"
+    )
+    assert stats[14813] == {
+        "Double Attack": 5,
+        "Refresh": 1,
+        "Regen": 2,
+        "Cure Potency": 10,
+        "Weapon Skill Accuracy": 7,
+    }
+
+
+def test_parse_level_scaling_handles_promathia_rings():
+    assert parse_level_scaling('STR+2～5 DEX+2～5 "Store TP"+5', 30) == {
+        "STR": {"min": 2, "max": 5, "min_level": 30, "max_level": 75, "tier_levels": 15},
+        "DEX": {"min": 2, "max": 5, "min_level": 30, "max_level": 75, "tier_levels": 15},
     }
 
 
@@ -156,11 +193,17 @@ def test_gear_optimizer_uses_catalog_without_loading_character_equipment(monkeyp
     assert b'<option value="" selected disabled>Select One</option>' in page.data
     assert b'<option value="" selected>None</option>' in page.data
     assert b"gear_select.css?v=1" in page.data
+    assert b"gear_optimizer.js?v=20" in page.data
     assert b"Owned Gear" not in page.data
     assert b"Add Equipment You Own" not in page.data
     assert b"Game-wide equipment index" in page.data
     assert b"Tarutaru Female" in page.data
     assert b"Gear Optimizer</a>" in page.data
+
+    optimizer_script = client.get("/static/gear_optimizer.js").data
+    assert b"if (item.rare) return false" in optimizer_script
+    assert b"copiesAlreadyUsed < (ownedCounts.get" in optimizer_script
+    assert b"Object.entries(item.level_scaling || {})" in optimizer_script
 
 
 def test_owned_gear_is_saved_per_character(monkeypatch, tmp_path):

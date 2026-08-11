@@ -108,7 +108,21 @@
     node.addEventListener("blur", hideTooltip);
   };
 
-  const itemStats = item => item && item.stats ? item.stats : {};
+  const itemStats = item => {
+    if (!item) return {};
+    const stats = { ...(item.stats || {}) };
+    Object.entries(item.level_scaling || {}).forEach(([stat, range]) => {
+      const minimumLevel = Number(range.min_level || item.level || 1);
+      const maximumLevel = Number(range.max_level || 75);
+      const tierLevels = Number(range.tier_levels || 15);
+      const selectedLevel = Math.max(minimumLevel, Math.min(Number(levelControl.value || 75), maximumLevel));
+      const totalTiers = Math.max(1, Math.ceil((maximumLevel - minimumLevel) / tierLevels));
+      const currentTier = Math.min(totalTiers, Math.floor((selectedLevel - minimumLevel) / tierLevels));
+      stats[stat] = Math.round(Number(range.min) +
+        (Number(range.max) - Number(range.min)) * currentTier / totalTiers);
+    });
+    return stats;
+  };
   const selectedStats = () => [primaryControl.value, secondaryControl.value].filter(Boolean);
   const score = item => {
     const stats = itemStats(item);
@@ -132,9 +146,18 @@
     const paired = pairedSlots[slot];
     return Boolean(paired && gear[paired] && Number(gear[paired].item_id) === Number(item.item_id));
   };
+  const pairedDuplicateAllowed = (item, slot, gear = equipmentSet) => {
+    if (!duplicateInPairedSlot(item, slot, gear)) return true;
+    if (item.rare) return false;
+    if (scopeControl.value !== "owned") return true;
+    const copiesAlreadyUsed = Object.entries(gear)
+      .filter(([candidate, equipped]) => candidate !== slot && equipped && Number(equipped.item_id) === Number(item.item_id))
+      .length;
+    return copiesAlreadyUsed < (ownedCounts.get(Number(item.item_id)) || 0);
+  };
   const equipItem = (item, slot) => {
     const paired = pairedSlots[slot];
-    if (paired && equipmentSet[paired] && Number(equipmentSet[paired].item_id) === Number(item.item_id)) {
+    if (!pairedDuplicateAllowed(item, slot) && paired) {
       equipmentSet[paired] = null;
     }
     equipmentSet[slot] = item;
@@ -358,7 +381,7 @@
     const remaining = new Map(ownedCounts);
     slotOrder.forEach(slot => {
       const match = candidates.find(item => applicableSlots(item).includes(slot) &&
-        !duplicateInPairedSlot(item, slot, calculatedSet) &&
+        pairedDuplicateAllowed(item, slot, calculatedSet) &&
         (scopeControl.value !== "owned" || (remaining.get(Number(item.item_id)) || 0) > 0));
       calculatedSet[slot] = match || null;
       if (match && scopeControl.value === "owned") {
