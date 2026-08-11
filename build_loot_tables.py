@@ -13,6 +13,7 @@ BASE = "https://raw.githubusercontent.com/LandSandBoat/server/refs/heads/base/sq
 SOURCES = {
     "drops": f"{BASE}/mob_droplist.sql", "zones": f"{BASE}/zone_settings.sql",
     "spawns": f"{BASE}/mob_spawn_points.sql",
+    "descriptions": "https://raw.githubusercontent.com/Windower/Resources/master/resources_data/item_descriptions.lua",
 }
 RATE_VARIABLES = {
     "@ALWAYS": 1000, "@VCOMMON": 240, "@COMMON": 150, "@UNCOMMON": 100,
@@ -85,7 +86,7 @@ def parse_drops(sql, zones):
         if not match or not current_mobs:
             continue
         block_has_drops = True
-        _drop_id, drop_type, _group_id, group_rate, _item_id, item_rate, item_name = match.groups()
+        _drop_id, drop_type, _group_id, group_rate, item_id, item_rate, item_name = match.groups()
         drop_type = int(drop_type)
         if drop_type not in (0, 1):
             continue
@@ -98,13 +99,30 @@ def parse_drops(sql, zones):
             zone_name = zones.get(current_zone, "")
             if not allowed_zone(current_zone, zone_name):
                 continue
-            key = (zone_name.replace("_", " "), current_mob.replace("_", " "), item_name.strip())
+            key = (zone_name.replace("_", " "), current_mob.replace("_", " "),
+                   item_name.strip(), int(item_id))
             rolls[key].append(rates)
     rows = []
-    for (zone, mob, item), chances in rolls.items():
+    for (zone, mob, item, item_id), chances in rolls.items():
         combined = [100 * (1 - math.prod(1 - roll[th] / 100 for roll in chances)) for th in range(5)]
-        rows.append([zone, mob, item, *[round(value, 3) for value in combined], len(chances)])
+        rows.append([zone, mob, item, *[round(value, 3) for value in combined], len(chances), item_id])
     return sorted(rows, key=lambda row: (row[0].casefold(), row[1].casefold(), row[2].casefold()))
+
+
+def parse_item_details(sql, rows):
+    """Build compact hover-card descriptions for items present in the drop matrix."""
+    names = {row[9]: row[2] for row in rows}
+    descriptions = {}
+    for item_id, description in re.findall(
+        r'^\s*\[(\d+)\] = \{id=\d+,en="((?:\\.|[^"\\])*)"', sql, re.M
+    ):
+        item_id = int(item_id)
+        if item_id in names:
+            descriptions[str(item_id)] = {
+                "name": names[item_id],
+                "description": description.replace(r"\n", "\n").replace(r'\"', '"').replace(r"\\", "\\"),
+            }
+    return descriptions
 
 
 def normalized_mob(name):
@@ -164,6 +182,7 @@ def main():
     zone_ids = {name.replace("_", " "): zone_id for zone_id, name in zones.items()
                 if allowed_zone(zone_id, name)}
     payload = {"source": SOURCES["drops"], "th_max": 4, "rows": rows,
+               "items": parse_item_details(fetch(SOURCES["descriptions"]), rows),
                "spawns": spawns, "zone_bounds": zone_bounds, "zone_ids": zone_ids}
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")

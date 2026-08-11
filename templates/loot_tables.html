@@ -2,7 +2,7 @@
 {% block title %}HorizonXI Loot Tables · Hokuten Knights{% endblock %}
 {% block content %}
 <link rel="stylesheet" href="{{ url_for('static',filename='loot_tracker.css') }}">
-<link rel="stylesheet" href="{{ url_for('static',filename='loot_tracker_layout.css') }}">
+<link rel="stylesheet" href="{{ url_for('static',filename='loot_tracker_layout.css',v=2) }}">
 <section class="loot-hero">
   <div><p class="eyebrow">Original · Zilart · Promathia · Treasures</p><h1>HorizonXI Loot Tables</h1><p>Search general drops or track linkshell Dynamis and Limbus equipment.</p></div>
   <div class="loot-mode-picker"><label for="loot-mode">Loot section</label><select id="loot-mode"><option value="general" {{ 'selected' if mode == 'general' }}>General Loot Tables</option><option value="dynamis" {{ 'selected' if mode == 'dynamis' }}>Dynamis Loot</option><option value="limbus" {{ 'selected' if mode == 'limbus' }}>Limbus Loot</option></select></div>
@@ -15,7 +15,7 @@
 <section class="th-strip" id="th-strip" aria-label="Treasure Hunter rarity rates"></section>
 <section class="loot-panel"><header><div><h2>Drop matrix</h2><span id="loot-count">Loading loot data…</span></div><div class="loot-legend"><i></i> Selected TH column</div></header><div class="loot-table-wrap"><table class="loot-table"><thead><tr><th>Item</th><th>Monster</th><th>Zone</th>{% for th in range(5) %}<th data-th="{{ th }}">TH{{ th }}</th>{% endfor %}</tr></thead><tbody id="loot-body"><tr><td colspan="8" class="help-empty">Loading…</td></tr></tbody></table></div><footer><button class="button" id="loot-prev" type="button">← Previous</button><span id="loot-page"></span><button class="button" id="loot-next" type="button">Next →</button></footer></section>
 <div class="spawn-modal" id="spawn-popover" hidden role="dialog" aria-modal="true" aria-labelledby="spawn-mob"><section class="spawn-dialog"><header><div><small id="spawn-zone"></small><b id="spawn-mob"></b></div><span id="spawn-count"></span><button class="spawn-close" id="spawn-close" type="button" aria-label="Close map">×</button></header><div class="spawn-map-stage"><div class="spawn-image-wrap" id="spawn-image-wrap" hidden><img id="spawn-map-image" alt=""><div id="spawn-markers"></div></div><canvas id="spawn-map" width="320" height="190"></canvas></div><nav id="spawn-map-pages" hidden></nav><footer id="spawn-meta"></footer></section></div>
-<p class="loot-footnote">Rates are projections from the supplied TH rarity matrix. Map artwork by <a href="https://remapster.com/" target="_blank" rel="noopener">Remapster</a>.</p><script>window.LOOT_DATA_URL={{ url_for('static',filename='loot_tables.json')|tojson }};</script><script src="{{ url_for('static',filename='loot_tables.js') }}"></script>
+<p class="loot-footnote">Rates are projections from the supplied TH rarity matrix. Map artwork by <a href="https://remapster.com/" target="_blank" rel="noopener">Remapster</a>.</p><script>window.LOOT_DATA_URL={{ url_for('static',filename='loot_tables.json',v=2)|tojson }};</script><script defer src="{{ url_for('static',filename='loot_tables.js',v=2) }}"></script>
 {% else %}
 <section class="tracker-toolbar">
   <div><span>Tracking for</span><strong>{{ target_member.name if target_member else 'Sign in to track ownership' }}</strong></div>
@@ -49,8 +49,8 @@
   {% if editable %}<div class="tracker-save collapsible-save-bar"><button class="save-bar-toggle" type="button" aria-expanded="true" aria-label="Collapse save bar">⌄</button><div class="save-bar-content"><button class="button primary" type="submit">Save {{ mode|title }} ownership</button><span>Both views update from the same saved selections.</span></div></div><script src="{{ url_for('static', filename='collapsible_save_bars.js') }}"></script>{% elif not target_member %}<div class="tracker-signin"><a class="button primary" href="{{ url_for('login',next=request.full_path) }}">Sign in to track your loot</a></div>{% endif %}
 </form>
 {% endif %}
-<aside class="item-stat-tooltip" id="item-stat-tooltip" hidden role="tooltip"><header><span id="tooltip-job"></span><b id="tooltip-name"></b></header><div id="tooltip-meta"></div><p id="tooltip-stats"></p></aside>
+<aside class="item-stat-tooltip" id="item-stat-tooltip" hidden role="tooltip"><img id="tooltip-image" alt=""><div class="item-tooltip-copy"><header><span id="tooltip-job"></span><b id="tooltip-name"></b></header><div id="tooltip-meta"></div><p id="tooltip-stats"></p></div></aside>
 <script>window.ITEM_TOOLTIP_URL={{ url_for('static',filename='item_tooltips.json')|tojson }};</script>
-<script src="{{ url_for('static',filename='item_tooltips.js') }}"></script>
+<script src="{{ url_for('static',filename='item_tooltips.js',v=2) }}"></script>
 <script>document.querySelector('#loot-mode').onchange=e=>location.href={{ url_for('loot_tables')|tojson }}+'?mode='+e.target.value;let member=document.querySelector('#loot-member');if(member)member.onchange=e=>{let p=new URLSearchParams(location.search);p.set('member_id',e.target.value);location.search=p};</script>
 {% endblock %}
