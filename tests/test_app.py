@@ -80,6 +80,7 @@ def test_header_uses_single_yellow_account_control(tmp_path):
     assert b"public_landing.js" in signed_out.data
     assert b"Enter the Linkshell" not in signed_out.data
     assert b"public_landing_controls.css" in signed_out.data
+    assert b"public_landing_alignment.css?v=2" in signed_out.data
     landing_script = client.get("/static/public_landing.js")
     assert b"audio.duration/scenes.length" in landing_script.data
     assert b'id="landing-audio"' in signed_out.data
