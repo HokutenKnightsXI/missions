@@ -22,7 +22,6 @@
   <header class="site-header {{ 'signed-in-header' if is_editor() else 'public-header' }}">
     {% if is_editor() %}
     <a class="brand" href="{{ url_for('index') }}"><span class="crystal">◆</span> Hokuten Knights</a>
-    <span class="subtitle">HorizonXI Linkshell Progress</span>
     <nav class="site-nav">
       <a class="{{ 'active' if request.endpoint == 'index' }}" href="{{ url_for('index') }}">Missions</a>
       <a class="{{ 'active' if request.endpoint in ('help_board', 'create_help_request', 'edit_help_request', 'help_request_detail') }}" href="{{ url_for('help_board') }}">Help Requests</a>

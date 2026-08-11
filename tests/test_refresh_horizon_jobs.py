@@ -1,7 +1,19 @@
 import json
 import sqlite3
+from pathlib import Path
 
 from refresh_horizon_jobs import load_snapshot, update_jobs
+from github_refresh_horizon_jobs import JOBS as GITHUB_REFRESH_JOBS
+
+
+def test_github_refresh_includes_all_toau_jobs():
+    assert {"BLU", "COR", "PUP"} <= GITHUB_REFRESH_JOBS
+
+
+def test_github_refresh_targets_current_site():
+    workflow = Path(".github/workflows/refresh-job-roster.yml").read_text(encoding="utf-8")
+    assert "ROSTER_BASE_URL: https://hokutenknights.com" in workflow
+    assert "maven.pythonanywhere.com" not in workflow
 
 
 def test_offline_snapshot_matches_names_case_insensitively_and_updates_jobs(tmp_path):
