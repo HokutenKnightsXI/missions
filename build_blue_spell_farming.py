@@ -106,12 +106,23 @@ def parse_blue_metadata(spell_list_sql: str, spell_mods_sql: str,
 
 def parse_combat_metadata(script: str) -> tuple[str, list[str]]:
     """Extract spell category and damage-scaling stats from an LSB spell script."""
-    if "usePhysicalSpell" in script:
+    if "useCuringSpell" in script:
+        spell_type = "Magical"
+        # Blue cures use getCurePowerOld: (3 * MND) + VIT +
+        # (3 * floor(Blue Magic skill / 5)).
+        modifiers = ["MND x3", "VIT x1", "3 x floor(Blue Magic Skill / 5)"]
+    elif "usePhysicalSpell" in script:
         spell_type = "Physical"
         modifiers = ["STR (fSTR)"]
     elif "useBreathSpell" in script:
         spell_type = "Magical (Breath)"
-        modifiers = ["HP"]
+        modifiers = ["Current HP", "Main Level"]
+    elif "useDrainSpell" in script:
+        spell_type = "Magical"
+        modifiers = ["Blue Magic Skill"]
+    elif "useEnfeeblingSpell" in script:
+        spell_type = "Magical"
+        modifiers = ["Fixed potency", "INT (accuracy)", "Blue Magic Skill (accuracy)"]
     elif "useMagicalSpell" in script or "useDrainSpell" in script:
         spell_type = "Magical"
         modifiers = []
@@ -128,9 +139,25 @@ def parse_combat_metadata(script: str) -> tuple[str, list[str]]:
             spell_type = "Support"
         modifiers = []
 
+    # These spells bypass the standard helpers and carry misleading, unused
+    # parameter blocks in their scripts. Describe the formula that is actually
+    # executed rather than parsing those unused fields.
+    if re.search(r"--\s*Spell:\s*1000 Needles\b", script, re.I):
+        return "Magical", ["Fixed 1000 damage", "INT (accuracy)", "Blue Magic Skill (accuracy)"]
+    if re.search(r"--\s*Spell:\s*Self-Destruct\b", script, re.I):
+        return "Magical", ["Current HP"]
+
     attribute = re.search(r"params\.attribute\s*=\s*xi\.mod\.(STR|DEX|VIT|AGI|INT|MND|CHR)", script)
     if attribute:
-        modifiers.append(attribute.group(1))
+        stat = attribute.group(1)
+        if "useMagicalSpell" in script:
+            label = stat
+        elif "usePhysicalSpell" in script:
+            label = f"{stat} (effect accuracy)"
+        else:
+            label = f"{stat} (accuracy)"
+        if label not in modifiers:
+            modifiers.append(label)
     for stat, coefficient in re.findall(
         r"params\.(str|dex|vit|agi|int|mnd|chr)_wsc\s*=\s*(-?\d+(?:\.\d+)?)",
         script,
@@ -141,6 +168,16 @@ def parse_combat_metadata(script: str) -> tuple[str, list[str]]:
             label = f"{stat.upper()} {value * 100:g}%"
             if label not in modifiers:
                 modifiers.append(label)
+
+    if "useMagicalSpell" not in script and "usePhysicalSpell" not in script:
+        if re.search(r"getSkillLevel\(xi\.skill\.BLUE_MAGIC\)", script) and "Blue Magic Skill" not in modifiers:
+            modifiers.append("Blue Magic Skill")
+        if re.search(r"actorStat\s*=\s*xi\.mod\.INT", script):
+            for label in ("INT (accuracy)", "Blue Magic Skill (accuracy)"):
+                if label not in modifiers:
+                    modifiers.append(label)
+        if not modifiers:
+            modifiers.append("Fixed potency")
     return spell_type, modifiers
 
 
