@@ -12,7 +12,7 @@ from urllib.request import Request, urlopen
 HORIZON_API = "https://api.horizonxi.com/api/v1"
 JOBS = {
     "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST",
-    "BRD", "RNG", "SAM", "NIN", "DRG", "SMN",
+    "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP",
 }
 
 

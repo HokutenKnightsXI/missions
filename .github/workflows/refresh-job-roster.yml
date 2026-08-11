@@ -21,6 +21,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Fetch current job levels and update the website
         env:
-          ROSTER_BASE_URL: https://maven.pythonanywhere.com
+          ROSTER_BASE_URL: https://hokutenknights.com
           ROSTER_REFRESH_TOKEN: ${{ secrets.ROSTER_REFRESH_TOKEN }}
         run: python github_refresh_horizon_jobs.py
