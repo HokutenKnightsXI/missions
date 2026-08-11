@@ -140,6 +140,7 @@ GEAR_STAT_ALIASES = {
     "triple attack": "Triple Attack", "ranged accuracy": "Ranged Accuracy",
     "ranged attack": "Ranged Attack", "magic accuracy": "Magic Accuracy",
     "magic attack bonus": "Magic Attack Bonus", "magic defense bonus": "Magic Defense Bonus",
+    "magic def. bonus": "Magic Defense Bonus",
     "cure potency": "Cure Potency", "refresh": "Refresh", "regen": "Regen",
     "fire resistance": "Fire Resistance", "ice resistance": "Ice Resistance",
     "wind resistance": "Wind Resistance", "earth resistance": "Earth Resistance",
@@ -189,7 +190,10 @@ def horizon_json(path, timeout=20):
 
 def parse_gear_stats(description):
     """Extract common unconditional equipment stats from a Horizon item description."""
-    text = " ".join(str(description or "").replace("\n", " ").split())
+    text = " ".join(
+        str(description or "").replace("\n", " ").replace('"', "")
+        .replace("“", "").replace("”", "").split()
+    )
     unconditional = re.split(
         r"\b(?:Latent effect|Set|Assault|Salvage|Campaign|Besieged|Daytime|Nighttime):",
         text,

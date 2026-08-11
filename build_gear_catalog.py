@@ -6,12 +6,22 @@ import re
 from pathlib import Path
 from urllib.request import Request, urlopen
 
-from missions import parse_gear_stats
+from missions import GEAR_STAT_ALIASES, parse_gear_stats
 
 ITEMS_SOURCE = "https://raw.githubusercontent.com/Windower/Resources/master/resources_data/items.lua"
 DESCRIPTIONS_SOURCE = "https://raw.githubusercontent.com/Windower/Resources/master/resources_data/item_descriptions.lua"
 LSB_BASE = "https://raw.githubusercontent.com/LandSandBoat/server/base/sql"
 OUTPUT = Path("static/gear_catalog.json")
+
+ITEM_MOD_STATS = {
+    29: "Magic Defense Bonus",
+    48: "Weapon Skill Accuracy",
+    288: "Double Attack",
+    302: "Triple Attack",
+    369: "Refresh",
+    370: "Regen",
+    374: "Cure Potency",
+}
 
 JOBS = {
     1: "WAR", 2: "MNK", 3: "WHM", 4: "BLM", 5: "RDM", 6: "THF",
@@ -93,7 +103,46 @@ def lsb_keys(*sql_sources: str) -> dict[int, str]:
     return keys
 
 
-def build(items_lua: str, descriptions_lua: str, keys: dict[int, str]) -> dict:
+def lsb_item_stats(item_mods_sql: str) -> dict[int, dict[str, int]]:
+    """Return numeric equipment modifiers omitted or abbreviated in item descriptions."""
+    stats = {}
+    for item_id, mod_id, value in re.findall(
+        r"INSERT INTO `item_mods` VALUES \((\d+),(\d+),(-?\d+)\)", item_mods_sql
+    ):
+        stat = ITEM_MOD_STATS.get(int(mod_id))
+        if stat:
+            stats.setdefault(int(item_id), {})[stat] = int(value)
+    return stats
+
+
+def parse_level_scaling(description: str, minimum_level: int) -> dict[str, dict[str, int]]:
+    """Extract explicit level-scaled stat ranges such as STR+2～5."""
+    text = " ".join(
+        str(description or "").replace("\n", " ").replace('"', "")
+        .replace("“", "").replace("”", "").split()
+    )
+    names = sorted(GEAR_STAT_ALIASES, key=len, reverse=True)
+    pattern = re.compile(
+        rf"(?<![A-Za-z])({'|'.join(re.escape(name) for name in names)})\s*"
+        r"([+-]?\d+)\s*[～~]\s*([+-]?\d+)",
+        re.IGNORECASE,
+    )
+    scaling = {}
+    for match in pattern.finditer(text):
+        stat = GEAR_STAT_ALIASES[match.group(1).casefold()]
+        scaling[stat] = {
+            "min": int(match.group(2)),
+            "max": int(match.group(3)),
+            "min_level": minimum_level,
+            "max_level": 75,
+            "tier_levels": 15,
+        }
+    return scaling
+
+
+def build(items_lua: str, descriptions_lua: str, keys: dict[int, str],
+          item_mod_stats: dict[int, dict[str, int]] | None = None) -> dict:
+    item_mod_stats = item_mod_stats or {}
     descriptions = {
         int(match.group(1)): lua_string(match.group(2), "en")
         for match in re.finditer(r"^\s*\[(\d+)\] = \{(.*)\},$", descriptions_lua, re.M)
@@ -116,6 +165,8 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str]) -> dict:
         flags = lua_int(record, "flags")
         for glyph, label in ELEMENT_GLYPHS.items():
             description = description.replace(glyph, label)
+        parsed_stats = parse_gear_stats(description)
+        parsed_stats.update(item_mod_stats.get(item_id, {}))
         rows.append({
             "item_id": item_id,
             "item_key": keys.get(item_id, ""),
@@ -128,7 +179,8 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str]) -> dict:
             "description": description,
             "rare": bool(flags & 32768),
             "ex": bool(flags & 16384),
-            "stats": parse_gear_stats(description),
+            "stats": parsed_stats,
+            "level_scaling": parse_level_scaling(description, level),
         })
     rows.sort(key=lambda item: (item["level"], item["name"].casefold(), item["item_id"]))
     stats = sorted({stat for item in rows for stat in item["stats"]})
@@ -142,10 +194,12 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str]) -> dict:
 
 
 def main() -> None:
+    item_mods_sql = fetch_text(f"{LSB_BASE}/item_mods.sql")
     payload = build(
         fetch_text(ITEMS_SOURCE),
         fetch_text(DESCRIPTIONS_SOURCE),
         lsb_keys(fetch_text(f"{LSB_BASE}/item_equipment.sql"), fetch_text(f"{LSB_BASE}/item_weapon.sql")),
+        lsb_item_stats(item_mods_sql),
     )
     OUTPUT.write_text(json.dumps(payload, separators=(",", ":")), encoding="utf-8")
     print(f"Wrote {len(payload['rows'])} level-75/ToAU equipment records to {OUTPUT}")
