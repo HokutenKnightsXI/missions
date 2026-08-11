@@ -2,7 +2,10 @@ import json
 import sqlite3
 from pathlib import Path
 
-from build_blue_spell_farming import blue_magic_cap, build, parse_blue_metadata
+from build_blue_spell_farming import (
+    blue_magic_cap, build, parse_blue_metadata, parse_combat_metadata,
+    parse_physical_damage_type,
+)
 from missions import create_app
 
 
@@ -44,6 +47,23 @@ def test_blue_metadata_parser_adds_set_cost_stats_and_trait():
         "trait": "Magic Attack Bonus",
         "trait_weight": 1,
     }
+
+
+def test_combat_metadata_parser_distinguishes_damage_type_and_wsc():
+    physical = """-- Spell Type: Physical (Blunt)
+params.str_wsc = 0.0
+params.chr_wsc = 0.3
+return xi.spells.blue.usePhysicalSpell(caster, target, spell, params)
+"""
+    assert parse_combat_metadata(physical) == (
+        "Physical", ["STR (fSTR)", "CHR 30%"]
+    )
+    assert parse_physical_damage_type(physical) == "Blunt"
+    magical = """params.attribute = xi.mod.INT
+params.int_wsc = 0.2
+return xi.spells.blue.useMagicalSpell(caster, target, spell, params)
+"""
+    assert parse_combat_metadata(magical) == ("Magical", ["INT", "INT 20%"])
 
 
 def test_spell_farming_page_and_generated_catalog(tmp_path):
