@@ -153,6 +153,9 @@ def test_gear_optimizer_uses_catalog_without_loading_character_equipment(monkeyp
     assert b'id="gear-negative"' in page.data
     assert b">BLU</option>" in page.data
     assert b">PUP</option>" in page.data
+    assert b'<option value="" selected disabled>Select One</option>' in page.data
+    assert b'<option value="" selected>None</option>' in page.data
+    assert b"gear_select.css?v=1" in page.data
     assert b"Owned Gear" not in page.data
     assert b"Add Equipment You Own" not in page.data
     assert b"Game-wide equipment index" in page.data
