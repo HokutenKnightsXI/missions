@@ -1,0 +1,7 @@
+.gear-controls .gear-job-select {
+  border-color: #e7b83f;
+  background: linear-gradient(180deg, #e8bd54, #c99325);
+  box-shadow: 0 0 0 1px #ffdc7666, 0 0 18px #d9a62c33;
+  color: #171006;
+  font-weight: 900;
+}
