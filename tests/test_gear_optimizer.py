@@ -147,6 +147,26 @@ def test_catalog_assigns_psxi_auction_house_categories():
     assert rows["Kraken Club"]["ah_category"] == "clubs"
 
 
+def test_catalog_marks_two_handed_and_hand_to_hand_weapons():
+    items = (
+        "[17567] = {id=17567,en=\"Kirin's Pole\",category=\"Weapon\",flags=0,"
+        'jobs=16,level=75,races=510,skill=12,slots=1,type=4},\n'
+        '[17024] = {id=17024,en="Ash Club",category="Weapon",flags=0,'
+        'jobs=16,level=1,races=510,skill=11,slots=3,type=4},\n'
+        '[16400] = {id=16400,en="Bronze Knuckles",category="Weapon",flags=0,'
+        'jobs=2,level=1,races=510,skill=1,slots=1,type=4},\n'
+    )
+    descriptions = (
+        '[17567] = {id=17567,en="INT+10"},\n'
+        '[17024] = {id=17024,en="MND+1"},\n'
+        '[16400] = {id=16400,en="Accuracy+1"},\n'
+    )
+    rows = {item["name"]: item for item in build_catalog(items, descriptions, {}).get("rows", [])}
+    assert rows["Kirin's Pole"]["two_handed"] is True
+    assert rows["Bronze Knuckles"]["two_handed"] is True
+    assert rows["Ash Club"]["two_handed"] is False
+
+
 def test_bundled_catalog_has_level_75_gear_and_searchable_stats():
     payload = json.loads(Path("static/gear_catalog.json").read_text(encoding="utf-8"))
     assert len(payload["rows"]) > 6000
@@ -193,7 +213,7 @@ def test_gear_optimizer_uses_catalog_without_loading_character_equipment(monkeyp
     assert b'<option value="" selected disabled>Select One</option>' in page.data
     assert b'<option value="" selected>None</option>' in page.data
     assert b"gear_select.css?v=1" in page.data
-    assert b"gear_optimizer.js?v=20" in page.data
+    assert b"gear_optimizer.js?v=21" in page.data
     assert b"Owned Gear" not in page.data
     assert b"Add Equipment You Own" not in page.data
     assert b"Game-wide equipment index" in page.data
@@ -204,6 +224,8 @@ def test_gear_optimizer_uses_catalog_without_loading_character_equipment(monkeyp
     assert b"if (item.rare) return false" in optimizer_script
     assert b"copiesAlreadyUsed < (ownedCounts.get" in optimizer_script
     assert b"Object.entries(item.level_scaling || {})" in optimizer_script
+    assert b'mainBlocksSub = slot === "sub"' in optimizer_script
+    assert b'item.two_handed) equipmentSet.sub = null' in optimizer_script
 
 
 def test_owned_gear_is_saved_per_character(monkeypatch, tmp_path):

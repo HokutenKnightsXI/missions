@@ -55,6 +55,7 @@ ARMOR_AH_CATEGORIES = {
     "Hands": "hands", "Legs": "legs", "Feet": "feet", "Neck": "neck",
     "Waist": "waist", "Ear": "earrings", "Ring": "rings", "Back": "back",
 }
+TWO_HANDED_WEAPON_SKILLS = {1, 4, 6, 7, 8, 10, 12}
 
 
 def fetch_text(url: str) -> str:
@@ -163,6 +164,7 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str],
             continue
         description = descriptions.get(item_id, "")
         flags = lua_int(record, "flags")
+        weapon_skill = lua_int(record, "skill")
         for glyph, label in ELEMENT_GLYPHS.items():
             description = description.replace(glyph, label)
         parsed_stats = parse_gear_stats(description)
@@ -175,7 +177,9 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str],
             "jobs": jobs,
             "races": races,
             "slots": slots,
-            "ah_category": auction_house_category(category, slots, lua_int(record, "skill")),
+            "ah_category": auction_house_category(category, slots, weapon_skill),
+            "two_handed": category == "Weapon" and "Main" in slots and
+                          weapon_skill in TWO_HANDED_WEAPON_SKILLS,
             "description": description,
             "rare": bool(flags & 32768),
             "ex": bool(flags & 16384),

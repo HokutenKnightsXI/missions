@@ -160,6 +160,8 @@
     if (!pairedDuplicateAllowed(item, slot) && paired) {
       equipmentSet[paired] = null;
     }
+    if (slot === "main" && item.two_handed) equipmentSet.sub = null;
+    if (slot === "sub" && equipmentSet.main && equipmentSet.main.two_handed) equipmentSet.main = null;
     equipmentSet[slot] = item;
     setInitialized = true;
   };
@@ -380,7 +382,9 @@
     calculatedSet = {};
     const remaining = new Map(ownedCounts);
     slotOrder.forEach(slot => {
-      const match = candidates.find(item => applicableSlots(item).includes(slot) &&
+      const mainBlocksSub = slot === "sub" && calculatedSet.main && calculatedSet.main.two_handed;
+      const match = mainBlocksSub ? null : candidates.find(item =>
+        applicableSlots(item).includes(slot) &&
         pairedDuplicateAllowed(item, slot, calculatedSet) &&
         (scopeControl.value !== "owned" || (remaining.get(Number(item.item_id)) || 0) > 0));
       calculatedSet[slot] = match || null;
