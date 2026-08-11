@@ -78,6 +78,32 @@ body:has(.public-landing) .public-signin {
 }
 
 @media (max-width: 700px) {
+  .public-landing {
+    height: 100dvh;
+    min-height: 540px;
+  }
+
+  .landing-copy {
+    top: 36%;
+    width: calc(100% - 48px);
+  }
+
+  .landing-copy h1 {
+    font-size: clamp(38px, 11vw, 54px);
+    line-height: .96;
+  }
+
+  .landing-copy > p:not(.landing-kicker) {
+    margin-top: 14px;
+    font-size: 14px;
+    line-height: 1.42;
+  }
+
+  .landing-kicker {
+    margin-bottom: 10px;
+    font-size: 10px;
+  }
+
   body:has(.public-landing) .public-signin {
     margin-left: 30px;
   }
@@ -87,11 +113,12 @@ body:has(.public-landing) .public-signin {
   }
 
   .landing-soundtrack {
-    right: 20px;
-    bottom: max(24px, env(safe-area-inset-bottom));
+    right: 18px;
+    left: 18px;
+    bottom: calc(max(20px, env(safe-area-inset-bottom)) + 78px);
     display: grid;
-    grid-template-columns: auto auto minmax(80px, 125px);
-    gap: 8px 12px;
+    grid-template-columns: 34px auto minmax(76px, 112px);
+    gap: 6px 10px;
     align-items: center;
   }
 
@@ -124,6 +151,24 @@ body:has(.public-landing) .public-signin {
     grid-column: 1 / -1;
     grid-row: 1;
     justify-self: start;
-    margin: 0 0 4px;
+    margin: 0 0 2px;
+    padding: 8px 12px;
+    font-size: 11px;
+  }
+
+  .landing-script {
+    right: 16px !important;
+    bottom: calc(max(18px, env(safe-area-inset-bottom)) + 18px) !important;
+    padding: 5px 8px;
+    font-size: 19px !important;
+  }
+
+  .landing-script:before {
+    width: 150px;
+    height: 42px;
+  }
+
+  .landing-script:after {
+    width: 190px;
   }
 }
