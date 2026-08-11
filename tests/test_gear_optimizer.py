@@ -232,6 +232,10 @@ def test_gear_optimizer_uses_catalog_without_loading_character_equipment(monkeyp
     assert b">PUP</option>" in page.data
     assert b'<option value="" selected disabled>Select One</option>' in page.data
     assert b'<option value="" selected>None</option>' in page.data
+    page_text = page.get_data(as_text=True)
+    assert page_text.index('value="BLM">BLM') < page_text.index('value="BLU">BLU')
+    assert page_text.index('value="Accuracy"') < page_text.index('value="Attack"')
+    assert page_text.index('value="Attack"') < page_text.index('value="Avatar Perpetuation Cost"')
     assert b"gear_select.css?v=1" in page.data
     assert b"gear_optimizer.js?v=21" in page.data
     assert b"Owned Gear" not in page.data
