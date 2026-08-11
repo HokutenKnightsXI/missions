@@ -2,7 +2,7 @@
 {% block head %}{% if not is_editor() %}<link rel="preload" as="image" href="{{ url_for('static', filename='landing/tulia-pencil.png') }}" fetchpriority="high">{% endif %}{% endblock %}
 {% block content %}
 {% if not is_editor() %}
-<link rel="stylesheet" href="{{ url_for('static', filename='public_landing.css', v=2) }}"><link rel="stylesheet" href="{{ url_for('static', filename='public_landing_controls.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='public_landing_alignment.css', v=2) }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='public_landing.css', v=2) }}"><link rel="stylesheet" href="{{ url_for('static', filename='public_landing_controls.css') }}"><link rel="stylesheet" href="{{ url_for('static', filename='public_landing_alignment.css', v=3) }}">
 <section class="public-landing" aria-label="Hokuten Knights linkshell welcome">
   <div class="landing-scenes" aria-hidden="true">
     <div class="landing-scene active initial" data-name="The Celestial Ruins" style="--scene:url('{{ url_for('static', filename='landing/tulia-pencil.png') }}')"></div>
