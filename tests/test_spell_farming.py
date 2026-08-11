@@ -65,6 +65,46 @@ return xi.spells.blue.useMagicalSpell(caster, target, spell, params)
 """
     assert parse_combat_metadata(magical) == ("Magical", ["INT", "INT 20%"])
 
+    physical_effect = """params.attribute = xi.mod.INT
+params.vit_wsc = 0.5
+return xi.spells.blue.usePhysicalSpell(caster, target, spell, params)
+"""
+    assert parse_combat_metadata(physical_effect) == (
+        "Physical", ["STR (fSTR)", "INT (effect accuracy)", "VIT 50%"]
+    )
+
+    healing = """-- Spell: Healing Breeze
+-- Spell Type: Magical (Wind)
+return xi.spells.blue.useCuringSpell(caster, target, spell, params)
+"""
+    assert parse_combat_metadata(healing) == (
+        "Magical", ["MND x3", "VIT x1", "3 x floor(Blue Magic Skill / 5)"]
+    )
+
+
+def test_combat_metadata_parser_covers_non_nuke_magic_formulas():
+    assert parse_combat_metadata("""-- Spell: Bad Breath
+return xi.spells.blue.useBreathSpell(caster, target, spell, params)
+""") == ("Magical (Breath)", ["Current HP", "Main Level"])
+    assert parse_combat_metadata("""-- Spell: Sheep Song
+return xi.spells.blue.useEnfeeblingSpell(caster, target, spell, params)
+""") == (
+        "Magical",
+        ["Fixed potency", "INT (accuracy)", "Blue Magic Skill (accuracy)"],
+    )
+    assert parse_combat_metadata("""-- Spell: Metallic Body
+local blueSkill = caster:getSkillLevel(xi.skill.BLUE_MAGIC)
+""") == ("Support", ["Blue Magic Skill"])
+    assert parse_combat_metadata("""-- Spell: Cocoon
+local power = 50
+""") == ("Support", ["Fixed potency"])
+    assert parse_combat_metadata("""-- Spell: 1000 Needles
+params.int_wsc = 2.0
+""") == (
+        "Magical",
+        ["Fixed 1000 damage", "INT (accuracy)", "Blue Magic Skill (accuracy)"],
+    )
+
 
 def test_spell_farming_page_and_generated_catalog(tmp_path):
     app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "spell.db"),
