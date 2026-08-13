@@ -3,9 +3,10 @@ import re
 from pathlib import Path
 
 import pytest
+import missions
 
-from build_loot_tables import allowed_zone, parse_drops, parse_item_details, th_rate
-from missions import create_app, dynamis_catalog
+from build_loot_tables import allowed_zone, parse_drops, parse_item_details, parse_spawns, th_rate
+from missions import compact_market_snapshot, create_app, dynamis_catalog, market_snapshot
 
 
 @pytest.fixture()
@@ -42,6 +43,15 @@ INSERT INTO `mob_droplist` VALUES (2438,0,0,1000,1429,@UNCOMMON); -- Black Mages
     assert all(row[9] == 1429 for row in rows)
 
 
+def test_general_loot_index_excludes_dynamis_currency():
+    sql = """-- ZoneID: 134 - Vanguard Eye
+INSERT INTO `mob_droplist` VALUES (1,0,0,1000,1452,@COMMON); -- One Byne Bill (Common, 15%)
+INSERT INTO `mob_droplist` VALUES (2,0,0,1000,15102,@RARE); -- Warriors Mufflers (Rare, 5%)
+"""
+    rows = parse_drops(sql, {134: "Dynamis-Bastok"})
+    assert [row[2] for row in rows] == ["Warriors Mufflers"]
+
+
 def test_drop_item_details_include_icon_id_and_description():
     rows = [["Yhoator Jungle", "Tonberry Jinxer", "Black Mages Testimony",
              10, 12, 15, 16.5, 18, 1, 1429]]
@@ -50,6 +60,18 @@ def test_drop_item_details_include_icon_id_and_description():
     )
     assert details["1429"]["name"] == "Black Mages Testimony"
     assert details["1429"]["description"] == "A testimony from a black mage."
+
+
+def test_bhaflau_wivre_uses_renamed_locus_spawn_coordinates():
+    sql = """-- Bhaflau Thickets (Zone 52)
+INSERT INTO `mob_spawn_points` VALUES (17000001,1,'Locus_Wivre','Locus_Wivre',0,135,137,-560,-11,-66,0);
+"""
+    rows = [["Bhaflau Thickets", "Wivre", "Wivre Hide"]]
+    spawns, _bounds = parse_spawns(sql, {52: "Bhaflau_Thickets"}, rows)
+    assert spawns["Bhaflau Thickets\twivre"] == {
+        "p": [[-560.0, -66.0, -11.0]],
+        "l": [78, 83],
+    }
 
 
 def test_loot_table_page_and_generated_index(client):
@@ -67,9 +89,64 @@ def test_loot_table_page_and_generated_index(client):
     assert dark_stalker["l"] == [57, 59]
 
 
+def test_market_snapshot_is_compacted_for_price_cells():
+    snapshot = compact_market_snapshot({
+        "meta": {"generatedAt": "2026-08-11T18:00:00Z"},
+        "data": [{
+            "itemId": 15515, "itemName": "Peacock Amulet", "asOf": "2026-08-11T17:55:00Z",
+            "ah": {"currentStock": 2, "currentStackStock": 0,
+                   "single": {"lastSale": 900000, "median": 875000, "volume": 4},
+                   "stack": {"lastSale": None, "median": None, "volume": 0}},
+        }],
+    })
+    assert snapshot["generated_at"] == "2026-08-11T18:00:00Z"
+    assert snapshot["prices"]["15515"]["single_last"] == 900000
+    assert snapshot["prices"]["15515"]["stock"] == 2
+
+
+def test_market_price_endpoint_returns_server_cached_values(client, monkeypatch):
+    monkeypatch.setattr(missions, "market_snapshot", lambda _path, _token: {
+        "generated_at": "2026-08-11T18:00:00Z",
+        "prices": {"15515": {"single_last": 900000}},
+    })
+    response = client.get("/api/market-prices")
+    assert response.status_code == 200
+    assert response.get_json()["prices"]["15515"]["single_last"] == 900000
+    assert response.headers["Cache-Control"] == "public, max-age=300"
+
+
+def test_market_snapshot_fetches_only_once_inside_hour(tmp_path, monkeypatch):
+    calls = []
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return json.dumps({"meta": {"generatedAt": "now"}, "data": []}).encode()
+
+    monkeypatch.setattr(missions, "urlopen", lambda *_args, **_kwargs: calls.append(1) or Response())
+    cache = tmp_path / "market.json"
+    assert market_snapshot(cache, now=1000)["generated_at"] == "now"
+    assert market_snapshot(cache, now=1001)["generated_at"] == "now"
+    assert len(calls) == 1
+
+
 def test_loot_hub_offers_general_dynamis_and_limbus_modes(client):
     general = client.get("/loot-tables")
     assert b"General Loot Tables" in general.data
+    assert b"AH Value" in general.data and b"MARKET_DATA_URL" in general.data
+    assert b'id="market-value-header"' in general.data
+    market_script = client.get("/static/loot_tables.js").data
+    assert b"MARKET_NAME_ALIASES={peacockamulet:'peacockcharm'}" in market_script
+    assert b"marketByName" in market_script
+    assert b"marketSortDirection" in market_script
+    assert b"aria-sort" in market_script
+    assert b"zone-map-trigger" in market_script
+    assert b"trigger.dataset.mob" in market_script
     assert b"Dynamis Loot" in general.data and b"Limbus Loot" in general.data
     dynamis = client.get("/loot-tables?mode=dynamis&member_id=1")
     assert b"By Dynamis Area" in dynamis.data

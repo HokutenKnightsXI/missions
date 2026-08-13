@@ -4,7 +4,7 @@ from pathlib import Path
 
 from build_blue_spell_farming import (
     blue_magic_cap, build, parse_blue_metadata, parse_combat_metadata,
-    parse_physical_damage_type,
+    parse_physical_damage_type, parse_spell_description, parse_spell_effects,
 )
 from missions import create_app
 
@@ -59,6 +59,19 @@ return xi.spells.blue.usePhysicalSpell(caster, target, spell, params)
         "Physical", ["STR (fSTR)", "CHR 30%"]
     )
     assert parse_physical_damage_type(physical) == "Blunt"
+
+
+def test_spell_description_uses_effect_summary_from_script_header():
+    script = """-----------------------------------
+-- Spell: Head Butt
+-- Damage varies with TP. Additional effect: \"Stun\"
+-- Spell cost: 12 MP
+-- Monster Type: Beastmen
+-----------------------------------
+"""
+    assert parse_spell_description(script) == 'Damage varies with TP. Additional effect: "Stun"'
+    assert parse_spell_effects('Damage varies with TP. Additional effect: "Stun"') == ["Stun"]
+    assert parse_spell_effects("Steals an enemy's HP. Ineffective against undead") == ["HP Drain"]
     magical = """params.attribute = xi.mod.INT
 params.int_wsc = 0.2
 return xi.spells.blue.useMagicalSpell(caster, target, spell, params)
@@ -130,6 +143,9 @@ def test_spell_farming_page_and_generated_catalog(tmp_path):
     assert foot_kick["set_points"] == 2
     assert foot_kick["set_stats"] == ["AGI+1"]
     assert foot_kick["trait"] == "Lizard Killer"
+    head_butt = next(row for row in payload["rows"] if row["spell"] == "Head Butt")
+    assert "Stun" in head_butt["description"]
+    assert head_butt["effects"] == ["Stun"]
     assert not any("Abyssea" in row["zone"] or " (S)" in row["zone"]
                    for row in payload["rows"])
 
@@ -188,3 +204,51 @@ def test_learned_spells_are_isolated_to_signed_in_character(tmp_path):
     ).fetchall()
     database.close()
     assert ownership == [(1, "Head Butt"), (1, "Pollen"), (2, "Cocoon")]
+
+
+def test_spellbook_saves_a_private_named_template(tmp_path):
+    database_path = tmp_path / "spellbook.db"
+    app = create_app({"TESTING": True, "DATABASE": str(database_path),
+                      "SECRET_KEY": "test", "AUTH_DISABLED": True})
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["member_id"] = 1
+        session["is_editor"] = True
+    response = client.post("/blue-mage-tools/templates", data={
+        "name": "Nyzul Utility", "blue_level": "75",
+        "spells": ["Head Butt", "Cocoon"],
+    })
+    assert response.status_code == 302
+    client.get(response.headers["Location"])
+    with client.session_transaction() as session:
+        session["member_id"] = 2
+    page = client.get("/spell-farming?view=spellbook")
+    assert page.status_code == 200
+    assert b"Nyzul Utility" not in page.data
+    assert b"Share with the linkshell" not in page.data
+    assert b"Save This Spell Book" in page.data
+    assert b'id="trait-priority"' in page.data
+    assert b'id="clear-goals"' in page.data
+    assert b'class="spellbook-three-column"' in page.data
+    assert b'id="spell-picker-modal"' in page.data
+    assert b'id="spell-detail-modal"' in page.data
+    builder_script = client.get("/static/blue_spellbook.js").data
+    assert b'goal-effects' in builder_script
+    assert b'HP Drain (Drain)' in builder_script
+    assert b'active-effects' in builder_script
+    assert b'effectTooltip(spell)' in builder_script
+    assert b'Additional Effect / Spell Equivalent' in builder_script
+    assert b'spellbook-right-rail' in builder_script
+
+
+def test_spellbook_rejects_level_invalid_template(tmp_path):
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "invalid-book.db"),
+                      "SECRET_KEY": "test", "AUTH_DISABLED": True})
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["member_id"] = 1
+        session["is_editor"] = True
+    response = client.post("/blue-mage-tools/templates", data={
+        "name": "Too Early", "blue_level": "10", "spells": ["Head Butt"],
+    })
+    assert response.status_code == 400

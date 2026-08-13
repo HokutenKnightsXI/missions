@@ -136,6 +136,21 @@ CREATE TABLE IF NOT EXISTS blue_spell_ownership (
     FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS blue_spell_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_member_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    blue_level INTEGER NOT NULL CHECK(blue_level BETWEEN 1 AND 75),
+    spells_json TEXT NOT NULL DEFAULT '[]',
+    is_shared INTEGER NOT NULL DEFAULT 0 CHECK(is_shared IN (0,1)),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (owner_member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_blue_spell_templates_owner
+ON blue_spell_templates(owner_member_id, updated_at);
+
 CREATE TABLE IF NOT EXISTS gear_ownership (
     member_id INTEGER NOT NULL,
     item_id INTEGER NOT NULL,

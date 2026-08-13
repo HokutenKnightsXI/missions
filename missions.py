@@ -5,6 +5,7 @@ import hmac
 import re
 import secrets
 import calendar
+import threading
 from datetime import date, datetime, time, timedelta
 from functools import wraps
 from urllib.error import HTTPError, URLError
@@ -125,6 +126,9 @@ HELP_STATUS_TRANSITIONS = {
 }
 EASTERN_TIME = ZoneInfo("America/New_York")
 HORIZON_API = "https://api.horizonxi.com/api/v1"
+PSXI_MARKET_API = "https://www.psxi.gg/api/v1/market/horizonxi"
+PSXI_MARKET_TTL = 60 * 60
+_market_cache_lock = threading.Lock()
 MAP_ZONE_ID_OVERRIDES = {"Ifrits Cauldron": 205}
 GEAR_SLOTS = (
     "main", "sub", "ranged", "ammo", "head", "body", "hands", "legs",
@@ -187,6 +191,59 @@ def horizon_json(path, timeout=20):
     )
     with urlopen(api_request, timeout=timeout) as response:
         return json.load(response)
+
+
+def compact_market_snapshot(payload):
+    """Reduce the PSXI bulk response to the fields used by loot-table price cells."""
+    prices = {}
+    for item in payload.get("data", []):
+        item_id = item.get("itemId")
+        if not isinstance(item_id, int):
+            continue
+        auction = item.get("ah") or {}
+        single = auction.get("single") or {}
+        stack = auction.get("stack") or {}
+        prices[str(item_id)] = {
+            "name": item.get("itemName") or "",
+            "as_of": item.get("asOf"),
+            "stock": auction.get("currentStock"),
+            "stack_stock": auction.get("currentStackStock"),
+            "single_last": single.get("lastSale"),
+            "single_median": single.get("median"),
+            "single_volume": single.get("volume"),
+            "stack_last": stack.get("lastSale"),
+            "stack_median": stack.get("median"),
+            "stack_volume": stack.get("volume"),
+        }
+    return {"generated_at": (payload.get("meta") or {}).get("generatedAt"), "prices": prices}
+
+
+def market_snapshot(cache_path, token="", now=None):
+    """Return an hourly file-backed PSXI market snapshot without exposing credentials."""
+    cache_path = Path(cache_path)
+    current_time = datetime.now().timestamp() if now is None else float(now)
+    with _market_cache_lock:
+        cached = None
+        if cache_path.exists():
+            cached = json.loads(cache_path.read_text(encoding="utf-8"))
+            if current_time - cache_path.stat().st_mtime < PSXI_MARKET_TTL:
+                return cached
+        headers = {"Accept": "application/json", "User-Agent": "HokutenMarketCache/1.0"}
+        if token:
+            headers["Authorization"] = f"Bearer {token}"
+        request_data = Request(PSXI_MARKET_API, headers=headers)
+        try:
+            with urlopen(request_data, timeout=45) as response:
+                snapshot = compact_market_snapshot(json.load(response))
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+            if cached is not None:
+                return cached
+            raise
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = cache_path.with_suffix(f"{cache_path.suffix}.{os.getpid()}.tmp")
+        temporary.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
+        temporary.replace(cache_path)
+        return snapshot
 
 
 def parse_gear_stats(description):
@@ -642,6 +699,8 @@ def create_app(test_config=None):
         DISCORD_ADMIN_USER_ID=os.environ.get("DISCORD_ADMIN_USER_ID", ""),
         CANONICAL_HOST=os.environ.get("CANONICAL_HOST", "hokutenknights.com"),
         ROSTER_REFRESH_TOKEN=os.environ.get("ROSTER_REFRESH_TOKEN", ""),
+        PSXI_API_TOKEN=os.environ.get("PSXI_API_TOKEN", ""),
+        PSXI_MARKET_CACHE=os.path.join(app.instance_path, "psxi_market_snapshot.json"),
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "").lower() in {"1", "true", "yes"},
@@ -1641,6 +1700,19 @@ def create_app(test_config=None):
             limbus_af1=limbus_af1,
         )
 
+    @app.get("/api/market-prices")
+    def market_prices_api():
+        """Return a compact hourly cached HorizonXI AH snapshot."""
+        try:
+            snapshot = market_snapshot(
+                app.config["PSXI_MARKET_CACHE"], app.config.get("PSXI_API_TOKEN", "")
+            )
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+            return jsonify({"error": "Market prices are temporarily unavailable."}), 503
+        response = jsonify(snapshot)
+        response.headers["Cache-Control"] = "public, max-age=300"
+        return response
+
     @app.get("/gear-optimizer")
     @editor_required
     def gear_optimizer():
@@ -1771,11 +1843,31 @@ def create_app(test_config=None):
     @editor_required
     def spell_farming():
         member = require_member_identity()
+        view = request.args.get("view", "farming")
+        if view not in {"farming", "spellbook"}:
+            view = "farming"
         learned = [row["spell"] for row in get_db().execute(
             "SELECT spell FROM blue_spell_ownership WHERE member_id=?",
             (member["id"],),
         )]
-        return render_template("spell_farming.html", learned_spells=learned, member=member)
+        db = get_db()
+        templates = db.execute(
+            """SELECT t.*,m.name owner_name FROM blue_spell_templates t
+               JOIN members m ON m.id=t.owner_member_id
+               WHERE t.owner_member_id=?
+               ORDER BY t.updated_at DESC,t.name COLLATE NOCASE""",
+            (member["id"],),
+        ).fetchall()
+        selected_template = None
+        if request.args.get("template", "").isdigit():
+            template_id = int(request.args["template"])
+            selected_template = next((row for row in templates if row["id"] == template_id), None)
+        return render_template(
+            "spell_farming.html", learned_spells=learned, member=member, view=view,
+            spell_templates=templates, selected_template=selected_template,
+            selected_template_spells=(json.loads(selected_template["spells_json"])
+                                      if selected_template else []),
+        )
 
     @app.post("/spell-farming/ownership")
     @editor_required
@@ -1800,6 +1892,74 @@ def create_app(test_config=None):
             raise
         flash(f"Saved {len(selected)} learned Blue Magic spells for {member['name']}.", "success")
         return redirect(url_for("spell_farming"))
+
+    @app.post("/blue-mage-tools/templates")
+    @editor_required
+    def save_blue_spell_template():
+        member = require_member_identity()
+        name = " ".join(request.form.get("name", "").split())[:60]
+        if not name:
+            abort(400, description="Give the spell template a name.")
+        try:
+            blue_level = int(request.form.get("blue_level", "75"))
+        except ValueError:
+            abort(400, description="Choose a valid Blue Mage level.")
+        if not 1 <= blue_level <= 75:
+            abort(400, description="Blue Mage level must be between 1 and 75.")
+        data_path = Path(app.root_path) / "static" / "blue_spell_farming.json"
+        with data_path.open(encoding="utf-8") as spell_file:
+            rows = json.load(spell_file)["rows"]
+        spell_levels = {row["spell"]: row["spell_level"] for row in rows}
+        spell_costs = {row["spell"]: int(row.get("set_points") or 0) for row in rows}
+        spells = list(dict.fromkeys(request.form.getlist("spells")))
+        if any(spell not in spell_levels or spell_levels[spell] > blue_level for spell in spells):
+            abort(400, description="The template contains a spell unavailable at that level.")
+        point_limit = 10 + ((blue_level - 1) // 10) * 5
+        slot_limit = min(20, 6 + ((blue_level - 1) // 10) * 2)
+        if len(spells) > slot_limit or sum(spell_costs[spell] for spell in spells) > point_limit:
+            abort(400, description="The template exceeds the spell-slot or Blue Magic point limit.")
+        template_id = request.form.get("template_id", "")
+        db = get_db()
+        if template_id.isdigit():
+            existing = db.execute(
+                "SELECT id FROM blue_spell_templates WHERE id=? AND owner_member_id=?",
+                (int(template_id), member["id"]),
+            ).fetchone()
+        else:
+            existing = None
+        values = (name, blue_level, json.dumps(spells), 0)
+        if existing:
+            db.execute(
+                """UPDATE blue_spell_templates SET name=?,blue_level=?,spells_json=?,is_shared=?,
+                   updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+                (*values, existing["id"]),
+            )
+            saved_id = existing["id"]
+        else:
+            cursor = db.execute(
+                """INSERT INTO blue_spell_templates
+                   (owner_member_id,name,blue_level,spells_json,is_shared)
+                   VALUES (?,?,?,?,?)""",
+                (member["id"], *values),
+            )
+            saved_id = cursor.lastrowid
+        db.commit()
+        flash(f"Saved Blue Mage template {name}.", "success")
+        return redirect(url_for("spell_farming", view="spellbook", template=saved_id))
+
+    @app.post("/blue-mage-tools/templates/<int:template_id>/delete")
+    @editor_required
+    def delete_blue_spell_template(template_id):
+        member = require_member_identity()
+        cursor = get_db().execute(
+            "DELETE FROM blue_spell_templates WHERE id=? AND owner_member_id=?",
+            (template_id, member["id"]),
+        )
+        get_db().commit()
+        if not cursor.rowcount:
+            abort(404)
+        flash("Deleted the Blue Mage spell template.", "success")
+        return redirect(url_for("spell_farming", view="spellbook"))
 
     @app.post("/loot-tables/ownership")
     @editor_required
@@ -1907,6 +2067,11 @@ def create_app(test_config=None):
                 for row in records
                 if row.get("zone", "").casefold() == requested_zone and row.get("image")]
         return jsonify({"maps": sorted(maps, key=lambda row: row["map_id"])})
+
+    @app.get("/travel-planner")
+    @editor_required
+    def travel_planner():
+        return render_template("travel_planner.html")
 
     @app.get("/wiki-map-assets/<pack>/<path:filename>")
     def wiki_map_asset(pack, filename):

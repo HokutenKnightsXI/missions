@@ -250,6 +250,8 @@ def test_gear_optimizer_uses_catalog_without_loading_character_equipment(monkeyp
     assert b"Object.entries(item.level_scaling || {})" in optimizer_script
     assert b'mainBlocksSub = slot === "sub"' in optimizer_script
     assert b'item.two_handed) equipmentSet.sub = null' in optimizer_script
+    assert b'id="gear-active-search"' in page.data
+    assert b'activeSearchControl.addEventListener("input", renderActiveItems)' in optimizer_script
 
 
 def test_owned_gear_is_saved_per_character(monkeypatch, tmp_path):

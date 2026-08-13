@@ -201,6 +201,54 @@ def parse_physical_damage_type(script: str) -> str | None:
     return None
 
 
+def parse_spell_description(script: str) -> str:
+    """Extract the concise player-facing effect summary from a spell header."""
+    lines = [re.sub(r"^\s*--\s?", "", line).strip() for line in script.splitlines()]
+    spell_index = next((index for index, line in enumerate(lines)
+                        if line.casefold().startswith("spell:")), -1)
+    ignored = ("spell cost:", "monster type:", "spell type:", "blue magic points:",
+               "stat bonus:", "level:", "casting time:", "recast time:",
+               "duration:", "skillchain element", "combos:")
+    descriptions = []
+    for line in lines[spell_index + 1:]:
+        if not line or set(line) == {"-"}:
+            if descriptions:
+                break
+            continue
+        if line.casefold().startswith(ignored):
+            if descriptions:
+                break
+            continue
+        descriptions.append(line)
+    return " ".join(descriptions).strip()
+
+
+EFFECT_PATTERNS = (
+    ("HP Drain", r"steals? (?:an enemy's |)hp"), ("MP Drain", r"steals? (?:an amount of enemy's |an enemy's |)mp"),
+    ("Stun", r"\bstun\b|prevented from acting"), ("Slow", r"\bslow\b|reduces? the attack speed of enemies"),
+    ("Poison", r"\bpoison(?:s|ed)?\b"), ("Sleep", r"\bsleep\b"), ("Bind", r"\bbind\b"),
+    ("Paralyze", r"\bparalysis\b"), ("Blind", r"\bblind(?:ness|s)?\b"), ("Silence", r"\bsilence[ds]?\b"),
+    ("Dispel", r"removes? one beneficial magic effect|steals? an enemy's buff"),
+    ("Defense Down", r"weakens? defense|lowers? the defense"),
+    ("Magic Defense Down", r"lowers? .*magical defense"), ("Attack Down", r"weakens? attacks"),
+    ("Accuracy Down", r"lowers? (?:the |)accuracy"), ("Evasion Down", r"lowers? the evasion"),
+    ("STR Down", r"\bstr down\b|lowers? strength"), ("DEX Down", r"\bdex down\b"),
+    ("VIT Down", r"\bvit(?:ality)? down\b|lowers? vitality"), ("AGI Down", r"lowers? agility"),
+    ("INT Down", r"lowers? intelligence"), ("Weight", r"\bweight\b"),
+    ("Disease", r"\bdisease\b"), ("TP Down", r"reduces? an enemy's tp"), ("Fear", r"\bfear\b"),
+    ("Cure", r"restores? hp"), ("Stoneskin", r"\bstoneskin\b|absorbs? an? certain amount of damage"),
+    ("Haste", r"increases? attack speed"), ("Defense Boost", r"enhances? defense"),
+    ("Magic Attack Boost", r"enhances? magic attack"), ("Magic Defense Boost", r"enhances? magic defense"),
+    ("Evasion Boost", r"enhances? evasion"), ("Accuracy Boost", r"enhances? accuracy"),
+    ("Blink", r"shadow images"), ("Spikes", r"magical .* spikes"),
+)
+
+
+def parse_spell_effects(description: str) -> list[str]:
+    """Map Blue Magic wording to familiar player-facing spell/effect goals."""
+    return [name for name, pattern in EFFECT_PATTERNS if re.search(pattern, description, re.I)]
+
+
 def fetch_combat_metadata() -> dict[str, dict]:
     """Download and parse the current LSB Blue Magic action scripts."""
     with urlopen(BLUE_SPELL_SCRIPTS_API, timeout=30) as response:
@@ -220,6 +268,7 @@ def fetch_combat_metadata() -> dict[str, dict]:
                 "spell_type": spell_type,
                 "stat_modifiers": modifiers,
                 "physical_damage_type": parse_physical_damage_type(script),
+                "description": parse_spell_description(script),
             }
     return metadata
 
@@ -263,6 +312,8 @@ def build(rows: list[dict], metadata: dict[str, dict] | None = None,
             "spell_type": combat.get("spell_type", "Support"),
             "stat_modifiers": combat.get("stat_modifiers", []),
             "physical_damage_type": combat.get("physical_damage_type"),
+            "description": combat.get("description", ""),
+            "effects": parse_spell_effects(combat.get("description", "")),
         })
     catalog.sort(key=lambda item: (item["spell_level"], item["spell"], item["zone"], item["monster"]))
     return {
