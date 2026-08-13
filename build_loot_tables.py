@@ -28,6 +28,10 @@ TH_TABLE = (
 )
 EXCLUDED_ZONES = {"Everbloom_Hollow", "Ruhotz_Silvermines", "Ghoyus_Reverie",
                   "Walk_of_Echoes", "Provenance"}
+EXCLUDED_ITEMS = {
+    "One Byne Bill", "Ordelle Bronzepiece", "Tukuku Whiteshell",
+    "One Hundred Byne Bill", "Montiont Silverpiece", "Lungo-Nango Jadeshell",
+}
 
 
 def fetch(url):
@@ -87,6 +91,9 @@ def parse_drops(sql, zones):
             continue
         block_has_drops = True
         _drop_id, drop_type, _group_id, group_rate, item_id, item_rate, item_name = match.groups()
+        item_name = item_name.strip()
+        if item_name in EXCLUDED_ITEMS:
+            continue
         drop_type = int(drop_type)
         if drop_type not in (0, 1):
             continue
@@ -100,7 +107,7 @@ def parse_drops(sql, zones):
             if not allowed_zone(current_zone, zone_name):
                 continue
             key = (zone_name.replace("_", " "), current_mob.replace("_", " "),
-                   item_name.strip(), int(item_id))
+                   item_name, int(item_id))
             rolls[key].append(rates)
     rows = []
     for (zone, mob, item, item_id), chances in rolls.items():
@@ -130,6 +137,17 @@ def normalized_mob(name):
     return re.sub(r"(?:war|mnk|whm|blm|rdm|thf|pld|drk|bst|brd|rng|sam|nin|drg|smn)$", "", value)
 
 
+SPAWN_NAME_ALIASES = {
+    # Retail renamed these original ToAU spawns after Horizon's era. Their
+    # coordinates still identify the Wivre camp on Bhaflau map 2.
+    ("Bhaflau Thickets", "locuswivre"): "wivre",
+}
+
+SPAWN_LEVEL_OVERRIDES = {
+    ("Bhaflau Thickets", "wivre"): (78, 83),
+}
+
+
 def parse_spawns(sql, zones, rows):
     wanted = {(row[0], normalized_mob(row[1])) for row in rows}
     current_zone = None
@@ -153,14 +171,18 @@ def parse_spawns(sql, zones, rows):
         mob, minimum, maximum, x, y, z = match.groups()
         zone_name = zone_name.replace("_", " ")
         key = (zone_name, normalized_mob(mob))
+        key = (zone_name, SPAWN_NAME_ALIASES.get(key, key[1]))
         x, elevation, map_y = float(x), float(y), float(z)
         if abs(x) > 5000 or abs(map_y) > 5000:
             continue
         zone_points[zone_name].append((x, map_y))
         if key in wanted:
             points[key].append([round(x, 1), round(map_y, 1), round(elevation, 1)])
-            old = levels.get(key, (99, 0))
-            levels[key] = (min(old[0], int(minimum)), max(old[1], int(maximum)))
+            if key in SPAWN_LEVEL_OVERRIDES:
+                levels[key] = SPAWN_LEVEL_OVERRIDES[key]
+            else:
+                old = levels.get(key, (99, 0))
+                levels[key] = (min(old[0], int(minimum)), max(old[1], int(maximum)))
     bounds = {}
     for zone_name, coordinates in zone_points.items():
         xs, ys = [point[0] for point in coordinates], [point[1] for point in coordinates]

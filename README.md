@@ -104,6 +104,20 @@ The workflow runs daily at 10:17 UTC. Its update endpoint does not use the links
 administrator passwords and modifies only `member_jobs` plus each updated member's
 timestamp.
 
+## Hourly auction values
+
+The general loot table retrieves the complete HorizonXI market snapshot from PSXI and
+caches a compact copy at `instance/psxi_market_snapshot.json` for one hour. Configure a
+free PSXI API token on the host so the integration continues working after anonymous
+market access is retired:
+
+```text
+PSXI_API_TOKEN=psxi_your_token
+```
+
+The token remains server-side and is never returned to the browser. If PSXI is temporarily
+unavailable, the loot table continues working and displays unavailable market values.
+
 ## Current scope
 
 - Add and update linkshell members

@@ -35,7 +35,8 @@
 main:has(.my-requests-grid),
 main:has(.loot-filters),
 main:has(.job-roster-panel),
-main:has(.alliance-builder) {
+main:has(.alliance-builder),
+main:has(.travel-workspace) {
   max-width: 1600px;
 }
 

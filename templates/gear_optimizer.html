@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Gear Optimizer &middot; Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=19) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=18) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_select.css', v=1) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=20) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=18) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_select.css', v=1) }}">{% endblock %}
 {% block content %}
 <section class="gear-hero">
   <div><p class="eyebrow">HorizonXI &middot; Level 75 &middot; Treasures era</p><h1>Gear Optimizer</h1><p>Choose a job, level, race, and stat to build the strongest eligible set and browse every matching item by slot.</p></div>
@@ -39,7 +39,7 @@
   <div id="gear-set-body">
     <div class="gear-setup-split">
       <div class="gear-grid-wrap"><div class="gear-preset-actions"><button type="button" id="gear-use-best" class="gear-use-best-button">Use Best Set</button><button type="button" id="gear-use-current" class="gear-use-best-button">Use Your Current Set</button></div><div class="gear-slots" id="gear-best-slots"></div></div>
-      <aside class="gear-active-picker"><header><div><p class="eyebrow">Active equipment slot</p><h3>Items for <span id="gear-active-slot">Main</span></h3></div><strong id="gear-active-count"></strong></header><div id="gear-active-items" class="gear-active-items"></div></aside>
+      <aside class="gear-active-picker"><header><div><p class="eyebrow">Active equipment slot</p><h3>Items for <span id="gear-active-slot">Main</span></h3></div><strong id="gear-active-count"></strong></header><label class="gear-active-search"><span>Search items</span><input id="gear-active-search" type="search" placeholder="Type an item name…" autocomplete="off"></label><div id="gear-active-items" class="gear-active-items"></div></aside>
     </div>
     <div class="gear-total-panel"><h3>Equipment Totals</h3><div id="gear-stat-totals" class="gear-stat-totals"></div><p id="gear-load-summary">The optimizer starts with the highest eligible items. Equip any item below to customize the set; deltas compare available gear with your current setup.</p></div>
   </div>

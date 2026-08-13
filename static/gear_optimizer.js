@@ -13,6 +13,7 @@
   const negativeControl = document.querySelector("#gear-negative");
   const raceControl = document.querySelector("#gear-race");
   const scopeControl = document.querySelector("#gear-scope");
+  const activeSearchControl = document.querySelector("#gear-active-search");
   let ownedCounts = new Map(Object.entries(data.archived || {}).map(([id, count]) => [Number(id), Number(count)]));
   let catalog = [];
   const slotOrder = [
@@ -196,6 +197,7 @@
       const unowned = item && !ownsEquippedCopy(item, slot);
       const card = element("article", `gear-slot${item ? "" : " empty"}${unowned ? " unowned" : ""}${slot === activeSlot ? " active" : ""}`);
       card.addEventListener("click", () => {
+        if (slot !== activeSlot) activeSearchControl.value = "";
         activeSlot = slot;
         renderEquipmentSet();
         renderActiveItems();
@@ -248,10 +250,12 @@
   };
 
   const renderActiveItems = () => {
-    const items = matchingItemsForSlot(activeSlot);
+    const allItems = matchingItemsForSlot(activeSlot);
+    const query = activeSearchControl.value.trim().toLocaleLowerCase();
+    const items = allItems.filter(item => !query || item.name.toLocaleLowerCase().includes(query));
     const stat = primaryControl.value;
     document.querySelector("#gear-active-slot").textContent = labels[activeSlot];
-    document.querySelector("#gear-active-count").textContent = `${items.length} items`;
+    document.querySelector("#gear-active-count").textContent = query ? `${items.length} of ${allItems.length} items` : `${items.length} items`;
     const nodes = items.map(item => {
       const unowned = scopeControl.value === "owned" && !ownedCounts.has(Number(item.item_id));
       const row = element("article", `gear-active-item${equipmentSet[activeSlot] && equipmentSet[activeSlot].item_id === item.item_id ? " equipped" : ""}${unowned ? " unowned" : ""}`);
@@ -282,7 +286,7 @@
       bindTooltip(row, item);
       return row;
     });
-    document.querySelector("#gear-active-items").replaceChildren(...(nodes.length ? nodes : [element("p", "gear-empty", `No matching ${labels[activeSlot]} items.`)]));
+    document.querySelector("#gear-active-items").replaceChildren(...(nodes.length ? nodes : [element("p", "gear-empty", query ? `No ${labels[activeSlot]} items match “${activeSearchControl.value.trim()}”.` : `No matching ${labels[activeSlot]} items.`)]));
   };
 
   const renderTotals = () => {
@@ -513,6 +517,7 @@
     renderCatalog();
     renderActiveItems();
   });
+  activeSearchControl.addEventListener("input", renderActiveItems);
 
   const safeSetName = () => document.querySelector("#gear-set-name").value.trim() || "Hokuten Gear Set";
   const xmlEscape = value => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&apos;");
