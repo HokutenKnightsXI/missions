@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Endgame Operations · Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=2) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=3) }}">{% endblock %}
 {% block content %}
 <section class="endgame-shell">
   <header class="endgame-hero">
@@ -81,10 +81,9 @@
   </section>
 
   <section class="endgame-panel" data-endgame-panel="events" hidden>
-    <header class="panel-heading"><div><p class="eyebrow">Official attendance record</p><h2>Event Log</h2><p>Only scheduled endgame events count toward the rolling attendance window.</p></div>{% if is_admin() %}<button class="button primary" type="button">+ Record Event</button>{% endif %}</header>
+    <header class="panel-heading"><div><p class="eyebrow">Official attendance record</p><h2>Event Log</h2><p>Read-only history of currently scheduled and past linkshell events. Create new events from Event Calendar.</p></div></header>
     <div class="event-grid">
-      <article class="event-card"><time>Aug 13 <small>2026</small></time><div><span class="event-type">Imported endgame event</span><h3>Sky Operations</h3><p>Open the event to review its attendance roster and awarded loot together.</p><div class="event-meta"><b>6 loot awards</b><span>{{ roster|selectattr('attended','ge',1)|list|length }} attended</span></div></div><button type="button" data-open-event="08/13/2026" data-event-index="0" data-event-name="Sky Operations">Open event →</button></article>
-      <article class="event-card"><time>Aug 06 <small>2026</small></time><div><span class="event-type">Imported endgame event</span><h3>Sky Operations</h3><p>Open the event to review its attendance roster and awarded loot together.</p><div class="event-meta"><b>3 loot awards</b><span>{{ roster|selectattr('attended','ge',2)|list|length }} attended</span></div></div><button type="button" data-open-event="08/06/2026" data-event-index="1" data-event-name="Sky Operations">Open event →</button></article>
+      {% for event in guild_events %}<article class="event-card"><time>{{ event.start_at[:10] }}<small>{{ event.start_at[11:16] }}</small></time><div><span class="event-type">{{ 'Currently scheduled' if event.is_upcoming else 'Past event' }}</span><h3>{{ event.name }}</h3><p>{{ event.location }}{% if event.description %} · {{ event.description }}{% endif %}</p><div class="event-meta"><b>{{ event.signup_count }} signed up</b><span>{{ event.attendance_count }} attended</span><span>Created by {{ event.creator_name }}</span></div></div><span class="event-log-status {{ 'upcoming' if event.is_upcoming else 'past' }}">{{ 'Scheduled' if event.is_upcoming else 'Completed' }}</span></article>{% else %}<div class="event-calendar-empty"><h3>No event history yet</h3><p>Events created from Event Calendar will appear here automatically.</p></div>{% endfor %}
     </div>
   </section>
 

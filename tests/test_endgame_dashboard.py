@@ -58,8 +58,7 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert b'id="priority-source" value=""' in response.data
     assert b'id="priority-family" value=""' in response.data
     assert b">Loot class<" not in response.data
-    assert b'data-open-event="08/13/2026"' in response.data
-    assert b'data-open-event="08/06/2026"' in response.data
+    assert b"Create new events from Event Calendar" in response.data
     assert b"loot-column-filters" in response.data
     assert response.data.count(b"data-loot-sort=") == 7
 
@@ -71,7 +70,7 @@ def test_endgame_admin_sees_decision_inbox(tmp_path):
     response = client.get("/endgame#jobs")
     assert response.status_code == 200
     assert b"job-change requests need review" in response.data
-    assert b"Record Event" in response.data
+    assert b"Record Event" not in response.data
     assert b"Record Loot" in response.data
     assert b"job-editable" in response.data
     assert b'data-job-slot="main_job"' in response.data
@@ -211,6 +210,8 @@ def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(m
     page = client.get("/endgame#event-calendar")
     assert b"Sky Gods" in page.data
     assert b"Sexualpotato" in page.data
+    assert b"Currently scheduled" in page.data
+    assert b"Create new events from Event Calendar" in page.data
     alliance = client.get("/alliance-builder")
     assert b'id="alliance-guild-event"' in alliance.data
     assert b"Sky Gods" in alliance.data

@@ -1787,6 +1787,10 @@ def create_app(test_config=None):
                GROUP BY e.id ORDER BY e.start_at, e.id"""
         ).fetchall():
             event_data = dict(row)
+            event_start = parse_local_datetime(event_data["start_at"])
+            event_data["is_upcoming"] = bool(
+                event_start and event_start >= datetime.now().replace(second=0, microsecond=0)
+            )
             event_data["signups"] = [dict(item) for item in get_db().execute(
                 """SELECT m.id,m.name FROM guild_event_signups s JOIN members m ON m.id=s.member_id
                    WHERE s.event_id=? ORDER BY m.name COLLATE NOCASE""", (row["id"],)
