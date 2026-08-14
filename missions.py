@@ -41,7 +41,11 @@ def discord_bot_request(bot_token, method, path, payload=None):
     body = json.dumps(payload).encode("utf-8") if payload is not None else None
     api_request = Request(
         f"https://discord.com/api/v10{path}", data=body, method=method,
-        headers={"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bot {bot_token}",
+            "Content-Type": "application/json",
+            "User-Agent": "DiscordBot (https://hokutenknights.com, 1.0)",
+        },
     )
     with urlopen(api_request, timeout=20) as response:
         raw = response.read()
@@ -1094,6 +1098,13 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE members ADD COLUMN discord_user_id TEXT NOT NULL DEFAULT ''")
         if "discord_admin" not in member_columns:
             get_db().execute("ALTER TABLE members ADD COLUMN discord_admin INTEGER NOT NULL DEFAULT 0")
+        guild_event_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(guild_events)")
+        }
+        if "discord_message_id" not in guild_event_columns:
+            get_db().execute(
+                "ALTER TABLE guild_events ADD COLUMN discord_message_id TEXT NOT NULL DEFAULT ''"
+            )
         get_db().execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_members_discord_user_id "
             "ON members(discord_user_id) WHERE discord_user_id<>''"
@@ -1168,6 +1179,68 @@ def create_app(test_config=None):
             "INSERT OR IGNORE INTO members(name) VALUES (?)",
             [(name,) for name in LOGIN_CHARACTERS],
         )
+        archive_events = (
+            ("Sky Operations", "Imported historical event", "2026-08-06T20:00", "2026-08-06T23:00", "Ru'Aun Gardens"),
+            ("Sky Operations", "Imported historical event", "2026-08-13T20:00", "2026-08-13T23:00", "Ru'Aun Gardens"),
+        )
+        creator_id = get_db().execute(
+            "SELECT id FROM members WHERE name='Imaven' COLLATE NOCASE"
+        ).fetchone()["id"]
+        for event_name, event_description, start_at, end_at, location in archive_events:
+            if not get_db().execute(
+                "SELECT 1 FROM guild_events WHERE name=? AND start_at=?", (event_name, start_at)
+            ).fetchone():
+                get_db().execute(
+                    """INSERT INTO guild_events
+                       (creator_member_id,name,description,start_at,end_at,location,status)
+                       VALUES(?,?,?,?,?,?,'Completed')""",
+                    (creator_id, event_name, event_description, start_at, end_at, location),
+                )
+        archive_attendance = {
+            "2026-08-06T20:00": ("Sexualpotato", "Vlathgar", "Chickenbanana", "Alecy", "Rhode", "Shiru", "Venenua", "Teeje", "Mygas", "Ivalin", "Cartuja", "Shurgajoe", "Firewater", "Anonym", "Ramenwarrior", "Hikari"),
+            "2026-08-13T20:00": ("Sexualpotato", "Vlathgar", "Chickenbanana", "Alecy", "Rhode", "Shiru", "Venenua", "Teeje", "Mygas", "Ivalin", "Cartuja", "Shurgajoe", "Kaeru", "Firewater", "Anonym", "Ramenwarrior", "Eunos", "Hikari", "Gravekeeper"),
+        }
+        for start_at, names in archive_attendance.items():
+            event_id = get_db().execute(
+                "SELECT id FROM guild_events WHERE name='Sky Operations' AND start_at=?", (start_at,)
+            ).fetchone()["id"]
+            placeholders = ",".join("?" for _ in names)
+            member_ids = get_db().execute(
+                f"SELECT id FROM members WHERE name IN ({placeholders})", names
+            ).fetchall()
+            get_db().executemany(
+                """INSERT OR IGNORE INTO guild_event_attendance
+                   (event_id,member_id,attended,updated_by) VALUES(?,?,1,?)""",
+                [(event_id, row["id"], creator_id) for row in member_ids],
+            )
+        archive_loot = (
+            ("2026-08-06T20:00", "Chickenbanana", "Dryadic Abjuration: Hands", "MNK", "Hands", "Main priority", "Major Loot"),
+            ("2026-08-06T20:00", "Ivalin", "Aquarian Abjuration: Hands", "BLM", "Hands", "Main priority", "Major Loot"),
+            ("2026-08-06T20:00", "Anonym", "Martial Abjuration: Hands", "PLD", "Hands", "Main priority", "Major Loot"),
+            ("2026-08-13T20:00", "Ramenwarrior", "Martial Abjuration: Hands", "PLD", "Hands", "Main priority", "Major Loot"),
+            ("2026-08-13T20:00", "Cartuja", "Genbu's Kabuto", "NIN", "Head", "Main priority", "Major Loot"),
+            ("2026-08-13T20:00", "Chickenbanana", "Dryadic Abjuration: Feet", "MNK", "Feet", "Main priority", "Major Loot"),
+            ("2026-08-13T20:00", "Wizzaro", "Genbu's Shield", "RDM", "Other", "Freelot", "Standard"),
+            ("2026-08-13T20:00", "Vlathgar", "Aquarian Abjuration: Legs", "SMN", "Legs", "Main priority", "Major Loot"),
+            ("2026-08-13T20:00", "Ramenwarrior", "Martial Abjuration: Head", "PLD", "Head", "Main priority", "Major Loot"),
+        )
+        for start_at, member_name, item, job, family, distribution, classification in archive_loot:
+            event_id = get_db().execute(
+                "SELECT id FROM guild_events WHERE name='Sky Operations' AND start_at=?", (start_at,)
+            ).fetchone()["id"]
+            member_id = get_db().execute(
+                "SELECT id FROM members WHERE name=? COLLATE NOCASE", (member_name,)
+            ).fetchone()
+            if member_id and not get_db().execute(
+                "SELECT 1 FROM endgame_loot_awards WHERE event_id=? AND recipient_member_id=? AND item=?",
+                (event_id, member_id["id"], item),
+            ).fetchone():
+                get_db().execute(
+                    """INSERT INTO endgame_loot_awards
+                       (event_id,recipient_member_id,item,job,family,distribution,classification,recorded_by)
+                       VALUES(?,?,?,?,?,?,?,?)""",
+                    (event_id, member_id["id"], item, job, family, distribution, classification, creator_id),
+                )
         extra_admins = tuple(name.casefold() for name in DISCORD_ADMIN_CHARACTERS[1:])
         get_db().execute(
             f"UPDATE members SET discord_admin=CASE "
@@ -1663,11 +1736,24 @@ def create_app(test_config=None):
             "Ivalin": (1, "08/06/2026", False),
             "Anonym": (1, "08/06/2026", False),
         }
+        registration_overrides = {
+            row["name"].casefold(): (row["main_job"], row["secondary_job"])
+            for row in get_db().execute(
+                """SELECT m.name,r.main_job,r.secondary_job FROM endgame_job_registrations r
+                   JOIN members m ON m.id=r.member_id"""
+            ).fetchall()
+        }
         prototype_roster = []
         for name, main_job, secondary_job, eligible, attended in roster_source:
+            main_job, secondary_job = registration_overrides.get(
+                name.casefold(), (main_job, secondary_job)
+            )
             percentage = round(attended * 100 / eligible) if eligible else 0
             major_wins, last_win, cooldown = wins.get(name, (0, "—", False))
             prototype_roster.append({
+                "id": next((row["id"] for row in get_db().execute(
+                    "SELECT id FROM members WHERE name=? COLLATE NOCASE", (name,)
+                ).fetchall()), None),
                 "name": name, "main_job": main_job, "secondary_job": secondary_job,
                 "eligible": eligible, "attended": attended, "attendance": percentage,
                 "tier": 1 if percentage >= 75 else 2 if percentage >= 50 else 3,
@@ -1798,7 +1884,44 @@ def create_app(test_config=None):
             event_data["attendance"] = [item["member_id"] for item in get_db().execute(
                 "SELECT member_id FROM guild_event_attendance WHERE event_id=? AND attended=1", (row["id"],)
             ).fetchall()]
+            event_data["attendees"] = [dict(item) for item in get_db().execute(
+                """SELECT m.id,m.name FROM guild_event_attendance a JOIN members m ON m.id=a.member_id
+                   WHERE a.event_id=? AND a.attended=1 ORDER BY m.name COLLATE NOCASE""", (row["id"],)
+            ).fetchall()]
+            event_data["loot"] = [dict(item) for item in get_db().execute(
+                """SELECT l.id,l.item,m.name player,l.job,l.family,l.distribution award,
+                          l.classification='Major Loot' major
+                   FROM endgame_loot_awards l JOIN members m ON m.id=l.recipient_member_id
+                   WHERE l.event_id=? ORDER BY l.id""", (row["id"],)
+            ).fetchall()]
             guild_events.append(event_data)
+        completed_events = [event for event in guild_events if not event["is_upcoming"]]
+        for member in prototype_roster:
+            eligible = len(completed_events)
+            attended = sum(member["id"] in event["attendance"] for event in completed_events)
+            percentage = round(attended * 100 / eligible) if eligible else 0
+            member.update({
+                "eligible": eligible,
+                "attended": attended,
+                "attendance": percentage,
+                "tier": 1 if percentage >= 75 else 2 if percentage >= 50 else 3,
+            })
+        persistent_loot = [dict(row) for row in get_db().execute(
+            """SELECT substr(e.start_at,6,2)||'/'||substr(e.start_at,9,2)||'/'||substr(e.start_at,1,4) date,
+                      m.name player,l.item,l.family,l.classification='Major Loot' major,
+                      l.job,l.distribution award,e.name event_name,l.id
+               FROM endgame_loot_awards l JOIN guild_events e ON e.id=l.event_id
+               JOIN members m ON m.id=l.recipient_member_id ORDER BY e.start_at DESC,l.id DESC"""
+        ).fetchall()]
+        pending_job_requests = [dict(row) for row in get_db().execute(
+            """SELECT r.*,m.name member_name FROM endgame_job_change_requests r
+               JOIN members m ON m.id=r.member_id WHERE r.status='Pending'
+               ORDER BY r.requested_at"""
+        ).fetchall()]
+        own_job_request = get_db().execute(
+            """SELECT * FROM endgame_job_change_requests WHERE member_id=?
+               ORDER BY id DESC LIMIT 1""", (current_member_id(),)
+        ).fetchone()
         calendar_members = [dict(row) for row in get_db().execute(
             "SELECT id,name FROM members ORDER BY name COLLATE NOCASE"
         ).fetchall()]
@@ -1808,14 +1931,60 @@ def create_app(test_config=None):
                ORDER BY l.id DESC LIMIT 250"""
         ).fetchall()]
         persistent_audit.reverse()
+        get_db().executemany(
+            """INSERT OR IGNORE INTO endgame_event_job_snapshots
+               (event_id,member_id,main_job,secondary_job) VALUES(?,?,?,?)""",
+            [
+                (event["id"], member["id"], member["main_job"], member["secondary_job"])
+                for event in guild_events for member in prototype_roster if member["id"]
+            ],
+        )
+        get_db().commit()
+        job_snapshots = {
+            (row["event_id"], row["member_id"]): (row["main_job"], row["secondary_job"])
+            for row in get_db().execute(
+                "SELECT event_id,member_id,main_job,secondary_job FROM endgame_event_job_snapshots"
+            ).fetchall()
+        }
+        member_details = {}
+        for member in prototype_roster:
+            if not member["id"]:
+                continue
+            event_history = []
+            loot_history = []
+            for event in guild_events:
+                attended = member["id"] in event["attendance"]
+                event_main, event_secondary = job_snapshots.get(
+                    (event["id"], member["id"]), (member["main_job"], member["secondary_job"])
+                )
+                event_history.append({
+                    "id": event["id"], "name": event["name"], "start_at": event["start_at"],
+                    "attended": attended, "main_job": event_main,
+                    "secondary_job": event_secondary,
+                })
+                for award in event["loot"]:
+                    if award["player"].casefold() == member["name"].casefold():
+                        loot_history.append({
+                            **award, "event_id": event["id"], "event_name": event["name"],
+                            "event_date": event["start_at"][:10],
+                            "main_job": event_main, "secondary_job": event_secondary,
+                        })
+            member_details[str(member["id"])] = {
+                "id": member["id"], "name": member["name"],
+                "main_job": member["main_job"], "secondary_job": member["secondary_job"],
+                "events": event_history, "loot": loot_history,
+            }
         return render_template(
             "endgame_dashboard.html", roster=prototype_roster,
-            loot=prototype_loot, pop_items=pop_items, pop_targets=pop_targets,
+            loot=persistent_loot, pop_items=pop_items, pop_targets=pop_targets,
             priority_items=priority_items, jobs=JOBS, guild_events=guild_events,
             calendar_members=calendar_members,
+            pending_job_requests=pending_job_requests,
+            own_job_request=dict(own_job_request) if own_job_request else None,
             discord_events_enabled=bool(app.config.get("DISCORD_BOT_TOKEN")),
             discord_announcements_enabled=bool(app.config.get("DISCORD_EVENT_CHANNEL_ID")),
             persistent_audit=persistent_audit,
+            member_details=member_details,
         )
 
     @app.post("/endgame/events/new")
@@ -1834,6 +2003,7 @@ def create_app(test_config=None):
         # Keep that implementation detail out of the form and use a standard window.
         end_at = start_at + timedelta(hours=3)
         discord_event_id = ""
+        discord_message_id = ""
         token = app.config.get("DISCORD_BOT_TOKEN", "")
         if token:
             channel_id = str(app.config.get("DISCORD_EVENT_CHANNEL_ID", "")).strip()
@@ -1853,27 +2023,55 @@ def create_app(test_config=None):
                 flash("The website event was saved, but Discord could not create its scheduled event.", "error")
             if discord_event_id and channel_id:
                 event_url = f"https://discord.com/events/{app.config['DISCORD_GUILD_ID']}/{discord_event_id}"
-                timestamp = int(start_at.replace(tzinfo=EASTERN_TIME).timestamp())
-                announcement = (
-                    f"## {name}\n"
-                    f"**When:** <t:{timestamp}:F> (<t:{timestamp}:R>)\n"
-                    f"**Gather Location:** {location}\n"
-                    f"{description + chr(10) if description else ''}"
-                    f"[View Event & Sign Up]({event_url})"
-                )
+                local_start = start_at.replace(tzinfo=EASTERN_TIME)
+                empty_group = "No players have selected this role yet."
+                signup_payload = {
+                    "allowed_mentions": {"parse": []},
+                    "embeds": [{
+                        "title": f"⚔️ Hokuten Knights — {name}"[:256],
+                        "description": "━━━━━━━━━━━━━━━━━━━━━━",
+                        "color": 15844367,
+                        "fields": [
+                            {"name": "📅 Date", "value": local_start.strftime("%A %B %d %Y"), "inline": True},
+                            {"name": "🕒 Time", "value": local_start.strftime("%I:%M %p").lstrip("0"), "inline": True},
+                            {"name": "⏳ Duration", "value": "3", "inline": True},
+                            {"name": "👑 Hosted By", "value": creator["name"], "inline": False},
+                            {"name": "📍 Gather Location", "value": location, "inline": False},
+                            {"name": "📜 Description / Requirements", "value": description or "No additional requirements.", "inline": False},
+                            {"name": "📆 Discord Event", "value": f"[Open Server Calendar Event]({event_url})", "inline": False},
+                            {"name": "📊 Confirmed Alliance Setup", "value": "🛡️ Tanks: **0**\n✨ Healers: **0**\n🎵 Support: **0**\n⚔️ Damage Dealers: **0**", "inline": False},
+                            {"name": "🛡️ Tanks (0 confirmed)", "value": empty_group, "inline": False},
+                            {"name": "✨ Healers (0 confirmed)", "value": empty_group, "inline": False},
+                            {"name": "🎵 Support (0 confirmed)", "value": empty_group, "inline": False},
+                            {"name": "⚔️ Damage Dealers (0 confirmed)", "value": empty_group, "inline": False},
+                            {"name": "✅ Going (0)", "value": "No responses yet.", "inline": False},
+                            {"name": "❓ Maybe (0)", "value": "No responses yet.", "inline": False},
+                            {"name": "❌ Can't Attend (0)", "value": "No responses yet.", "inline": False},
+                        ],
+                        "footer": {"text": "Hokuten Knights Event Board • Maybe players are not included in confirmed totals"},
+                    }],
+                    "components": [{"type": 1, "components": [
+                        {"type": 2, "custom_id": "hokuten_event_going", "style": 3, "label": "Going", "emoji": {"name": "✅"}},
+                        {"type": 2, "custom_id": "hokuten_event_maybe", "style": 2, "label": "Maybe", "emoji": {"name": "❓"}},
+                        {"type": 2, "custom_id": "hokuten_event_cant", "style": 4, "label": "Can't Attend", "emoji": {"name": "❌"}},
+                        {"type": 2, "custom_id": "hokuten_event_choose_job", "style": 1, "label": "Choose Job", "emoji": {"name": "⚔️"}},
+                        {"type": 2, "custom_id": "hokuten_event_edit", "style": 2, "label": "Edit Event", "emoji": {"name": "✏️"}},
+                    ]}],
+                }
                 try:
-                    discord_bot_request(
+                    announcement_message = discord_bot_request(
                         token, "POST", f"/channels/{channel_id}/messages",
-                        {"content": announcement[:2000], "allowed_mentions": {"parse": []}},
+                        signup_payload,
                     )
+                    discord_message_id = str((announcement_message or {}).get("id", ""))
                 except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
                     flash("The Discord event was created, but its channel announcement could not be posted.", "error")
         event_id = get_db().execute(
             """INSERT INTO guild_events
-               (creator_member_id,name,description,start_at,end_at,location,discord_event_id)
-               VALUES(?,?,?,?,?,?,?)""",
+               (creator_member_id,name,description,start_at,end_at,location,discord_event_id,discord_message_id)
+               VALUES(?,?,?,?,?,?,?,?)""",
             (creator["id"], name, description, start_at.isoformat(timespec="minutes"),
-             end_at.isoformat(timespec="minutes"), location, discord_event_id),
+             end_at.isoformat(timespec="minutes"), location, discord_event_id, discord_message_id),
         ).lastrowid
         get_db().execute(
             "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
@@ -1881,6 +2079,51 @@ def create_app(test_config=None):
         )
         get_db().commit()
         flash(f"Created {name}{' in Discord and on the website' if discord_event_id else ' on the website'}.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+
+    @app.post("/endgame/events/<int:event_id>/delete")
+    @admin_required
+    def delete_guild_event(event_id):
+        if not can_create_guild_events():
+            abort(403, description="Only designated event administrators can delete events.")
+        event = get_db().execute("SELECT * FROM guild_events WHERE id=?", (event_id,)).fetchone()
+        if not event:
+            abort(404)
+        if event["discord_event_id"] and app.config.get("DISCORD_BOT_TOKEN"):
+            try:
+                token = app.config["DISCORD_BOT_TOKEN"]
+                channel_id = str(app.config.get("DISCORD_EVENT_CHANNEL_ID", "")).strip()
+                message_id = event["discord_message_id"]
+                if not message_id and channel_id:
+                    # Older events predate announcement-ID tracking. Locate their bot post
+                    # by the unique scheduled-event URL before deleting the event itself.
+                    event_url = f"discord.com/events/{app.config['DISCORD_GUILD_ID']}/{event['discord_event_id']}"
+                    messages = discord_bot_request(
+                        token, "GET", f"/channels/{channel_id}/messages?limit=100",
+                    ) or []
+                    match = next(
+                        (message for message in messages if event_url in message.get("content", "")), None,
+                    )
+                    message_id = str((match or {}).get("id", ""))
+                if message_id and channel_id:
+                    discord_bot_request(
+                        token, "DELETE", f"/channels/{channel_id}/messages/{message_id}",
+                    )
+                discord_bot_request(
+                    token, "DELETE",
+                    f"/guilds/{app.config['DISCORD_GUILD_ID']}/scheduled-events/{event['discord_event_id']}",
+                )
+            except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+                flash("Discord could not remove the full event and channel post, so the website event was preserved.", "error")
+                return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+        actor = require_member_identity()
+        get_db().execute("DELETE FROM guild_events WHERE id=?", (event_id,))
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "Event Calendar", "Event deleted", f"{event['name']} / Event #{event_id}"),
+        )
+        get_db().commit()
+        flash(f"Deleted {event['name']} from the website and Discord.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
 
     @app.post("/endgame/events/<int:event_id>/sync")
@@ -1932,6 +2175,18 @@ def create_app(test_config=None):
         member_ids = {int(value) for value in request.form.getlist("member_ids") if value.isdigit()}
         valid_ids = {row["id"] for row in get_db().execute("SELECT id FROM members").fetchall()}
         member_ids &= valid_ids
+        previous_ids = {row["member_id"] for row in get_db().execute(
+            "SELECT member_id FROM guild_event_attendance WHERE event_id=? AND attended=1", (event_id,),
+        ).fetchall()}
+        changed_ids = sorted(member_ids ^ previous_ids)
+        changed_names = {
+            row["id"]: row["name"] for row in get_db().execute(
+                f"SELECT id,name FROM members WHERE id IN ({','.join('?' for _ in changed_ids)})",
+                changed_ids,
+            ).fetchall()
+        } if changed_ids else {}
+        added = [changed_names[item] for item in sorted(member_ids - previous_ids)]
+        removed = [changed_names[item] for item in sorted(previous_ids - member_ids)]
         get_db().execute("DELETE FROM guild_event_attendance WHERE event_id=?", (event_id,))
         get_db().executemany(
             "INSERT INTO guild_event_attendance(event_id,member_id,attended,updated_by) VALUES(?,?,1,?)",
@@ -1939,11 +2194,175 @@ def create_app(test_config=None):
         )
         get_db().execute(
             "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
-            (updater["id"], "Event Attendance", "Attendance updated", f"Event #{event_id}: {len(member_ids)} attended"),
+            (updater["id"], "Event Attendance", "Attendance updated",
+             f"Event #{event_id}: added {', '.join(added) or 'none'}; removed {', '.join(removed) or 'none'}; {len(member_ids)} attended"),
         )
         get_db().commit()
         flash("Event attendance updated.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+
+    @app.post("/endgame/job-change-requests")
+    @editor_required
+    def request_endgame_job_change():
+        member = require_member_identity()
+        main_job = request.form.get("main_job", "").strip().upper()
+        secondary_job = request.form.get("secondary_job", "").strip().upper()
+        if main_job not in JOBS or (secondary_job and secondary_job not in JOBS):
+            abort(400, description="Choose valid main and secondary jobs.")
+        if main_job == secondary_job:
+            abort(400, description="Main and secondary jobs must be different.")
+        if get_db().execute(
+            "SELECT 1 FROM endgame_job_change_requests WHERE member_id=? AND status='Pending'",
+            (member["id"],),
+        ).fetchone():
+            abort(400, description="You already have a pending job-change request.")
+        recent = get_db().execute(
+            """SELECT 1 FROM endgame_job_change_requests WHERE member_id=? AND status='Approved'
+               AND reviewed_at >= datetime('now','-30 days')""", (member["id"],)
+        ).fetchone()
+        if recent:
+            abort(400, description="Approved job selections can only be changed once every 30 days.")
+        get_db().execute(
+            """INSERT INTO endgame_job_change_requests(member_id,requested_main,requested_secondary)
+               VALUES(?,?,?)""", (member["id"], main_job, secondary_job),
+        )
+        get_db().commit()
+        flash("Your job-selection request was sent to leadership.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="jobs"))
+
+    @app.post("/endgame/job-change-requests/<int:request_id>/review")
+    @admin_required
+    def review_endgame_job_change(request_id):
+        if not can_create_guild_events():
+            abort(403, description="Only designated administrators can review job changes.")
+        decision = request.form.get("decision", "")
+        if decision not in {"Approved", "Denied"}:
+            abort(400, description="Choose approve or deny.")
+        change = get_db().execute(
+            "SELECT * FROM endgame_job_change_requests WHERE id=? AND status='Pending'", (request_id,)
+        ).fetchone()
+        if not change:
+            abort(404)
+        reviewer = require_member_identity()
+        member = get_db().execute("SELECT name FROM members WHERE id=?", (change["member_id"],)).fetchone()
+        if decision == "Approved":
+            get_db().execute(
+                """INSERT INTO endgame_job_registrations(member_id,main_job,secondary_job,updated_at)
+                   VALUES(?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(member_id) DO UPDATE SET
+                   main_job=excluded.main_job,secondary_job=excluded.secondary_job,
+                   updated_at=CURRENT_TIMESTAMP""",
+                (change["member_id"], change["requested_main"], change["requested_secondary"]),
+            )
+        get_db().execute(
+            """UPDATE endgame_job_change_requests SET status=?,reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP
+               WHERE id=?""", (decision, reviewer["id"], request_id),
+        )
+        details = f"{member['name']}: {change['requested_main']} / {change['requested_secondary'] or 'None'} ({decision})"
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (reviewer["id"], "Job Selections", f"Request {decision.lower()}", details),
+        )
+        get_db().commit()
+        flash(f"{member['name']}'s job-selection request was {decision.lower()}.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="jobs"))
+
+    @app.post("/endgame/loot")
+    @admin_required
+    def record_endgame_loot():
+        if not can_create_guild_events():
+            abort(403, description="Only designated administrators can record loot.")
+        event_id = request.form.get("event_id", "")
+        member_id = request.form.get("member_id", "")
+        item = request.form.get("item", "").strip()[:120]
+        job = request.form.get("job", "").strip().upper()
+        family = request.form.get("family", "").strip()
+        distribution = request.form.get("distribution", "").strip()
+        classification = request.form.get("classification", "").strip()
+        if not event_id.isdigit() or not get_db().execute(
+            "SELECT 1 FROM guild_events WHERE id=?", (event_id,)
+        ).fetchone():
+            abort(400, description="Choose a valid current or past event.")
+        recipient = get_db().execute(
+            "SELECT id,name FROM members WHERE id=?", (member_id,)
+        ).fetchone() if member_id.isdigit() else None
+        if (not recipient or not item or job not in JOBS or family not in
+                {"Weapons", "Head", "Body", "Hands", "Legs", "Feet", "Accessories", "Other"}
+                or distribution not in {"Main priority", "Secondary priority", "Freelot"}
+                or classification not in {"Major Loot", "Standard"}):
+            abort(400, description="Complete the loot award using valid selections.")
+        recorder = require_member_identity()
+        get_db().execute(
+            """INSERT INTO endgame_loot_awards
+               (event_id,recipient_member_id,item,job,family,distribution,classification,recorded_by)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (int(event_id), recipient["id"], item, job, family, distribution, classification, recorder["id"]),
+        )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (recorder["id"], "Linkshell Loot", "Award recorded",
+             f"{item} to {recipient['name']} ({job}, {distribution}, {classification})"),
+        )
+        get_db().commit()
+        flash(f"Recorded {item} for {recipient['name']}.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="loot"))
+
+    @app.post("/endgame/loot/<int:award_id>/update")
+    @admin_required
+    def update_endgame_loot(award_id):
+        if not can_create_guild_events():
+            abort(403, description="Only designated administrators can edit loot.")
+        award = get_db().execute(
+            "SELECT * FROM endgame_loot_awards WHERE id=?", (award_id,)
+        ).fetchone()
+        if not award:
+            abort(404)
+        member_id = request.form.get("member_id", "")
+        recipient = get_db().execute(
+            "SELECT id,name FROM members WHERE id=?", (member_id,)
+        ).fetchone() if member_id.isdigit() else None
+        item = request.form.get("item", "").strip()[:120]
+        job = request.form.get("job", "").strip().upper()
+        family = request.form.get("family", "").strip()
+        distribution = request.form.get("distribution", "").strip()
+        classification = request.form.get("classification", "").strip()
+        if (not recipient or not item or job not in JOBS or family not in
+                {"Weapons", "Head", "Body", "Hands", "Legs", "Feet", "Accessories", "Other"}
+                or distribution not in {"Main priority", "Secondary priority", "Freelot"}
+                or classification not in {"Major Loot", "Standard"}):
+            abort(400, description="Complete the loot award using valid selections.")
+        editor = require_member_identity()
+        get_db().execute(
+            """UPDATE endgame_loot_awards SET recipient_member_id=?,item=?,job=?,family=?,
+                       distribution=?,classification=?,recorded_by=? WHERE id=?""",
+            (recipient["id"], item, job, family, distribution, classification, editor["id"], award_id),
+        )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (editor["id"], "Event Loot", "Award updated", f"Award #{award_id}: {item} to {recipient['name']}"),
+        )
+        get_db().commit()
+        flash("Loot award updated.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="events"))
+
+    @app.post("/endgame/loot/<int:award_id>/delete")
+    @admin_required
+    def delete_endgame_loot(award_id):
+        if not can_create_guild_events():
+            abort(403, description="Only designated administrators can remove loot.")
+        award = get_db().execute(
+            "SELECT item FROM endgame_loot_awards WHERE id=?", (award_id,)
+        ).fetchone()
+        if not award:
+            abort(404)
+        editor = require_member_identity()
+        get_db().execute("DELETE FROM endgame_loot_awards WHERE id=?", (award_id,))
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (editor["id"], "Event Loot", "Award removed", f"Award #{award_id}: {award['item']}"),
+        )
+        get_db().commit()
+        flash("Loot award removed.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="events"))
 
     @app.get("/api/job-roster/members")
     def job_roster_members_api():

@@ -193,7 +193,7 @@ def test_requests_is_first_navigation_tab_and_brand_destination(app):
     identify(client, owner)
     response = client.get("/help-requests")
     page = response.data.decode()
-    nav = page.split('<nav class="site-nav">', 1)[1].split("</nav>", 1)[0]
+    nav = page.split('<nav class="site-nav"', 1)[1].split("</nav>", 1)[0]
     assert nav.index(">Requests</a>") < nav.index(">Missions</a>")
     assert 'class="brand" href="/help-requests"' in page
 

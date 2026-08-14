@@ -29,7 +29,7 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     response = client.get("/endgame")
     assert response.status_code == 200
     for label in (
-        b"Priority Calculator", b"Job Selections", b"Event Log",
+        b"Priority Calculator", b"Member Detail", b"Event Log",
         b"Linkshell Loot", b"Linkshell Pops",
     ):
         assert label in response.data
@@ -59,7 +59,21 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert b'id="priority-family" value=""' in response.data
     assert b">Loot class<" not in response.data
     assert b"Create new events from Event Calendar" in response.data
+    assert b'data-endgame-view="job-selections"' not in response.data
+    assert b'id="job-request-dialog"' in response.data
+    assert b'data-open-server-event=' in response.data
+    assert b"Attendance Roster" not in response.data
+    assert b"Upcoming Events" in response.data
+    assert b"Past Events" in response.data
+    assert b"Loot Drops" in response.data
+    assert b"Edit Loot" in response.data
+    assert b"Edit Attendance" in response.data
     assert b"loot-column-filters" in response.data
+    assert b"ENDGAME_MEMBER_DETAILS" in response.data
+    assert b'data-name="alecy"' in response.data
+    alecy_row = response.data.split(b'data-name="alecy"', 1)[1].split(b"</tr>", 1)[0]
+    assert b'data-attendance="100"' in alecy_row
+    assert b'data-tier="1"' in alecy_row
     assert response.data.count(b"data-loot-sort=") == 7
 
 
@@ -72,8 +86,10 @@ def test_endgame_admin_sees_decision_inbox(tmp_path):
     assert b"job-change requests need review" in response.data
     assert b"Record Event" not in response.data
     assert b"Record Loot" in response.data
-    assert b"job-editable" in response.data
-    assert b'data-job-slot="main_job"' in response.data
+    assert b"Review requests" in response.data
+    assert b'id="record-loot-dialog"' in response.data
+    assert b'id="open-priority-matrix"' in response.data
+    assert b"Sky &amp; Sea Priority Matrix" in response.data
     assert b"ENDGAME_IS_ADMIN=true" in response.data
     assert b"roster-column-filters" in response.data
     assert response.data.count(b"data-roster-sort=") == 8
@@ -99,9 +115,12 @@ def test_only_designated_admins_can_create_guild_events(tmp_path):
     sign_in(client, member_id=ordinary_id, admin=True)
     page = client.get("/endgame").data
     assert b"Create Guild Event" not in page
-    assert b"Endgame Operations</button>" not in page
-    assert b"Priority Calculator" not in page
-    assert b"Linkshell Loot" not in page
+    assert b"Endgame Operations</button>" in page
+    assert b"Priority Calculator" in page
+    assert b"Linkshell Loot" in page
+    assert b"Linkshell Pops" in page
+    assert b"Admin Audit" not in page
+    assert b"Record Loot" not in page
     response = client.post("/endgame/events/new", data={
         "csrf_token": "token", "name": "Unauthorized Event",
         "start_at": "2026-08-20T20:00", "location": "Ru'Aun Gardens",
@@ -130,7 +149,7 @@ def test_linked_admin_character_does_not_depend_on_stale_session_flag(tmp_path):
     database.close()
     sign_in(client, member_id=member_id, admin=False)
     response = client.get("/endgame#jobs")
-    assert b"job-editable" in response.data
+    assert b"Review requests" in response.data
 
 
 def test_endgame_javascript_calculates_priority_and_pop_readiness(tmp_path):
@@ -152,6 +171,8 @@ def test_endgame_javascript_calculates_priority_and_pop_readiness(tmp_path):
     assert b"hokuten-admin-audit" in script.data
     assert b"hokuten-event-overrides" in script.data
     assert b"data-loot-filter" in script.data
+    styles = client.get("/static/endgame_dashboard.css")
+    assert b"[data-endgame-view-panel][hidden]{display:none!important}" in styles.data
 
 
 def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(monkeypatch, tmp_path):
@@ -188,15 +209,21 @@ def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(m
     })
     assert response.status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
-    event_id, discord_id = database.execute(
-        "SELECT id,discord_event_id FROM guild_events WHERE name='Sky Gods'"
+    event_id, discord_id, message_id = database.execute(
+        "SELECT id,discord_event_id,discord_message_id FROM guild_events WHERE name='Sky Gods'"
     ).fetchone()
     database.close()
     assert discord_id == "discord-event-1"
+    assert message_id == "discord-event-1"
     assert calls[0][2]["entity_type"] == 3
     assert calls[1][0:2] == ("POST", "/channels/endgame-channel-id/messages")
-    assert "Sky Gods" in calls[1][2]["content"]
-    assert "View Event & Sign Up" in calls[1][2]["content"]
+    signup = calls[1][2]
+    assert "Sky Gods" in signup["embeds"][0]["title"]
+    assert any(field["name"] == "📊 Confirmed Alliance Setup" for field in signup["embeds"][0]["fields"])
+    assert [button["custom_id"] for button in signup["components"][0]["components"]] == [
+        "hokuten_event_going", "hokuten_event_maybe", "hokuten_event_cant",
+        "hokuten_event_choose_job", "hokuten_event_edit",
+    ]
 
     assert client.post(f"/endgame/events/{event_id}/sync", data={"csrf_token": "token"}).status_code == 302
     assert client.post(f"/endgame/events/{event_id}/attendance", data={
@@ -204,7 +231,9 @@ def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(m
     }).status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
     assert database.execute("SELECT member_id FROM guild_event_signups").fetchall() == [(member_id,)]
-    assert database.execute("SELECT member_id FROM guild_event_attendance").fetchall() == [(member_id,)]
+    assert database.execute(
+        "SELECT member_id FROM guild_event_attendance WHERE event_id=?", (event_id,)
+    ).fetchall() == [(member_id,)]
     database.close()
 
     page = client.get("/endgame#event-calendar")
@@ -215,3 +244,96 @@ def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(m
     alliance = client.get("/alliance-builder")
     assert b'id="alliance-guild-event"' in alliance.data
     assert b"Sky Gods" in alliance.data
+
+
+def test_designated_admin_can_edit_archived_attendance_and_loot(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    database = sqlite3.connect(app.config["DATABASE"])
+    event_id = database.execute("SELECT id FROM guild_events ORDER BY start_at LIMIT 1").fetchone()[0]
+    award_id = database.execute(
+        "SELECT id FROM endgame_loot_awards WHERE event_id=? ORDER BY id LIMIT 1", (event_id,)
+    ).fetchone()[0]
+    member_id = database.execute("SELECT id FROM members WHERE name='Alecy'").fetchone()[0]
+    database.close()
+
+    sign_in(client, admin=True)
+    response = client.post(f"/endgame/events/{event_id}/attendance", data={
+        "csrf_token": "token", "member_ids": [str(member_id)],
+    })
+    assert response.status_code == 302
+    response = client.post(f"/endgame/loot/{award_id}/update", data={
+        "csrf_token": "token", "member_id": str(member_id), "item": "Byakko's Haidate",
+        "job": "NIN", "family": "Legs", "distribution": "Secondary priority",
+        "classification": "Major Loot",
+    })
+    assert response.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute(
+        "SELECT member_id FROM guild_event_attendance WHERE event_id=?", (event_id,)
+    ).fetchall() == [(member_id,)]
+    assert database.execute(
+        "SELECT recipient_member_id,item,job,family,distribution,classification FROM endgame_loot_awards WHERE id=?",
+        (award_id,),
+    ).fetchone() == (member_id, "Byakko's Haidate", "NIN", "Legs", "Secondary priority", "Major Loot")
+    database.close()
+
+    assert client.post(f"/endgame/loot/{award_id}/delete", data={"csrf_token": "token"}).status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT 1 FROM endgame_loot_awards WHERE id=?", (award_id,)).fetchone() is None
+    assert database.execute("SELECT COUNT(*) FROM admin_change_log").fetchone()[0] >= 3
+    attendance_audit = database.execute(
+        "SELECT details FROM admin_change_log WHERE area='Event Attendance' ORDER BY id DESC LIMIT 1"
+    ).fetchone()[0]
+    assert "added none" in attendance_audit
+    assert "removed Sexualpotato" in attendance_audit
+    database.close()
+
+
+def test_ordinary_member_cannot_edit_archived_loot(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    database = sqlite3.connect(app.config["DATABASE"])
+    award_id = database.execute("SELECT id FROM endgame_loot_awards ORDER BY id LIMIT 1").fetchone()[0]
+    ordinary_id = database.execute("SELECT id FROM members WHERE name='Alecy'").fetchone()[0]
+    database.close()
+    sign_in(client, member_id=ordinary_id, admin=True)
+    assert client.post(f"/endgame/loot/{award_id}/delete", data={"csrf_token": "token"}).status_code == 403
+
+
+def test_admin_event_delete_removes_discord_event_and_database_record(monkeypatch, tmp_path):
+    import sqlite3
+    import missions
+
+    app = make_app(tmp_path)
+    app.config.update(
+        DISCORD_BOT_TOKEN="bot-token", DISCORD_GUILD_ID="guild-id",
+        DISCORD_EVENT_CHANNEL_ID="channel-id",
+    )
+    calls = []
+    monkeypatch.setattr(
+        missions, "discord_bot_request",
+        lambda token, method, path, payload=None: calls.append((method, path)) or None,
+    )
+    database = sqlite3.connect(app.config["DATABASE"])
+    event_id = database.execute("SELECT id FROM guild_events ORDER BY id LIMIT 1").fetchone()[0]
+    database.execute(
+        "UPDATE guild_events SET discord_event_id='discord-event-1',discord_message_id='message-1' WHERE id=?",
+        (event_id,),
+    )
+    database.commit()
+    database.close()
+    client = app.test_client()
+    sign_in(client, admin=True)
+    assert client.post(f"/endgame/events/{event_id}/delete", data={"csrf_token": "token"}).status_code == 302
+    assert calls == [
+        ("DELETE", "/channels/channel-id/messages/message-1"),
+        ("DELETE", "/guilds/guild-id/scheduled-events/discord-event-1"),
+    ]
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT 1 FROM guild_events WHERE id=?", (event_id,)).fetchone() is None
+    database.close()

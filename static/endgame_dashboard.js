@@ -269,12 +269,74 @@
     if (!dialog.open) dialog.showModal();
   };
   syncEventChanges();
-  dialog.addEventListener("close", () => dialog.classList.remove("event-detail-dialog"));
-  document.querySelector(".dialog-close").addEventListener("click", () => { dialog.close(); dialog.classList.remove("event-detail-dialog"); });
+  dialog.addEventListener("close", () => dialog.classList.remove("event-detail-dialog", "member-history-dialog"));
+  document.querySelector(".dialog-close").addEventListener("click", () => { dialog.close(); dialog.classList.remove("event-detail-dialog", "member-history-dialog"); });
   document.addEventListener("click", event => {
+    const memberCell = event.target.closest("#endgame-roster-body td:first-child");
+    const eventHistoryLink = event.target.closest("[data-member-event-link]");
+    const lootHistoryLink = event.target.closest("[data-member-loot-link]");
+    const serverEventButton = event.target.closest("[data-open-server-event]");
+    const attendanceEditButton = event.target.closest("[data-edit-attendance]");
     const eventButton = event.target.closest("[data-open-event]");
     const jobBadge = event.target.closest("[data-job-member]");
     const attendance = event.target.closest("[data-attendance]"); const wins = event.target.closest("[data-wins]");
+    if (lootHistoryLink) {
+      const eventId = lootHistoryLink.dataset.memberLootLink;
+      dialog.close();
+      document.querySelector(`[data-open-server-event="${eventId}"]`)?.click();
+      return;
+    }
+    if (eventHistoryLink) {
+      dialog.close();
+      activateView("event-calendar");
+      const card = document.querySelector(`#guild-event-${eventHistoryLink.dataset.memberEventLink}`);
+      if (card) { card.open = true; card.scrollIntoView({behavior: "smooth", block: "start"}); }
+      return;
+    }
+    if (memberCell) {
+      const rosterMember = roster.find(row => row.name.toLowerCase() === memberCell.closest("tr").dataset.name);
+      const member = rosterMember ? (window.ENDGAME_MEMBER_DETAILS || {})[String(rosterMember.id)] : null;
+      if (!member) return;
+      const eventRows = member.events.map(row => `<tr><td><button class="member-event-link" type="button" data-member-event-link="${row.id}">${safeText(row.start_at.slice(0,10))}<small>${safeText(row.name)}</small></button></td><td><span class="attendance-result ${row.attended ? "attended" : "missed"}">${row.attended ? "✓ Attended" : "✕ Not attended"}</span></td><td><span class="job-badge main">${safeText(row.main_job || "Unassigned")}</span></td><td><span class="job-badge">${safeText(row.secondary_job || "None")}</span></td></tr>`).join("");
+      const lootRows = member.loot.map(row => `<tr><td><button class="member-loot-link" type="button" data-member-loot-link="${row.event_id}"><b>${safeText(row.item)}</b><small>${safeText(row.family)} / ${row.major ? "Major Loot" : "Standard"}</small></button></td><td><button class="member-event-link" type="button" data-member-event-link="${row.event_id}">${safeText(row.event_date)}<small>${safeText(row.event_name)}</small></button></td><td><span class="job-badge main">${safeText(row.job)}</span></td><td>${safeText(row.award)}</td><td>${safeText(row.main_job || "Unassigned")} / ${safeText(row.secondary_job || "None")}</td></tr>`).join("");
+      dialogEyebrow.textContent = "Member event and award history";
+      dialogTitle.textContent = member.name;
+      dialogContent.innerHTML = `<div class="member-history-summary"><span>Registered priorities</span><b>${safeText(member.main_job || "Unassigned")} / ${safeText(member.secondary_job || "None")}</b></div><section class="member-history-section"><header><h3>Event Attendance</h3><span>${member.events.filter(row => row.attended).length}/${member.events.length} attended</span></header><div class="endgame-table-wrap"><table class="endgame-table member-history-table"><thead><tr><th>Event</th><th>Attendance</th><th>Main job</th><th>Secondary job</th></tr></thead><tbody>${eventRows}</tbody></table></div></section><section class="member-history-section"><header><h3>Loot Wins</h3><span>${member.loot.length} awards</span></header><div class="endgame-table-wrap">${lootRows ? `<table class="endgame-table member-history-table"><thead><tr><th>Item</th><th>Event</th><th>Receiving job</th><th>Award</th><th>Registered main / secondary</th></tr></thead><tbody>${lootRows}</tbody></table>` : '<p class="event-empty">No loot wins recorded.</p>'}</div></section>`;
+      dialog.classList.add("member-history-dialog");
+      dialog.showModal();
+      return;
+    }
+    if (serverEventButton) {
+      const selected = (window.ENDGAME_EVENTS || []).find(row => String(row.id) === serverEventButton.dataset.openServerEvent);
+      if (!selected) return;
+      const attendees = selected.attendees || [];
+      const awards = selected.loot || [];
+      const allMembers = window.ENDGAME_MEMBERS || [];
+      const csrf = safeText(document.querySelector('input[name="csrf_token"]')?.value || window.ENDGAME_CSRF || "");
+      const familyOptions = ["Weapons", "Head", "Body", "Hands", "Legs", "Feet", "Accessories", "Other"];
+      const lootPanel = window.ENDGAME_IS_ADMIN
+        ? awards.map(row => `<form method="post" action="/endgame/loot/${row.id}/update" class="event-loot-persistent-editor"><input type="hidden" name="csrf_token" value="${csrf}"><input name="item" value="${safeText(row.item)}" aria-label="Item"><select name="member_id" aria-label="Recipient">${allMembers.map(member => `<option value="${member.id}" ${member.name === row.player ? "selected" : ""}>${safeText(member.name)}</option>`).join("")}</select><select name="job" aria-label="Receiving job">${jobs.map(job => `<option ${job === row.job ? "selected" : ""}>${job}</option>`).join("")}</select><select name="family" aria-label="Item family">${familyOptions.map(family => `<option ${family === row.family ? "selected" : ""}>${family}</option>`).join("")}</select><select name="distribution" aria-label="Award category"><option ${row.award === "Main priority" ? "selected" : ""}>Main priority</option><option ${row.award === "Secondary priority" ? "selected" : ""}>Secondary priority</option><option ${row.award === "Freelot" ? "selected" : ""}>Freelot</option></select><select name="classification" aria-label="Classification"><option ${row.major ? "selected" : ""}>Major Loot</option><option ${!row.major ? "selected" : ""}>Standard</option></select><div><button type="submit">Save</button><button class="danger" type="submit" formaction="/endgame/loot/${row.id}/delete">Remove</button></div></form>`).join("") || '<p class="event-empty">No loot was recorded for this event.</p>'
+        : awards.length ? `<table class="event-detail-table"><thead><tr><th>Item</th><th>Recipient</th><th>Job</th><th>Award</th></tr></thead><tbody>${awards.map(row => `<tr><td class="event-loot-item"><b>${safeText(row.item)}</b><small>${safeText(row.family)} / ${row.major ? "Major Loot" : "Standard"}</small></td><td>${safeText(row.player)}</td><td><span class="job-badge main">${safeText(row.job)}</span></td><td>${safeText(row.award)}</td></tr>`).join("")}</tbody></table>` : '<p class="event-empty">No loot was recorded for this event.</p>';
+      dialogEyebrow.textContent = `${selected.start_at.slice(0, 10)} / Endgame event`;
+      dialogTitle.textContent = `${selected.name} / Loot`;
+      dialogContent.innerHTML = `<section class="event-detail-column event-loot-only"><header><h3>Event Loot</h3><span>${awards.length} awards</span></header><div class="event-detail-scroll">${lootPanel}</div></section>`;
+      dialog.classList.add("event-detail-dialog");
+      dialog.showModal();
+      return;
+    }
+    if (attendanceEditButton && window.ENDGAME_IS_ADMIN) {
+      const selected = (window.ENDGAME_EVENTS || []).find(row => String(row.id) === attendanceEditButton.dataset.editAttendance);
+      if (!selected) return;
+      const attendeeIds = new Set((selected.attendees || []).map(member => Number(member.id)));
+      const allMembers = window.ENDGAME_MEMBERS || [];
+      const csrf = safeText(document.querySelector('input[name="csrf_token"]')?.value || window.ENDGAME_CSRF || "");
+      dialogEyebrow.textContent = `${selected.start_at.slice(0, 10)} / Administrator attendance`;
+      dialogTitle.textContent = `${selected.name} / Attendance`;
+      dialogContent.innerHTML = `<form method="post" action="/endgame/events/${selected.id}/attendance" class="event-attendance-editor"><input type="hidden" name="csrf_token" value="${csrf}"><div class="event-attendance-checks">${allMembers.map(member => `<label><input type="checkbox" name="member_ids" value="${member.id}" ${attendeeIds.has(Number(member.id)) ? "checked" : ""}><span>${safeText(member.name)}</span></label>`).join("")}</div><div class="attendance-editor-actions"><button class="button primary" type="submit">Save Attendance</button><button class="button edit-attendance-button" type="button" data-cancel-attendance>Cancel</button></div></form>`;
+      dialogContent.querySelector("[data-cancel-attendance]").addEventListener("click", () => dialog.close());
+      dialog.showModal();
+      return;
+    }
     if (eventButton) { renderEventDetail(eventButton); return; }
     if (eventButton) {
       const eventIndex = Number(eventButton.dataset.eventIndex);
@@ -317,6 +379,37 @@
     if (attendance) { const member = roster.find(row => row.name === attendance.dataset.attendance); dialogEyebrow.textContent = "Rolling attendance detail"; dialogTitle.textContent = member.name; dialogContent.innerHTML = `<div class="dialog-list"><article><div><b>Imported Event 02</b><small>Individual event detail pending import</small></div><span>${member.attended === 2 ? "Attended" : "Review"}</span></article><article><div><b>Imported Event 01</b><small>Individual event detail pending import</small></div><span>${member.attended ? "Attended / review" : "Missed"}</span></article></div>`; dialog.showModal(); }
     if (wins) { const rows = loot.filter(row => row.player === wins.dataset.wins); dialogEyebrow.textContent = "Loot history"; dialogTitle.textContent = wins.dataset.wins; dialogContent.innerHTML = rows.length ? `<div class="dialog-list">${rows.map(row => `<article><div><b>${row.item}</b><small>${row.date} · ${row.job} · ${row.award}</small></div><span>${row.major ? "Major" : "Standard"}</span></article>`).join("")}</div>` : "<p>No awards are recorded for this member.</p>"; dialog.showModal(); }
   });
+
+  const jobRequestDialog = document.querySelector("#job-request-dialog");
+  document.querySelector("#request-job-change")?.addEventListener("click", () => jobRequestDialog.showModal());
+  jobRequestDialog?.querySelector(".job-request-close")?.addEventListener("click", () => jobRequestDialog.close());
+  jobRequestDialog?.addEventListener("click", event => {
+    if (event.target === jobRequestDialog) jobRequestDialog.close();
+  });
+
+  const priorityMatrixDialog = document.querySelector("#priority-matrix-dialog");
+  document.querySelector("#open-priority-matrix")?.addEventListener("click", () => priorityMatrixDialog.showModal());
+  priorityMatrixDialog?.querySelector(".priority-dialog-close")?.addEventListener("click", () => priorityMatrixDialog.close());
+  priorityMatrixDialog?.addEventListener("click", event => {
+    if (event.target === priorityMatrixDialog) priorityMatrixDialog.close();
+  });
+
+  const recordLootDialog = document.querySelector("#record-loot-dialog");
+  const recordLootItem = document.querySelector("#record-loot-item");
+  const recordLootMember = document.querySelector("#record-loot-member");
+  const recordLootJob = document.querySelector("#record-loot-job");
+  const updateLootDefaults = () => {
+    if (!recordLootDialog) return;
+    document.querySelector("#record-loot-family").value = recordLootItem.selectedOptions[0]?.dataset.family || "";
+    const member = roster.find(row => String(row.id) === recordLootMember.value);
+    const job = recordLootJob.value;
+    document.querySelector("#record-loot-distribution").value = member && job === member.main_job
+      ? "Main priority"
+      : member && job === member.secondary_job ? "Secondary priority" : "Freelot";
+  };
+  document.querySelector("#open-record-loot")?.addEventListener("click", () => recordLootDialog.showModal());
+  recordLootDialog?.querySelector(".record-loot-close")?.addEventListener("click", () => recordLootDialog.close());
+  [recordLootItem, recordLootMember, recordLootJob].filter(Boolean).forEach(control => control.addEventListener("change", updateLootDefaults));
 
   let popArea = "Sky";
   const popItems = window.POP_ITEMS || [], popTargets = window.POP_TARGETS || [];

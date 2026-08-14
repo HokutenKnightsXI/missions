@@ -14,7 +14,7 @@
   <link rel="stylesheet" href="{{ url_for('static', filename='loot_tables.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='spawn_maps.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='spawn_markers.css') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='header_layout.css', v=7) }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='header_layout.css', v=8) }}">
   {% block head %}{% endblock %}
   <link rel="stylesheet" href="{{ url_for('static', filename='collapsible_save_bars.css') }}">
 </head>
@@ -22,7 +22,8 @@
   <header class="site-header {{ 'signed-in-header' if is_editor() else 'public-header' }}">
     {% if is_editor() %}
     <a class="brand" href="{{ url_for('help_board') }}"><span class="crystal">◆</span> Hokuten Knights</a>
-    <nav class="site-nav">
+    <button class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span><span></span></button>
+    <nav class="site-nav" id="site-navigation">
       <a class="{{ 'active' if request.endpoint in ('help_board', 'create_help_request', 'edit_help_request', 'help_request_detail', 'my_help_requests') }}" href="{{ url_for('help_board') }}">Requests</a>
       <a class="{{ 'active' if request.endpoint == 'index' }}" href="{{ url_for('index') }}">Missions</a>
       <a class="{{ 'active' if request.endpoint == 'loot_tables' }}" href="{{ url_for('loot_tables') }}">Loot Tables</a>
@@ -32,8 +33,8 @@
       <span class="nav-section-break" aria-hidden="true">Operations</span>
       <a class="operations-nav-link {{ 'active' if request.endpoint == 'endgame_dashboard' }}" href="{{ url_for('endgame_dashboard') }}">Endgame</a>
       {% if is_editor() and current_member_id() %}<a class="operations-nav-link {{ 'active' if request.endpoint == 'alliance_builder' }}" href="{{ url_for('alliance_builder') }}">Alliance Builder</a>{% endif %}
+      <form class="account-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button account-button" type="submit">Sign Out ({{ current_member_name() }})</button></form>
     </nav>
-    <form class="account-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button account-button" type="submit">Sign Out ({{ current_member_name() }})</button></form>
     {% elif request.endpoint not in ('index', 'discord_connect') %}<a class="button account-button public-signin" href="{{ url_for('discord_connect') }}">Sign In</a>{% endif %}
   </header>
   <main>
@@ -42,5 +43,6 @@
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
+  <script src="{{ url_for('static', filename='header_nav.js', v=1) }}"></script>
 </body>
 </html>
