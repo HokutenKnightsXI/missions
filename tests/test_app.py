@@ -95,7 +95,7 @@ def test_header_uses_single_yellow_account_control(tmp_path):
     assert b"Sign Out (Imaven)" in signed_in.data
     assert b"HorizonXI Linkshell Progress" not in signed_in.data
     assert b"Add or Update Progress" in signed_in.data
-    nav = signed_in.data.split(b'<nav class="site-nav">', 1)[1].split(b"</nav>", 1)[0]
+    nav = signed_in.data.split(b'<nav class="site-nav"', 1)[1].split(b"</nav>", 1)[0]
     assert [nav.index(label) for label in (
         b"Requests", b"Missions", b"Loot Tables",
         b"Job Roster", b"Alliance Builder",

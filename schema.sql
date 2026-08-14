@@ -140,6 +140,7 @@ CREATE TABLE IF NOT EXISTS guild_events (
     location TEXT NOT NULL DEFAULT 'Hokuten Knights',
     status TEXT NOT NULL DEFAULT 'Scheduled',
     discord_event_id TEXT NOT NULL DEFAULT '',
+    discord_message_id TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (creator_member_id) REFERENCES members(id) ON DELETE RESTRICT
@@ -178,6 +179,59 @@ CREATE TABLE IF NOT EXISTS admin_change_log (
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (actor_member_id) REFERENCES members(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS endgame_job_change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    requested_main TEXT NOT NULL DEFAULT '',
+    requested_secondary TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending','Approved','Denied')),
+    requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by INTEGER,
+    reviewed_at TEXT,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS endgame_job_registrations (
+    member_id INTEGER PRIMARY KEY,
+    main_job TEXT NOT NULL DEFAULT '',
+    secondary_job TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_endgame_job_change_pending
+ON endgame_job_change_requests(member_id) WHERE status='Pending';
+
+CREATE TABLE IF NOT EXISTS endgame_loot_awards (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    recipient_member_id INTEGER NOT NULL,
+    item TEXT NOT NULL,
+    job TEXT NOT NULL,
+    family TEXT NOT NULL,
+    distribution TEXT NOT NULL,
+    classification TEXT NOT NULL CHECK(classification IN ('Major Loot','Standard')),
+    awarded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    recorded_by INTEGER,
+    FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (recipient_member_id) REFERENCES members(id) ON DELETE RESTRICT,
+    FOREIGN KEY (recorded_by) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS endgame_event_job_snapshots (
+    event_id INTEGER NOT NULL,
+    member_id INTEGER NOT NULL,
+    main_job TEXT NOT NULL DEFAULT '',
+    secondary_job TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (event_id, member_id),
+    FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_endgame_loot_event ON endgame_loot_awards(event_id, awarded_at);
 
 CREATE TABLE IF NOT EXISTS blue_spell_ownership (
     member_id INTEGER NOT NULL,

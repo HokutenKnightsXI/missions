@@ -26,6 +26,14 @@
   margin: 0;
 }
 
+.site-nav .account-form {
+  margin-left: 8px;
+}
+
+.mobile-nav-toggle {
+  display: none;
+}
+
 .signed-in-header {
   /* Match the inner edges of the 1600px Missions/Help Requests layout. */
   padding-inline: max(24px, calc((100% - 1600px) / 2 + 24px));
@@ -119,6 +127,106 @@ main:has(.endgame-shell) {
     padding-left: 5px;
     overflow: hidden;
     color: transparent;
+  }
+}
+
+@media (max-width: 800px) {
+  .signed-in-header {
+    position: sticky;
+    min-height: 66px;
+    height: 66px;
+    flex-wrap: nowrap;
+    justify-content: space-between;
+    padding: 8px 16px;
+  }
+
+  .signed-in-header .brand {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: clamp(16px, 5vw, 21px);
+  }
+
+  .mobile-nav-toggle {
+    display: grid;
+    flex: 0 0 46px;
+    width: 46px;
+    height: 46px;
+    place-content: center;
+    gap: 5px;
+    border: 1px solid rgba(213, 170, 87, .75);
+    border-radius: 9px;
+    background: rgba(12, 22, 35, .96);
+    cursor: pointer;
+  }
+
+  .mobile-nav-toggle span {
+    display: block;
+    width: 23px;
+    height: 2px;
+    border-radius: 2px;
+    background: #f2ce73;
+    transition: transform .18s ease, opacity .18s ease;
+  }
+
+  .mobile-nav-toggle[aria-expanded="true"] span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+  .mobile-nav-toggle[aria-expanded="true"] span:nth-child(2) { opacity: 0; }
+  .mobile-nav-toggle[aria-expanded="true"] span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+
+  .signed-in-header .site-nav {
+    position: absolute;
+    z-index: 1001;
+    top: calc(100% + 1px);
+    right: 12px;
+    left: 12px;
+    display: none;
+    width: auto;
+    max-height: calc(100vh - 82px);
+    overflow-y: auto;
+    margin: 0;
+    padding: 10px;
+    border: 1px solid #475b72;
+    border-radius: 0 0 13px 13px;
+    background: rgba(7, 14, 24, .98);
+    box-shadow: 0 20px 45px rgba(0, 0, 0, .72);
+  }
+
+  .signed-in-header .site-nav.mobile-open {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .signed-in-header .site-nav a {
+    display: block;
+    width: 100%;
+    padding: 12px 14px;
+    border: 1px solid transparent;
+    text-align: left;
+    white-space: normal;
+  }
+
+  .signed-in-header .site-nav .nav-section-break {
+    width: 100%;
+    margin: 7px 0 2px;
+    padding: 9px 10px 4px;
+    border-top: 1px solid rgba(190, 157, 255, .4);
+    border-left: 0;
+    color: #bca4e9;
+    font-size: 9px;
+    overflow: visible;
+  }
+
+  .signed-in-header .site-nav .account-form {
+    width: 100%;
+    margin: 8px 0 0;
+    padding-top: 10px;
+    border-top: 1px solid #34465a;
+  }
+
+  .signed-in-header .site-nav .account-button {
+    width: 100%;
   }
 }
 .quarter-hour-dialog{width:min(420px,calc(100vw - 32px));padding:0;border:1px solid #b68a2e;border-radius:14px;background:#0b1928;color:#eef6ff;box-shadow:0 24px 80px #000b}.quarter-hour-dialog::backdrop{background:#020812c9;backdrop-filter:blur(3px)}.quarter-hour-dialog form{display:grid;grid-template-columns:1fr 1fr;gap:18px;padding:20px}.quarter-hour-dialog header,.quarter-hour-dialog footer{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:16px}.quarter-hour-dialog h2{margin:2px 0 0;font:700 22px Cinzel,serif}.quarter-hour-dialog small{color:#e5b945;text-transform:uppercase;letter-spacing:.12em}.quarter-hour-dialog header button{border:0;background:transparent;color:#fff;font-size:30px;cursor:pointer}.quarter-hour-dialog label{display:grid;gap:7px;color:#9ec8e8;font-weight:700}.quarter-hour-dialog input,.quarter-hour-dialog select{min-height:46px;border:1px solid #3b5872;border-radius:8px;background:#07131f;color:#fff;padding:0 12px;font:inherit}.quarter-hour-dialog footer{justify-content:flex-end;border-top:1px solid #29445c;padding-top:16px}@media(max-width:520px){.quarter-hour-dialog form{grid-template-columns:1fr}}
