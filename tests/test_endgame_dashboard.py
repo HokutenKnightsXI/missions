@@ -1,0 +1,216 @@
+from missions import create_app
+
+
+def make_app(tmp_path):
+    return create_app({
+        "TESTING": True,
+        "DATABASE": str(tmp_path / "endgame.db"),
+        "SECRET_KEY": "test",
+        "AUTH_DISABLED": False,
+    })
+
+
+def sign_in(client, member_id=1, admin=False):
+    with client.session_transaction() as session:
+        session["is_editor"] = True
+        session["is_admin"] = admin
+        session["member_id"] = member_id
+        session["csrf_token"] = "token"
+
+
+def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    response = client.get("/endgame")
+    assert response.status_code == 302
+    assert "/login" in response.location
+
+    sign_in(client, admin=True)
+    response = client.get("/endgame")
+    assert response.status_code == 200
+    for label in (
+        b"Priority Calculator", b"Job Selections", b"Event Log",
+        b"Linkshell Loot", b"Linkshell Pops",
+    ):
+        assert label in response.data
+    assert b"Blood Saber" not in response.data
+    assert b"Gem of the East" in response.data
+    assert b"High-Quality Euvhi Organ" in response.data
+    assert b"Jailer of Love" in response.data
+    assert b"Byakko&#39;s Haidate" in response.data
+    assert b"Novio Earring" in response.data
+    assert b"Crimson Finger Gauntlets" in response.data
+    assert b'"p3": ["THF", "WHM"]' in response.data
+    for priority in (
+        b'"name": "Seiryu\\u0027s Kote", "p1": ["RNG"], "p2": ["SAM", "NIN"]',
+        b'"name": "Adaman Celata", "p1": ["WAR"], "p2": ["DRK", "BST"]',
+        b'"name": "Adaman Sollerets", "p1": ["WAR"], "p2": ["DRK", "BST"], "p3": [], "source": "Byakko"',
+        b'"name": "Crimson Greaves", "p1": ["PLD"], "p2": ["RDM", "RNG"]',
+        b'"name": "Justice Torque", "p1": ["DRK", "SAM"], "p2": [], "p3": []',
+        b'"name": "Temperance Torque", "p1": ["BST"], "p2": ["WAR"]',
+        b'"name": "Love Torque", "p1": ["DRG", "THF"], "p2": ["COR"], "p3": ["BRD"]',
+    ):
+        assert priority in response.data
+    assert b'<option value="">Select an item</option>' in response.data
+    assert b"Byakko" in response.data
+    assert b"Jailer of Faith" in response.data
+    assert response.data.count(b"priority-source-heading") >= 10
+    assert b'id="priority-source" value=""' in response.data
+    assert b'id="priority-family" value=""' in response.data
+    assert b">Loot class<" not in response.data
+    assert b'data-open-event="08/13/2026"' in response.data
+    assert b'data-open-event="08/06/2026"' in response.data
+    assert b"loot-column-filters" in response.data
+    assert response.data.count(b"data-loot-sort=") == 7
+
+
+def test_endgame_admin_sees_decision_inbox(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, admin=True)
+    response = client.get("/endgame#jobs")
+    assert response.status_code == 200
+    assert b"job-change requests need review" in response.data
+    assert b"Record Event" in response.data
+    assert b"Record Loot" in response.data
+    assert b"job-editable" in response.data
+    assert b'data-job-slot="main_job"' in response.data
+    assert b"ENDGAME_IS_ADMIN=true" in response.data
+    assert b"roster-column-filters" in response.data
+    assert response.data.count(b"data-roster-sort=") == 8
+    assert b'Event date and time' in response.data
+    assert b'Choose date and time' in response.data
+    assert b'id="pick-guild-event-date"' in response.data
+    assert b"quarter_hour_picker.js" in response.data
+    assert b'type="hidden" name="start_at"' in response.data
+    assert b'Gather Location' in response.data
+    assert b'name="end_at"' not in response.data
+    assert b"Admin Audit" in response.data
+    assert b"admin-audit-body" in response.data
+
+
+def test_only_designated_admins_can_create_guild_events(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    database = sqlite3.connect(app.config["DATABASE"])
+    ordinary_id = database.execute("SELECT id FROM members WHERE name='Alecy'").fetchone()[0]
+    database.close()
+    sign_in(client, member_id=ordinary_id, admin=True)
+    page = client.get("/endgame").data
+    assert b"Create Guild Event" not in page
+    assert b"Endgame Operations</button>" not in page
+    assert b"Priority Calculator" not in page
+    assert b"Linkshell Loot" not in page
+    response = client.post("/endgame/events/new", data={
+        "csrf_token": "token", "name": "Unauthorized Event",
+        "start_at": "2026-08-20T20:00", "location": "Ru'Aun Gardens",
+    })
+    assert response.status_code == 403
+
+
+def test_linked_admin_character_does_not_depend_on_stale_session_flag(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    app.config.update(
+        DISCORD_CLIENT_ID="client", DISCORD_CLIENT_SECRET="secret",
+        DISCORD_GUILD_ID="guild", DISCORD_REDIRECT_URI="https://example.test/callback",
+        DISCORD_ADMIN_USER_ID="verified-imaven",
+    )
+    client = app.test_client()
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute(
+        "UPDATE members SET discord_user_id='verified-imaven' WHERE name='Imaven'"
+    )
+    database.commit()
+    member_id = database.execute(
+        "SELECT id FROM members WHERE name='Imaven'"
+    ).fetchone()[0]
+    database.close()
+    sign_in(client, member_id=member_id, admin=False)
+    response = client.get("/endgame#jobs")
+    assert b"job-editable" in response.data
+
+
+def test_endgame_javascript_calculates_priority_and_pop_readiness(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client)
+    script = client.get("/static/endgame_dashboard.js")
+    assert script.status_code == 200
+    assert b"jobStatus" in script.data
+    assert b"rankMatrixPriority" in script.data
+    assert b"priorityTier" in script.data
+    assert b'item.family' in script.data
+    assert b"hokuten-pop-prototype" in script.data
+    assert b"pop-readiness" in script.data
+    assert b"hokuten-job-change-log" in script.data
+    assert b"dataset.jobHistory" in script.data
+    assert b"data-roster-filter" in script.data
+    assert b"event-detail-grid" in script.data
+    assert b"hokuten-admin-audit" in script.data
+    assert b"hokuten-event-overrides" in script.data
+    assert b"data-loot-filter" in script.data
+
+
+def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(monkeypatch, tmp_path):
+    import sqlite3
+    import missions
+
+    app = make_app(tmp_path)
+    app.config.update(
+        DISCORD_BOT_TOKEN="bot-token", DISCORD_GUILD_ID="guild-id",
+        DISCORD_EVENT_CHANNEL_ID="endgame-channel-id",
+    )
+    calls = []
+
+    def fake_discord(_token, method, path, payload=None):
+        calls.append((method, path, payload))
+        if method == "POST":
+            return {"id": "discord-event-1"}
+        return [{"user": {"id": "discord-member-1"}}]
+
+    monkeypatch.setattr(missions, "discord_bot_request", fake_discord)
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute(
+        "UPDATE members SET discord_user_id='discord-member-1' WHERE name='Sexualpotato'"
+    )
+    database.commit()
+    member_id = database.execute("SELECT id FROM members WHERE name='Sexualpotato'").fetchone()[0]
+    database.close()
+
+    client = app.test_client()
+    sign_in(client, admin=True)
+    response = client.post("/endgame/events/new", data={
+        "csrf_token": "token", "name": "Sky Gods", "description": "Four gods and Kirin",
+        "start_at": "2026-08-20T20:00", "end_at": "2026-08-20T23:00", "location": "Ru'Aun Gardens",
+    })
+    assert response.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    event_id, discord_id = database.execute(
+        "SELECT id,discord_event_id FROM guild_events WHERE name='Sky Gods'"
+    ).fetchone()
+    database.close()
+    assert discord_id == "discord-event-1"
+    assert calls[0][2]["entity_type"] == 3
+    assert calls[1][0:2] == ("POST", "/channels/endgame-channel-id/messages")
+    assert "Sky Gods" in calls[1][2]["content"]
+    assert "View Event & Sign Up" in calls[1][2]["content"]
+
+    assert client.post(f"/endgame/events/{event_id}/sync", data={"csrf_token": "token"}).status_code == 302
+    assert client.post(f"/endgame/events/{event_id}/attendance", data={
+        "csrf_token": "token", "member_ids": [str(member_id)],
+    }).status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT member_id FROM guild_event_signups").fetchall() == [(member_id,)]
+    assert database.execute("SELECT member_id FROM guild_event_attendance").fetchall() == [(member_id,)]
+    database.close()
+
+    page = client.get("/endgame#event-calendar")
+    assert b"Sky Gods" in page.data
+    assert b"Sexualpotato" in page.data
+    alliance = client.get("/alliance-builder")
+    assert b'id="alliance-guild-event"' in alliance.data
+    assert b"Sky Gods" in alliance.data

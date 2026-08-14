@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Endgame Operations · Hokuten Knights{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=2) }}">{% endblock %}
+{% block content %}
+<section class="endgame-shell">
+  <header class="endgame-hero">
+    <div><p class="eyebrow">Hokuten Knights command board</p><h1>Endgame Operations</h1><p>One shared view for loot priority, attendance, awards, job registrations, and linkshell pop readiness.</p></div>
+    <div class="prototype-flag"><b>Interactive prototype</b><span>Spreadsheet snapshot · changes stay in this browser</span></div>
+  </header>
+
+  <nav class="endgame-view-tabs" aria-label="Endgame dashboard views">
+    <button class="active" type="button" data-endgame-view="event-calendar">Event Calendar</button>
+    {% if can_create_guild_events() %}<button type="button" data-endgame-view="operations">Endgame Operations</button>{% endif %}
+  </nav>
+
+  <section class="endgame-calendar-view" data-endgame-view-panel="event-calendar">
+    {% if can_create_guild_events() %}<details class="event-create-card" open>
+      <summary><span>+ Create Guild Event</span><small>Creates the website calendar entry and its Discord event</small></summary>
+      <form method="post" action="{{ url_for('create_guild_event') }}" class="event-create-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Event name<input name="name" maxlength="100" required placeholder="e.g. Sky Gods"></label><label class="calendar-field"><span class="field-title">Event date and time</span><span class="calendar-picker"><button type="button" id="pick-guild-event-date" aria-label="Choose event date and time" title="Choose event date and time"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2v3M17 2v3M3.5 9h17M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></button><span id="guild-event-date-display">Choose date and time</span><input class="native-date-input" type="hidden" name="start_at" required></span></label><label>Gather Location<input name="location" maxlength="100" value="Hokuten Knights" placeholder="Where should everyone gather?"></label><label class="event-description">Description<textarea name="description" maxlength="1000" placeholder="Goals, requirements, or special instructions"></textarea></label><button class="button primary" type="submit">Create Guild Event</button></form>
+      <p class="event-discord-state {{ 'ready' if discord_events_enabled and discord_announcements_enabled else 'offline' }}">{% if discord_events_enabled and discord_announcements_enabled %}Hokuten Event Bot is connected. This will create a Discord event and post it in the endgame event channel.{% elif discord_events_enabled %}Discord events are connected, but DISCORD_EVENT_CHANNEL_ID must be added on the host to post channel announcements.{% else %}Website events are available. Add DISCORD_BOT_TOKEN on the host to create and synchronize Discord events.{% endif %}</p>
+    </details>{% endif %}
+    <div class="guild-event-list">
+      {% for event in guild_events %}<details class="guild-event-card" id="guild-event-{{ event.id }}">
+        <summary><time>{{ event.start_at|replace('T',' at ') }}</time><div><h2>{{ event.name }}</h2><p>{{ event.location }}{% if event.description %} / {{ event.description }}{% endif %}</p></div><span><b>{{ event.signup_count }}</b> signed up</span></summary>
+        <div class="guild-event-detail"><section><header><h3>Discord Signups</h3><span>{{ event.signup_count }}</span></header><div class="guild-event-members">{% for member in event.signups %}<span>{{ member.name }}</span>{% else %}<p>No linked Discord signups have been synchronized yet.</p>{% endfor %}</div>{% if can_create_guild_events() and event.discord_event_id %}<form method="post" action="{{ url_for('sync_guild_event',event_id=event.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button" type="submit">Sync Discord Signups</button></form>{% endif %}</section>
+        <section><header><h3>Attendance</h3><span>{{ event.attendance_count }} confirmed</span></header>{% if can_create_guild_events() %}<form method="post" action="{{ url_for('update_guild_event_attendance',event_id=event.id) }}" class="guild-attendance-grid">{% for member in calendar_members %}<label><input type="checkbox" name="member_ids" value="{{ member.id }}" {{ 'checked' if member.id in event.attendance }}><span>{{ member.name }}</span></label>{% endfor %}<button class="button primary" type="submit">Save Attendance</button></form>{% else %}<div class="guild-event-members">{% for member in calendar_members if member.id in event.attendance %}<span>{{ member.name }}</span>{% else %}<p>Attendance has not been recorded.</p>{% endfor %}</div>{% endif %}</section></div>
+      </details>{% else %}<div class="event-calendar-empty"><h2>No guild events scheduled</h2><p>An administrator can create the first event above.</p></div>{% endfor %}
+    </div>
+  </section>
+
+  {% if can_create_guild_events() %}<div data-endgame-view-panel="operations" hidden>
+
+  <div class="endgame-kpis">
+    <article><span>Active roster</span><b>{{ roster|length }}</b><small>{{ roster|selectattr('tier','equalto',1)|list|length }} members in Tier 1</small></article>
+    <article><span>Major awards</span><b>{{ loot|selectattr('major')|list|length }}</b><small>{{ roster|selectattr('cooldown')|list|length }} currently on cooldown</small></article>
+    <article><span>Tracked events</span><b>2</b><small>Rolling 20-event attendance window</small></article>
+    <article><span>Admin inbox</span><b>{{ 2 if is_admin() else '—' }}</b><small>{{ 'Decisions awaiting review' if is_admin() else 'Visible to leadership' }}</small></article>
+  </div>
+
+  <nav class="endgame-tabs {{ 'has-admin-audit' if current_member_name()|lower == 'imaven' }}" aria-label="Endgame sections">
+    <button class="active" type="button" data-endgame-tab="priority"><span>01</span>Priority Calculator</button>
+    <button type="button" data-endgame-tab="jobs"><span>02</span>Job Selections</button>
+    <button type="button" data-endgame-tab="events"><span>03</span>Event Log</button>
+    <button type="button" data-endgame-tab="loot"><span>04</span>Linkshell Loot</button>
+    <button type="button" data-endgame-tab="pops"><span>05</span>Linkshell Pops</button>
+    {% if current_member_name()|lower == 'imaven' %}<button type="button" data-endgame-tab="admin-audit"><span>06</span>Admin Audit</button>{% endif %}
+  </nav>
+
+  <section class="endgame-panel active" data-endgame-panel="priority">
+    <header class="panel-heading"><div><p class="eyebrow">Live decision support</p><h2>Who has priority?</h2><p>Select the receiving job and award details. Every rank includes an explanation.</p></div><span class="rule-chip">Main → Attendance → Rotation → Wins → Last win</span></header>
+    <div class="priority-controls">
+      <label>Item
+        <select id="priority-item">
+          <option value="">Select an item</option>
+          {% for area in ('Sky','Sea') %}
+            <optgroup label="{{ area }}">
+              {% for source_group in priority_items|selectattr('area','equalto',area)|groupby('source') %}
+                <option class="priority-source-heading" disabled>{{ source_group.grouper }}</option>
+                {% for item in source_group.list %}<option value="{{ item.name }}">{{ item.name }}</option>{% endfor %}
+              {% endfor %}
+            </optgroup>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Source<input id="priority-source" value="" placeholder="Select an item" readonly></label>
+      <label>Item family<input id="priority-family" value="" placeholder="Select an item" readonly></label>
+      <input id="priority-major" type="hidden" value="major">
+    </div>
+    <div class="priority-tiers" id="priority-tiers"></div>
+    <div class="priority-summary"><div><span>Calculated order</span><b id="priority-title">Black Cloak · BLM</b></div><p id="priority-note">Eligible registered BLMs ranked under the current rules.</p></div>
+    <div class="endgame-table-wrap"><table class="endgame-table priority-table"><thead><tr><th>Rank</th><th>Member</th><th>Job status</th><th>Attendance</th><th>Cooldown</th><th>Major wins</th><th>Last major win</th><th>Why here</th></tr></thead><tbody id="priority-body"></tbody></table></div>
+  </section>
+
+  <section class="endgame-panel" data-endgame-panel="jobs" hidden>
+    <header class="panel-heading"><div><p class="eyebrow">Member registration</p><h2>Job Selections & Standing</h2><p>Main and secondary priorities, attendance standing, wins, and change eligibility in one roster.</p></div><button class="button primary" id="request-job-change" type="button">Request Job Change</button></header>
+    {% if is_admin() %}<aside class="admin-inbox"><div><b>2 job-change requests need review</b><span>Leadership actions will be recorded in the permanent audit history.</span></div><button type="button">Review requests</button></aside>{% endif %}
+    <div class="roster-toolbar"><label>Find a member<input id="endgame-roster-search" placeholder="Search character or job"></label><label>Attendance tier<select id="endgame-tier-filter"><option value="">All tiers</option><option value="1">Tier 1</option><option value="2">Tier 2</option><option value="3">Tier 3</option></select></label></div>
+    <div class="endgame-table-wrap"><table class="endgame-table roster-standing-table"><thead><tr>{% for label,key,type in [('Member','name','text'),('Main','main','text'),('Secondary','secondary','text'),('Attendance','attendance','number'),('Tier','tier','number'),('Major wins','wins','number'),('Last major','last','date'),('Cooldown','cooldown','text')] %}<th><button class="roster-sort" type="button" data-roster-sort="{{ key }}" data-sort-type="{{ type }}">{{ label }} <span>Sort</span></button></th>{% endfor %}<th></th></tr><tr class="roster-column-filters"><th><input data-roster-filter="name" placeholder="Filter"></th><th><select data-roster-filter="main"><option value="">All</option>{% for job in jobs %}<option>{{ job }}</option>{% endfor %}</select></th><th><select data-roster-filter="secondary"><option value="">All</option>{% for job in jobs %}<option>{{ job }}</option>{% endfor %}</select></th><th><input type="number" min="0" max="100" data-roster-filter="attendance" data-filter-mode="min" placeholder="Min %"></th><th><select data-roster-filter="tier"><option value="">All</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></th><th><input type="number" min="0" data-roster-filter="wins" data-filter-mode="min" placeholder="Min"></th><th><input data-roster-filter="last" placeholder="YYYY-MM-DD"></th><th><select data-roster-filter="cooldown"><option value="">All</option><option value="ready">Ready</option><option value="cooldown">Cooldown</option></select></th><th><button class="clear-roster-filters" type="button">Clear</button></th></tr></thead><tbody id="endgame-roster-body">
+      {% for member in roster %}<tr data-name="{{ member.name|lower }}" data-jobs="{{ member.main_job|lower }} {{ member.secondary_job|lower }}" data-main="{{ member.main_job|lower }}" data-secondary="{{ member.secondary_job|lower }}" data-attendance="{{ member.attendance }}" data-tier="{{ member.tier }}" data-wins="{{ member.major_wins }}" data-last="{{ member.last_major_win }}" data-cooldown="{{ 'cooldown' if member.cooldown else 'ready' }}"><td><b>{{ member.name }}</b><small>Active raider</small></td><td>{% if is_admin() %}<button type="button" class="job-badge main job-editable" data-job-member="{{ member.name }}" data-job-slot="main_job" data-job-history="No changes recorded">{{ member.main_job or 'Unassigned' }}</button>{% else %}<span class="job-badge main">{{ member.main_job or 'Unassigned' }}</span>{% endif %}</td><td>{% if is_admin() %}<button type="button" class="job-badge job-editable" data-job-member="{{ member.name }}" data-job-slot="secondary_job" data-job-history="No changes recorded">{{ member.secondary_job or '—' }}</button>{% else %}<span class="job-badge">{{ member.secondary_job or '—' }}</span>{% endif %}</td><td><button class="metric-link" data-attendance="{{ member.name }}"><b>{{ member.attendance }}%</b><span>{{ member.attended }}/{{ member.eligible }} events</span></button></td><td><span class="tier tier-{{ member.tier }}">Tier {{ member.tier }}</span></td><td><button class="metric-link" data-wins="{{ member.name }}"><b>{{ member.major_wins }}</b><span>View awards</span></button></td><td>{{ member.last_major_win }}</td><td><span class="cooldown {{ 'locked' if member.cooldown else 'ready' }}">{{ 'Cooldown' if member.cooldown else 'Ready' }}</span></td><td><button class="row-menu" type="button" aria-label="Open {{ member.name }} details">•••</button></td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="endgame-panel" data-endgame-panel="events" hidden>
+    <header class="panel-heading"><div><p class="eyebrow">Official attendance record</p><h2>Event Log</h2><p>Only scheduled endgame events count toward the rolling attendance window.</p></div>{% if is_admin() %}<button class="button primary" type="button">+ Record Event</button>{% endif %}</header>
+    <div class="event-grid">
+      <article class="event-card"><time>Aug 13 <small>2026</small></time><div><span class="event-type">Imported endgame event</span><h3>Sky Operations</h3><p>Open the event to review its attendance roster and awarded loot together.</p><div class="event-meta"><b>6 loot awards</b><span>{{ roster|selectattr('attended','ge',1)|list|length }} attended</span></div></div><button type="button" data-open-event="08/13/2026" data-event-index="0" data-event-name="Sky Operations">Open event →</button></article>
+      <article class="event-card"><time>Aug 06 <small>2026</small></time><div><span class="event-type">Imported endgame event</span><h3>Sky Operations</h3><p>Open the event to review its attendance roster and awarded loot together.</p><div class="event-meta"><b>3 loot awards</b><span>{{ roster|selectattr('attended','ge',2)|list|length }} attended</span></div></div><button type="button" data-open-event="08/06/2026" data-event-index="1" data-event-name="Sky Operations">Open event →</button></article>
+    </div>
+  </section>
+
+  <section class="endgame-panel" data-endgame-panel="loot" hidden>
+    <header class="panel-heading"><div><p class="eyebrow">Permanent award history</p><h2>Linkshell Loot</h2><p>Every award records its event, recipient, family, priority path, and Major Loot status.</p></div>{% if is_admin() %}<button class="button primary" type="button">+ Record Loot</button>{% endif %}</header>
+    <div class="roster-toolbar"><label>Search awards<input id="loot-log-search" placeholder="Item, player, job, or family"></label><label>Classification<select id="loot-major-filter"><option value="">All awards</option><option value="major">Major Loot</option><option value="normal">Standard Loot</option></select></label></div>
+    <div class="endgame-table-wrap"><table class="endgame-table loot-history-table"><thead><tr>{% for label,key,type in [('Date','date','date'),('Item','item','text'),('Recipient','recipient','text'),('Job','job','text'),('Item family','family','text'),('Distribution','award','text'),('Classification','major','text')] %}<th><button class="loot-sort" type="button" data-loot-sort="{{ key }}" data-sort-type="{{ type }}">{{ label }} <span>Sort</span></button></th>{% endfor %}</tr><tr class="loot-column-filters"><th><input data-loot-filter="date" placeholder="MM/DD/YYYY"></th><th><input data-loot-filter="item" placeholder="Filter item"></th><th><input data-loot-filter="recipient" placeholder="Filter member"></th><th><select data-loot-filter="job"><option value="">All</option>{% for job in jobs %}<option>{{ job }}</option>{% endfor %}</select></th><th><input data-loot-filter="family" placeholder="Filter family"></th><th><input data-loot-filter="award" placeholder="Filter award"></th><th><select data-loot-filter="major"><option value="">All</option><option value="major">Major Loot</option><option value="normal">Standard</option></select><button class="clear-loot-filters" type="button">Clear</button></th></tr></thead><tbody id="loot-log-body">{% for award in loot %}<tr data-search="{{ (award.item ~ ' ' ~ award.player ~ ' ' ~ award.job ~ ' ' ~ award.family ~ ' ' ~ award.award)|lower }}" data-date="{{ award.date|lower }}" data-item="{{ award.item|lower }}" data-recipient="{{ award.player|lower }}" data-job="{{ award.job|lower }}" data-family="{{ award.family|lower }}" data-award="{{ award.award|lower }}" data-major="{{ 'major' if award.major else 'normal' }}"><td>{{ award.date }}</td><td><b>{{ award.item }}</b></td><td>{{ award.player }}</td><td><span class="job-badge main">{{ award.job }}</span></td><td>{{ award.family }}</td><td>{{ award.award }}</td><td><span class="loot-class {{ 'major' if award.major else 'normal' }}">{{ 'Major Loot' if award.major else 'Standard' }}</span></td></tr>{% endfor %}</tbody></table></div>
+  </section>
+
+  <section class="endgame-panel" data-endgame-panel="pops" hidden>
+    <header class="panel-heading"><div><p class="eyebrow">Shared trigger inventory</p><h2>Linkshell Pops</h2><p>Record who holds each component and immediately see which Sky and Sea encounters are ready.</p></div><label class="holder-select">Updating inventory for<select id="pop-holder">{% for member in roster %}<option value="{{ member.name }}" {{ 'selected' if member.name == current_member_name() }}>{{ member.name }}</option>{% endfor %}</select></label></header>
+    <div class="pop-area-switch"><button class="active" data-pop-area="Sky" type="button">☁ Sky</button><button data-pop-area="Sea" type="button">🌊 Sea</button></div>
+    <div class="pop-workspace">
+      <section><header class="subpanel-heading"><div><h3>Shared inventory</h3><p>Totals across every recorded holder.</p></div><span id="pop-component-count">0 components held</span></header><div id="pop-inventory" class="pop-inventory"></div></section>
+      <section><header class="subpanel-heading"><div><h3>Encounter readiness</h3><p>Complete sets and missing requirements.</p></div><span id="pop-ready-count">0 ready</span></header><div id="pop-readiness" class="pop-readiness"></div></section>
+    </div>
+  </section>
+
+  {% if current_member_name()|lower == 'imaven' %}<section class="endgame-panel" data-endgame-panel="admin-audit" hidden>
+    <header class="panel-heading"><div><p class="eyebrow">Owner-only oversight</p><h2>Administrator Change Log</h2><p>Job registrations, event attendance, and loot edits made by administrators appear here.</p></div><span class="rule-chip">Visible only to Imaven</span></header>
+    <div class="endgame-table-wrap"><table class="endgame-table"><thead><tr><th>Date and time</th><th>Administrator</th><th>Area</th><th>Action</th><th>Change details</th></tr></thead><tbody id="admin-audit-body"></tbody></table></div>
+  </section>{% endif %}
+  </div>{% endif %}
+</section>
+
+<dialog class="endgame-dialog" id="endgame-dialog"><button class="dialog-close" type="button" aria-label="Close">×</button><p class="eyebrow" id="dialog-eyebrow">Member detail</p><h2 id="dialog-title"></h2><div id="dialog-content"></div></dialog>
+<script>window.ENDGAME_ROSTER={{ (roster if can_create_guild_events() else [])|tojson }};window.ENDGAME_LOOT={{ (loot if can_create_guild_events() else [])|tojson }};window.ENDGAME_PRIORITY_ITEMS={{ (priority_items if can_create_guild_events() else [])|tojson }};window.ENDGAME_JOBS={{ (jobs if can_create_guild_events() else [])|tojson }};window.ENDGAME_IS_ADMIN={{ can_create_guild_events()|tojson }};window.ENDGAME_ACTOR={{ current_member_name()|tojson }};window.ENDGAME_IS_OWNER={{ (current_member_name()|lower == 'imaven')|tojson }};window.ENDGAME_SERVER_AUDIT={{ (persistent_audit if can_create_guild_events() else [])|tojson }};window.POP_ITEMS={{ (pop_items if can_create_guild_events() else [])|tojson }};window.POP_TARGETS={{ (pop_targets if can_create_guild_events() else [])|tojson }};</script>
+<script src="{{ url_for('static',filename='quarter_hour_picker.js',v=3) }}"></script><script src="{{ url_for('static',filename='endgame_dashboard.js',v=4) }}"></script>
+{% endblock %}

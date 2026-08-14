@@ -97,12 +97,16 @@ def test_header_uses_single_yellow_account_control(tmp_path):
     assert b"Add or Update Progress" in signed_in.data
     nav = signed_in.data.split(b'<nav class="site-nav">', 1)[1].split(b"</nav>", 1)[0]
     assert [nav.index(label) for label in (
-        b"Missions", b"Help Requests", b"My Requests", b"Loot Tables",
+        b"Requests", b"Missions", b"Loot Tables",
         b"Job Roster", b"Alliance Builder",
     )] == sorted(nav.index(label) for label in (
-        b"Missions", b"Help Requests", b"My Requests", b"Loot Tables",
+        b"Requests", b"Missions", b"Loot Tables",
         b"Job Roster", b"Alliance Builder",
     ))
+    assert b"Help Requests" not in nav
+    assert b"My Requests" not in nav
+    assert b'class="nav-section-break"' in nav
+    assert b">Operations</span>" in nav
     assert b">Members</a>" not in nav
 
     with client.session_transaction() as session:

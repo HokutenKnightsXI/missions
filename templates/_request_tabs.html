@@ -1,0 +1,4 @@
+<nav class="request-subtabs" aria-label="Request sections">
+  <a class="{{ 'active' if request.endpoint != 'my_help_requests' }}" href="{{ url_for('help_board') }}">Help Requests</a>
+  {% if is_editor() and current_member_id() %}<a class="{{ 'active' if request.endpoint == 'my_help_requests' }}" href="{{ url_for('my_help_requests') }}">My Requests</a>{% endif %}
+</nav>

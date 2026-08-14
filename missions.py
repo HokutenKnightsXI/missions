@@ -36,6 +36,18 @@ def load_local_env():
 load_local_env()
 
 
+def discord_bot_request(bot_token, method, path, payload=None):
+    """Call Discord's bot REST API and decode its JSON response."""
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    api_request = Request(
+        f"https://discord.com/api/v10{path}", data=body, method=method,
+        headers={"Authorization": f"Bot {bot_token}", "Content-Type": "application/json"},
+    )
+    with urlopen(api_request, timeout=20) as response:
+        raw = response.read()
+    return json.loads(raw.decode("utf-8")) if raw else None
+
+
 JOBS = (
     "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST",
     "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP",
@@ -113,6 +125,7 @@ LOGIN_CHARACTERS = (
     "Kaeru", "Firewater", "Anonym", "Ramenwarrior", "Kalindra", "Eunos",
     "Brewski", "Bodom", "Werx", "Palumbo", "Hikari", "Gravekeeper",
 )
+DISCORD_ADMIN_CHARACTERS = ("Imaven", "Sexualpotato", "Vlathgar")
 AVAILABILITY_MODES = {
     "now": "Today/Now — PM Me",
     "after": "Any Time After",
@@ -697,6 +710,8 @@ def create_app(test_config=None):
         DISCORD_GUILD_ID=os.environ.get("DISCORD_GUILD_ID", ""),
         DISCORD_REDIRECT_URI=os.environ.get("DISCORD_REDIRECT_URI", ""),
         DISCORD_ADMIN_USER_ID=os.environ.get("DISCORD_ADMIN_USER_ID", ""),
+        DISCORD_BOT_TOKEN=os.environ.get("DISCORD_BOT_TOKEN", ""),
+        DISCORD_EVENT_CHANNEL_ID=os.environ.get("DISCORD_EVENT_CHANNEL_ID", ""),
         CANONICAL_HOST=os.environ.get("CANONICAL_HOST", "hokutenknights.com"),
         ROSTER_REFRESH_TOKEN=os.environ.get("ROSTER_REFRESH_TOKEN", ""),
         PSXI_API_TOKEN=os.environ.get("PSXI_API_TOKEN", ""),
@@ -708,7 +723,7 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
         if test_config.get("TESTING"):
-            for key in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID", "DISCORD_REDIRECT_URI", "DISCORD_ADMIN_USER_ID"):
+            for key in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID", "DISCORD_REDIRECT_URI", "DISCORD_ADMIN_USER_ID", "DISCORD_BOT_TOKEN", "DISCORD_EVENT_CHANNEL_ID"):
                 if key not in test_config:
                     app.config[key] = ""
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
@@ -727,8 +742,20 @@ def create_app(test_config=None):
         return bool(app.config.get("AUTH_DISABLED") or session.get("is_editor") or session.get("is_admin"))
 
     def is_admin():
-        return bool(session.get("is_admin") or (
-            app.config.get("AUTH_DISABLED") and current_member_id() is None
+        if session.get("is_admin") or (app.config.get("AUTH_DISABLED") and current_member_id() is None):
+            return True
+        member_id = current_member_id()
+        if not member_id:
+            return False
+        member = get_db().execute(
+            "SELECT name, discord_user_id, discord_admin FROM members WHERE id=?",
+            (member_id,),
+        ).fetchone()
+        return bool(member and discord_ready() and (
+            member["discord_admin"]
+            or (member["discord_user_id"] and member["name"].casefold() in {
+                name.casefold() for name in DISCORD_ADMIN_CHARACTERS
+            })
         ))
 
     def discord_ready():
@@ -747,6 +774,15 @@ def create_app(test_config=None):
             return "Administrator" if is_admin() else ""
         member = get_db().execute("SELECT name FROM members WHERE id=?", (member_id,)).fetchone()
         return member["name"] if member else ("Administrator" if is_admin() else "")
+
+    def can_create_guild_events():
+        return bool(
+            is_admin()
+            and current_member_id()
+            and current_member_name().casefold() in {
+                name.casefold() for name in DISCORD_ADMIN_CHARACTERS
+            }
+        )
 
     def editor_required(view):
         @wraps(view)
@@ -772,7 +808,7 @@ def create_app(test_config=None):
     app.jinja_env.globals.update(
         csrf_token=csrf_token, is_editor=is_editor, is_admin=is_admin,
         current_member_id=current_member_id, current_member_name=current_member_name,
-        discord_ready=discord_ready,
+        discord_ready=discord_ready, can_create_guild_events=can_create_guild_events,
     )
 
     @app.before_request
@@ -832,7 +868,7 @@ def create_app(test_config=None):
                 csrf_token()
                 destination = request.form.get("next", "")
                 if not destination.startswith("/") or destination.startswith("//"):
-                    destination = url_for("index")
+                    destination = url_for("help_board")
                 return redirect(destination)
             flash("Incorrect linkshell password.", "error")
         members = get_db().execute(
@@ -918,6 +954,7 @@ def create_app(test_config=None):
         member = db.execute(
             "SELECT * FROM members WHERE discord_user_id=?", (discord_user_id,)
         ).fetchone()
+        linked_member_before_login = member is not None
         if member and member["name"].casefold() == "imaven" and not is_discord_admin:
             flash("The Imaven character is reserved for its verified Discord account.", "error")
             return redirect(url_for("discord_connect"))
@@ -968,6 +1005,19 @@ def create_app(test_config=None):
             db.commit()
             member = db.execute("SELECT * FROM members WHERE id=?", (member["id"],)).fetchone()
 
+        is_discord_admin = bool(
+            is_discord_admin or (
+                linked_member_before_login
+                and
+                member["discord_user_id"]
+                and member["name"].casefold()
+                in {name.casefold() for name in DISCORD_ADMIN_CHARACTERS[1:]}
+            )
+        )
+        db.execute("UPDATE members SET discord_admin=? WHERE id=?",
+                   (int(is_discord_admin), member["id"]))
+        db.commit()
+
         destination = session.pop("discord_oauth_next", "")
         session.clear()
         session["is_editor"] = True
@@ -978,7 +1028,7 @@ def create_app(test_config=None):
             flash(f"Welcome, {member['name']}! Your roster entry was created. Add your jobs and progress.", "success")
             return redirect(url_for("member_form", member_id=member["id"]))
         flash(f"Signed in with Discord as {member['name']}.", "success")
-        return redirect(destination or url_for("index"))
+        return redirect(destination or url_for("help_board"))
 
     @app.post("/logout")
     def logout():
@@ -1080,6 +1130,8 @@ def create_app(test_config=None):
         }
         if "owner_member_id" not in alliance_columns:
             get_db().execute("ALTER TABLE alliance_events ADD COLUMN owner_member_id INTEGER")
+        if "guild_event_id" not in alliance_columns:
+            get_db().execute("ALTER TABLE alliance_events ADD COLUMN guild_event_id INTEGER")
         slot_columns = {
             row["name"] for row in get_db().execute("PRAGMA table_info(alliance_slots)")
         }
@@ -1116,10 +1168,13 @@ def create_app(test_config=None):
             "INSERT OR IGNORE INTO members(name) VALUES (?)",
             [(name,) for name in LOGIN_CHARACTERS],
         )
+        extra_admins = tuple(name.casefold() for name in DISCORD_ADMIN_CHARACTERS[1:])
         get_db().execute(
-            "UPDATE members SET discord_admin=CASE "
-            "WHEN name='Imaven' COLLATE NOCASE AND discord_user_id=? THEN 1 ELSE 0 END",
-            (str(app.config.get("DISCORD_ADMIN_USER_ID", "")),),
+            f"UPDATE members SET discord_admin=CASE "
+            f"WHEN name='Imaven' COLLATE NOCASE AND discord_user_id=? THEN 1 "
+            f"WHEN lower(name) IN ({','.join('?' for _ in extra_admins)}) "
+            f"AND discord_user_id<>'' THEN 1 ELSE 0 END",
+            (str(app.config.get("DISCORD_ADMIN_USER_ID", "")), *extra_admins),
         )
         for old_mission, new_mission in ZILART_MISSION_MIGRATIONS.items():
             get_db().execute(
@@ -1283,6 +1338,13 @@ def create_app(test_config=None):
                                 abort(403, description="Select your character before updating progress.")
 
                         if target_member_id:
+                            target_member = db.execute(
+                                "SELECT discord_user_id FROM members WHERE id=?",
+                                (target_member_id,),
+                            ).fetchone()
+                            linked_discord_user_id = (
+                                target_member["discord_user_id"] if target_member else ""
+                            )
                             db.execute(
                                 """UPDATE members SET name=?, discord_name=?, timezone=?, availability=?,
                                    notes=?, discord_admin=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
@@ -1290,11 +1352,13 @@ def create_app(test_config=None):
                                  request.form.get("timezone", "").strip(),
                                  request.form.get("availability", "").strip(),
                                  request.form.get("notes", "").strip(),
-                                 int(
-                                     name.casefold() == "imaven"
-                                     and member["discord_user_id"]
-                                     == str(app.config.get("DISCORD_ADMIN_USER_ID", ""))
-                                 ),
+                                int(bool(linked_discord_user_id) and (
+                                     (name.casefold() == "imaven" and linked_discord_user_id
+                                      == str(app.config.get("DISCORD_ADMIN_USER_ID", "")))
+                                     or name.casefold() in {
+                                         value.casefold() for value in DISCORD_ADMIN_CHARACTERS[1:]
+                                     }
+                                 )),
                                  target_member_id),
                             )
                         else:
@@ -1401,10 +1465,19 @@ def create_app(test_config=None):
         for row in member_rows:
             roster.setdefault(row["id"], {"id": row["id"], "name": row["name"], "jobs": {}})
             roster[row["id"]]["jobs"][row["job"]] = row["level"]
+        guild_events = []
+        for row in db.execute(
+            "SELECT id,name,start_at,location FROM guild_events WHERE status='Scheduled' ORDER BY start_at"
+        ).fetchall():
+            item = dict(row)
+            item["signup_ids"] = [signup["member_id"] for signup in db.execute(
+                "SELECT member_id FROM guild_event_signups WHERE event_id=?", (row["id"],)
+            ).fetchall()]
+            guild_events.append(item)
         return render_template(
             "alliance_builder.html", events=events, event=event,
             assignments=assignments, roster=list(roster.values()), jobs=JOBS,
-            role_jobs=ALLIANCE_ROLE_JOBS, owner=owner,
+            role_jobs=ALLIANCE_ROLE_JOBS, owner=owner, guild_events=guild_events,
         )
 
     @app.post("/alliance-builder/save")
@@ -1416,10 +1489,18 @@ def create_app(test_config=None):
             abort(400, description="Enter an event name up to 80 characters.")
         event_at_value = request.form.get("event_at", "").strip()
         event_at = parse_local_datetime(event_at_value)
-        if event_at_value and not event_at:
-            abort(400, description="Choose a valid event date and time.")
+        if event_at_value and (not event_at or event_at.minute % 15):
+            abort(400, description="Choose an event time in a 15-minute interval.")
         notes = request.form.get("notes", "").strip()[:1000]
         db = get_db()
+        guild_event_value = request.form.get("guild_event_id", "").strip()
+        guild_event_id = None
+        if guild_event_value:
+            if not guild_event_value.isdigit() or not db.execute(
+                "SELECT 1 FROM guild_events WHERE id=?", (guild_event_value,)
+            ).fetchone():
+                abort(400, description="Choose a valid guild event.")
+            guild_event_id = int(guild_event_value)
         event_id = request.form.get("event_id", "")
         if event_id:
             if not event_id.isdigit() or not db.execute(
@@ -1427,15 +1508,15 @@ def create_app(test_config=None):
                     (event_id, owner["id"])).fetchone():
                 abort(404)
             db.execute(
-                "UPDATE alliance_events SET name=?,event_at=?,notes=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_member_id=?",
-                (name, event_at.isoformat(timespec="minutes") if event_at else None, notes,
+                "UPDATE alliance_events SET name=?,event_at=?,notes=?,guild_event_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_member_id=?",
+                (name, event_at.isoformat(timespec="minutes") if event_at else None, notes, guild_event_id,
                  event_id, owner["id"]),
             )
             event_id = int(event_id)
         else:
             event_id = db.execute(
-                "INSERT INTO alliance_events(owner_member_id,name,event_at,notes) VALUES(?,?,?,?)",
-                (owner["id"], name, event_at.isoformat(timespec="minutes") if event_at else None, notes),
+                "INSERT INTO alliance_events(owner_member_id,guild_event_id,name,event_at,notes) VALUES(?,?,?,?,?)",
+                (owner["id"], guild_event_id, name, event_at.isoformat(timespec="minutes") if event_at else None, notes),
             ).lastrowid
 
         roster_jobs = {
@@ -1548,6 +1629,317 @@ def create_app(test_config=None):
             jobs=JOBS, filter_job=filter_job, min_level=min_level,
             sort_job=sort_job, direction=direction, level_75_counts=level_75_counts,
         )
+
+    @app.get("/endgame")
+    @editor_required
+    def endgame_dashboard():
+        """Interactive prototype for the linkshell's endgame operations hub."""
+        roster_source = (
+            ("Sexualpotato", "BLM", "", 2, 2), ("Vlathgar", "SMN", "MNK", 2, 2),
+            ("Soyabean", "BST", "", 2, 2), ("Chickenbanana", "MNK", "", 2, 2),
+            ("Alecy", "RDM", "", 2, 1), ("Rhode", "WAR", "DRK", 2, 1),
+            ("Shiru", "SMN", "RDM", 2, 0), ("Venenua", "RNG", "", 2, 2),
+            ("Teeje", "BRD", "", 2, 2), ("Mygas", "THF", "NIN", 2, 2),
+            ("Starnack", "WHM", "SMN", 2, 0), ("HMP", "RDM", "", 2, 0),
+            ("Ivalin", "BLM", "THF", 2, 2), ("Cartuja", "NIN", "BLM", 2, 2),
+            ("Thorkell", "MNK", "", 2, 0), ("Shurgajoe", "NIN", "PLD", 2, 2),
+            ("Zanth", "BLM", "", 2, 0), ("Zaelin", "PLD", "DRG", 2, 0),
+            ("Kaeru", "NIN", "THF", 2, 1), ("Firewater", "RNG", "", 2, 2),
+            ("Anonym", "PLD", "", 2, 2), ("Ramenwarrior", "PLD", "", 2, 2),
+            ("Kalindra", "SMN", "", 2, 0), ("Eunos", "THF", "BRD", 2, 1),
+            ("Brewski", "BLM", "DRG", 2, 0), ("Bodom", "SAM", "", 2, 2),
+            ("Werx", "BST", "", 2, 0), ("Hikari", "DRG", "WHM", 2, 2),
+            ("Gravekeeper", "WAR", "", 2, 1), ("Boshu", "RNG", "", 2, 2),
+            ("Chonk", "RDM", "BLM", 2, 1), ("Desier", "WHM", "", 2, 1),
+            ("Wizzaro", "RDM", "", 2, 1), ("Anshul", "", "", 2, 1),
+            ("Escii", "BRD", "THF", 2, 1), ("Imaven", "", "", 2, 2),
+            ("Tarantula", "", "", 2, 2),
+        )
+        wins = {
+            "Chickenbanana": (2, "08/13/2026", True),
+            "Ramenwarrior": (2, "08/13/2026", True),
+            "Vlathgar": (1, "08/13/2026", True),
+            "Cartuja": (1, "08/13/2026", True),
+            "Ivalin": (1, "08/06/2026", False),
+            "Anonym": (1, "08/06/2026", False),
+        }
+        prototype_roster = []
+        for name, main_job, secondary_job, eligible, attended in roster_source:
+            percentage = round(attended * 100 / eligible) if eligible else 0
+            major_wins, last_win, cooldown = wins.get(name, (0, "—", False))
+            prototype_roster.append({
+                "name": name, "main_job": main_job, "secondary_job": secondary_job,
+                "eligible": eligible, "attended": attended, "attendance": percentage,
+                "tier": 1 if percentage >= 75 else 2 if percentage >= 50 else 3,
+                "major_wins": major_wins, "last_major_win": last_win,
+                "cooldown": cooldown,
+            })
+        prototype_loot = (
+            {"date": "08/06/2026", "player": "Chickenbanana", "item": "Dryadic Abjuration: Hands", "family": "Hands", "major": True, "job": "MNK", "award": "Main priority"},
+            {"date": "08/06/2026", "player": "Ivalin", "item": "Aquarian Abjuration: Hands", "family": "Hands", "major": True, "job": "BLM", "award": "Main priority"},
+            {"date": "08/06/2026", "player": "Anonym", "item": "Martial Abjuration: Hands", "family": "Hands", "major": True, "job": "PLD", "award": "Main priority"},
+            {"date": "08/13/2026", "player": "Ramenwarrior", "item": "Martial Abjuration: Hands", "family": "Hands", "major": True, "job": "PLD", "award": "Main priority"},
+            {"date": "08/13/2026", "player": "Cartuja", "item": "Genbu's Kabuto", "family": "Head", "major": True, "job": "NIN", "award": "Main priority"},
+            {"date": "08/13/2026", "player": "Chickenbanana", "item": "Dryadic Abjuration: Feet", "family": "Feet", "major": True, "job": "MNK", "award": "Main priority"},
+            {"date": "08/13/2026", "player": "Wizzaro", "item": "Genbu's Shield", "family": "Other", "major": False, "job": "RDM", "award": "Freelot"},
+            {"date": "08/13/2026", "player": "Vlathgar", "item": "Aquarian Abjuration: Legs", "family": "Legs", "major": True, "job": "SMN", "award": "Main priority"},
+            {"date": "08/13/2026", "player": "Ramenwarrior", "item": "Martial Abjuration: Head", "family": "Head", "major": True, "job": "PLD", "award": "Main priority"},
+        )
+        pop_items = (
+            {"key": "gem-east", "area": "Sky", "name": "Gem of the East", "source": "Steam Cleaner"},
+            {"key": "springstone", "area": "Sky", "name": "Springstone", "source": "Mother Globe"},
+            {"key": "gem-south", "area": "Sky", "name": "Gem of the South", "source": "Brigandish Blade"},
+            {"key": "summerstone", "area": "Sky", "name": "Summerstone", "source": "Faust"},
+            {"key": "gem-west", "area": "Sky", "name": "Gem of the West", "source": "Despot"},
+            {"key": "autumnstone", "area": "Sky", "name": "Autumnstone", "source": "Ullikummi"},
+            {"key": "gem-north", "area": "Sky", "name": "Gem of the North", "source": "Zipacna"},
+            {"key": "winterstone", "area": "Sky", "name": "Winterstone", "source": "Olla Grande"},
+            {"key": "seal-seiryu", "area": "Sky", "name": "Seal of Seiryu", "source": "Seiryu"},
+            {"key": "seal-suzaku", "area": "Sky", "name": "Seal of Suzaku", "source": "Suzaku"},
+            {"key": "seal-byakko", "area": "Sky", "name": "Seal of Byakko", "source": "Byakko"},
+            {"key": "seal-genbu", "area": "Sky", "name": "Seal of Genbu", "source": "Genbu"},
+            {"key": "curtana", "area": "Sky", "name": "Curtana", "source": "Treasure Coffer"},
+            {"key": "diorite", "area": "Sky", "name": "Diorite", "source": "Aura Statue"},
+            {"key": "romeave-water", "area": "Sky", "name": "Ro'Maeve Water", "source": "Aura Pot"},
+            {"key": "ghrah-chip", "area": "Sea", "name": "Ghrah M Chip", "source": "Ghrah", "bundle": 12},
+            {"key": "hq-euvhi", "area": "Sea", "name": "High-Quality Euvhi Organ", "source": "Euvhi"},
+            {"key": "first-virtue", "area": "Sea", "name": "First Virtue", "source": "Jailer of Temperance"},
+            {"key": "second-virtue", "area": "Sea", "name": "Second Virtue", "source": "Jailer of Fortitude"},
+            {"key": "third-virtue", "area": "Sea", "name": "Third Virtue", "source": "Jailer of Faith"},
+            {"key": "deed-moderation", "area": "Sea", "name": "Deed of Moderation", "source": "Ix'aern (DRK)"},
+            {"key": "deed-placidity", "area": "Sea", "name": "Deed of Placidity", "source": "Ix'aern (MNK)"},
+            {"key": "deed-sensibility", "area": "Sea", "name": "Deed of Sensibility", "source": "Ix'aern (DRG)"},
+            {"key": "hq-xzomit", "area": "Sea", "name": "High-Quality Xzomit Organ", "source": "Xzomit"},
+            {"key": "hq-phuabo", "area": "Sea", "name": "High-Quality Phuabo Organ", "source": "Phuabo"},
+            {"key": "hq-hpemde", "area": "Sea", "name": "High-Quality Hpemde Organ", "source": "Hpemde"},
+            {"key": "fourth-virtue", "area": "Sea", "name": "Fourth Virtue", "source": "Jailer of Justice"},
+            {"key": "fifth-virtue", "area": "Sea", "name": "Fifth Virtue", "source": "Jailer of Hope"},
+            {"key": "sixth-virtue", "area": "Sea", "name": "Sixth Virtue", "source": "Jailer of Prudence"},
+        )
+        pop_targets = (
+            {"area": "Sky", "name": "Seiryu", "requires": ("gem-east", "springstone")},
+            {"area": "Sky", "name": "Suzaku", "requires": ("gem-south", "summerstone")},
+            {"area": "Sky", "name": "Byakko", "requires": ("gem-west", "autumnstone")},
+            {"area": "Sky", "name": "Genbu", "requires": ("gem-north", "winterstone")},
+            {"area": "Sky", "name": "Kirin", "requires": ("seal-seiryu", "seal-suzaku", "seal-byakko", "seal-genbu")},
+            {"area": "Sea", "name": "Jailer of Fortitude", "requires": ("ghrah-chip:12",)},
+            {"area": "Sea", "name": "Jailer of Faith", "requires": ("hq-euvhi",)},
+            {"area": "Sea", "name": "Jailer of Justice", "requires": ("second-virtue", "deed-moderation", "hq-xzomit")},
+            {"area": "Sea", "name": "Jailer of Hope", "requires": ("first-virtue", "deed-placidity", "hq-phuabo")},
+            {"area": "Sea", "name": "Jailer of Prudence", "requires": ("third-virtue", "deed-sensibility", "hq-hpemde")},
+            {"area": "Sea", "name": "Jailer of Love", "requires": ("fourth-virtue", "fifth-virtue", "sixth-virtue")},
+        )
+        priority_items = (
+            {"area": "Sky", "source": "Byakko", "name": "Byakko's Haidate", "p1": ("NIN", "WAR", "SAM", "MNK"), "p2": ("BST", "BRD"), "p3": ()},
+            {"area": "Sky", "source": "Byakko", "name": "Byakko's Axe", "p1": ("WAR",), "p2": (), "p3": ()},
+            {"area": "Sky", "source": "Byakko", "name": "Hecatomb Mittens", "p1": ("THF", "WAR"), "p2": ("DRK",), "p3": ("BRD",)},
+            {"area": "Sky", "source": "Byakko", "name": "Shura Haidate", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
+            {"area": "Sky", "source": "Byakko", "name": "Adaman Sollerets", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
+            {"area": "Sky", "source": "Seiryu", "name": "Zenith Crown", "p1": ("BLM",), "p2": ("RDM", "WHM", "SMN"), "p3": ("BRD",)},
+            {"area": "Sky", "source": "Seiryu", "name": "Seiryu's Kote", "p1": ("RNG",), "p2": ("SAM", "NIN"), "p3": ()},
+            {"area": "Sky", "source": "Seiryu", "name": "Seiryu's Sword", "p1": (), "p2": (), "p3": (), "freelot": True},
+            {"area": "Sky", "source": "Seiryu", "name": "Crimson Finger Gauntlets", "p1": ("COR", "RNG"), "p2": ("RDM",), "p3": ("DRK",)},
+            {"area": "Sky", "source": "Suzaku", "name": "Zenith Slacks", "p1": ("BLM",), "p2": ("RDM", "SMN"), "p3": ("BRD",)},
+            {"area": "Sky", "source": "Suzaku", "name": "Shura Zunari Kabuto", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
+            {"area": "Sky", "source": "Suzaku", "name": "Koenig Schaller", "p1": ("PLD",), "p2": ("WAR",), "p3": ()},
+            {"area": "Sky", "source": "Suzaku", "name": "Suzaku's Sune-Ate", "p1": ("BRD",), "p2": ("RNG", "SAM", "NIN"), "p3": ()},
+            {"area": "Sky", "source": "Genbu", "name": "Hecatomb Leggings", "p1": ("THF", "DRK", "WAR"), "p2": ("BRD",), "p3": ()},
+            {"area": "Sky", "source": "Genbu", "name": "Shura Kote", "p1": ("MNK", "SAM", "NIN"), "p2": (), "p3": ()},
+            {"area": "Sky", "source": "Genbu", "name": "Adaman Celata", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
+            {"area": "Sky", "source": "Genbu", "name": "Genbu's Shield", "p1": ("RDM",), "p2": ("WHM", "BLU"), "p3": ()},
+            {"area": "Sky", "source": "Genbu", "name": "Genbu's Kabuto", "p1": ("WAR", "MNK"), "p2": ("BRD",), "p3": ()},
+            {"area": "Sky", "source": "Genbu", "name": "Zenith Mitts", "p1": ("BLM",), "p2": ("RDM",), "p3": ("SMN",)},
+            {"area": "Sky", "source": "Genbu", "name": "Koenig Handschuhs", "p1": ("PLD",), "p2": ("WAR",), "p3": ()},
+            {"area": "Sky", "source": "Genbu", "name": "Crimson Greaves", "p1": ("PLD",), "p2": ("RDM", "RNG"), "p3": ()},
+            {"area": "Sky", "source": "Kirin", "name": "Kirin's Osode", "p1": ("RNG", "SAM"), "p2": ("WAR",), "p3": ("BRD", "NIN")},
+            {"area": "Sky", "source": "Kirin", "name": "Kirin's Pole", "p1": ("BLM",), "p2": ("RDM",), "p3": ("MNK",)},
+            {"area": "Sky", "source": "Kirin", "name": "Shura Togi", "p1": ("MNK",), "p2": ("SAM",), "p3": ()},
+            {"area": "Sky", "source": "Kirin", "name": "Hecatomb Harness", "p1": ("THF", "DRK"), "p2": ("WAR",), "p3": ()},
+            {"area": "Sky", "source": "Kirin", "name": "Crimson Cuisses", "p1": ("PLD",), "p2": ("RDM",), "p3": ("RNG", "COR")},
+            {"area": "Sea", "source": "Jailer of Faith", "name": "Faith Torque", "p1": ("MNK",), "p2": ("RNG", "COR"), "p3": ("THF", "WHM")},
+            {"area": "Sea", "source": "Jailer of Justice", "name": "Justice Torque", "p1": ("DRK", "SAM"), "p2": (), "p3": ()},
+            {"area": "Sea", "source": "Jailer of Hope", "name": "Hope Torque", "p1": ("NIN", "RNG"), "p2": ("THF",), "p3": ("SAM",)},
+            {"area": "Sea", "source": "Jailer of Prudence", "name": "Prudence Torque", "p1": ("DRK", "BLM"), "p2": ("RDM",), "p3": ("BLU",)},
+            {"area": "Sea", "source": "Jailer of Fortitude", "name": "Fortitude Torque", "p1": ("WAR",), "p2": ("DRK", "BLU"), "p3": ("RDM",)},
+            {"area": "Sea", "source": "Jailer of Temperance", "name": "Temperance Torque", "p1": ("BST",), "p2": ("WAR",), "p3": ()},
+            {"area": "Sea", "source": "Jailer of Love", "name": "Love Torque", "p1": ("DRG", "THF"), "p2": ("COR",), "p3": ("BRD",)},
+            {"area": "Sea", "source": "Jailer of Love", "name": "Novio Earring", "p1": ("BLM",), "p2": ("RDM", "BLU", "NIN", "COR"), "p3": ()},
+            {"area": "Sea", "source": "Jailer of Love", "name": "Novia Earring", "p1": ("WHM",), "p2": ("PLD", "THF", "NIN"), "p3": ("RDM", "SMN")},
+        )
+        item_families = {
+            "Byakko's Haidate": "Legs", "Byakko's Axe": "Weapons", "Hecatomb Mittens": "Hands", "Shura Haidate": "Legs",
+            "Zenith Crown": "Head", "Seiryu's Kote": "Hands", "Seiryu's Sword": "Weapons", "Crimson Finger Gauntlets": "Hands",
+            "Zenith Slacks": "Legs", "Shura Zunari Kabuto": "Head", "Koenig Schaller": "Head", "Suzaku's Sune-Ate": "Feet",
+            "Hecatomb Leggings": "Feet", "Shura Kote": "Hands", "Adaman Celata": "Head", "Adaman Sollerets": "Feet", "Genbu's Shield": "Other",
+            "Genbu's Kabuto": "Head", "Zenith Mitts": "Hands", "Koenig Handschuhs": "Hands", "Crimson Greaves": "Feet",
+            "Kirin's Osode": "Body", "Kirin's Pole": "Weapons", "Shura Togi": "Body", "Hecatomb Harness": "Body", "Crimson Cuisses": "Legs",
+        }
+        for priority_item in priority_items:
+            priority_item["family"] = item_families.get(priority_item["name"], "Accessories")
+        guild_events = []
+        for row in get_db().execute(
+            """SELECT e.*, m.name creator_name,
+                      COUNT(DISTINCT s.member_id) signup_count,
+                      COUNT(DISTINCT CASE WHEN a.attended=1 THEN a.member_id END) attendance_count
+               FROM guild_events e JOIN members m ON m.id=e.creator_member_id
+               LEFT JOIN guild_event_signups s ON s.event_id=e.id
+               LEFT JOIN guild_event_attendance a ON a.event_id=e.id
+               GROUP BY e.id ORDER BY e.start_at, e.id"""
+        ).fetchall():
+            event_data = dict(row)
+            event_data["signups"] = [dict(item) for item in get_db().execute(
+                """SELECT m.id,m.name FROM guild_event_signups s JOIN members m ON m.id=s.member_id
+                   WHERE s.event_id=? ORDER BY m.name COLLATE NOCASE""", (row["id"],)
+            ).fetchall()]
+            event_data["attendance"] = [item["member_id"] for item in get_db().execute(
+                "SELECT member_id FROM guild_event_attendance WHERE event_id=? AND attended=1", (row["id"],)
+            ).fetchall()]
+            guild_events.append(event_data)
+        calendar_members = [dict(row) for row in get_db().execute(
+            "SELECT id,name FROM members ORDER BY name COLLATE NOCASE"
+        ).fetchall()]
+        persistent_audit = [dict(row) for row in get_db().execute(
+            """SELECT l.created_at at,COALESCE(m.name,'Administrator') actor,l.area,l.action,l.details
+               FROM admin_change_log l LEFT JOIN members m ON m.id=l.actor_member_id
+               ORDER BY l.id DESC LIMIT 250"""
+        ).fetchall()]
+        persistent_audit.reverse()
+        return render_template(
+            "endgame_dashboard.html", roster=prototype_roster,
+            loot=prototype_loot, pop_items=pop_items, pop_targets=pop_targets,
+            priority_items=priority_items, jobs=JOBS, guild_events=guild_events,
+            calendar_members=calendar_members,
+            discord_events_enabled=bool(app.config.get("DISCORD_BOT_TOKEN")),
+            discord_announcements_enabled=bool(app.config.get("DISCORD_EVENT_CHANNEL_ID")),
+            persistent_audit=persistent_audit,
+        )
+
+    @app.post("/endgame/events/new")
+    @admin_required
+    def create_guild_event():
+        if not can_create_guild_events():
+            abort(403, description="Only designated event administrators can create guild events.")
+        creator = require_member_identity()
+        name = request.form.get("name", "").strip()
+        description = request.form.get("description", "").strip()[:1000]
+        location = request.form.get("location", "").strip()[:100] or "Hokuten Knights"
+        start_at = parse_local_datetime(request.form.get("start_at", ""))
+        if not name or len(name) > 100 or not start_at or start_at.minute % 15:
+            abort(400, description="Enter an event name and choose a start time in a 15-minute interval.")
+        # Discord requires an end timestamp for external scheduled events.
+        # Keep that implementation detail out of the form and use a standard window.
+        end_at = start_at + timedelta(hours=3)
+        discord_event_id = ""
+        token = app.config.get("DISCORD_BOT_TOKEN", "")
+        if token:
+            channel_id = str(app.config.get("DISCORD_EVENT_CHANNEL_ID", "")).strip()
+            payload = {
+                "name": name, "description": description or None,
+                "privacy_level": 2, "entity_type": 3, "channel_id": None,
+                "entity_metadata": {"location": location},
+                "scheduled_start_time": start_at.replace(tzinfo=EASTERN_TIME).isoformat(),
+                "scheduled_end_time": end_at.replace(tzinfo=EASTERN_TIME).isoformat(),
+            }
+            try:
+                discord_event = discord_bot_request(
+                    token, "POST", f"/guilds/{app.config['DISCORD_GUILD_ID']}/scheduled-events", payload,
+                )
+                discord_event_id = str(discord_event.get("id", ""))
+            except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+                flash("The website event was saved, but Discord could not create its scheduled event.", "error")
+            if discord_event_id and channel_id:
+                event_url = f"https://discord.com/events/{app.config['DISCORD_GUILD_ID']}/{discord_event_id}"
+                timestamp = int(start_at.replace(tzinfo=EASTERN_TIME).timestamp())
+                announcement = (
+                    f"## {name}\n"
+                    f"**When:** <t:{timestamp}:F> (<t:{timestamp}:R>)\n"
+                    f"**Gather Location:** {location}\n"
+                    f"{description + chr(10) if description else ''}"
+                    f"[View Event & Sign Up]({event_url})"
+                )
+                try:
+                    discord_bot_request(
+                        token, "POST", f"/channels/{channel_id}/messages",
+                        {"content": announcement[:2000], "allowed_mentions": {"parse": []}},
+                    )
+                except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+                    flash("The Discord event was created, but its channel announcement could not be posted.", "error")
+        event_id = get_db().execute(
+            """INSERT INTO guild_events
+               (creator_member_id,name,description,start_at,end_at,location,discord_event_id)
+               VALUES(?,?,?,?,?,?,?)""",
+            (creator["id"], name, description, start_at.isoformat(timespec="minutes"),
+             end_at.isoformat(timespec="minutes"), location, discord_event_id),
+        ).lastrowid
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (creator["id"], "Event Calendar", "Event created", f"{name} / {start_at.isoformat(timespec='minutes')}"),
+        )
+        get_db().commit()
+        flash(f"Created {name}{' in Discord and on the website' if discord_event_id else ' on the website'}.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+
+    @app.post("/endgame/events/<int:event_id>/sync")
+    @admin_required
+    def sync_guild_event(event_id):
+        if not can_create_guild_events():
+            abort(403, description="Only designated event administrators can synchronize guild events.")
+        event = get_db().execute("SELECT * FROM guild_events WHERE id=?", (event_id,)).fetchone()
+        if not event:
+            abort(404)
+        if not event["discord_event_id"] or not app.config.get("DISCORD_BOT_TOKEN"):
+            abort(400, description="This event is not connected to Discord.")
+        try:
+            users = discord_bot_request(
+                app.config["DISCORD_BOT_TOKEN"], "GET",
+                f"/guilds/{app.config['DISCORD_GUILD_ID']}/scheduled-events/{event['discord_event_id']}/users?limit=100&with_member=true",
+            ) or []
+        except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+            flash("Discord signups could not be refreshed.", "error")
+            return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+        discord_ids = [str(item.get("user", {}).get("id", "")) for item in users]
+        get_db().execute("DELETE FROM guild_event_signups WHERE event_id=? AND source='Discord'", (event_id,))
+        if discord_ids:
+            placeholders = ",".join("?" for _ in discord_ids)
+            members = get_db().execute(
+                f"SELECT id FROM members WHERE discord_user_id IN ({placeholders})", discord_ids
+            ).fetchall()
+            get_db().executemany(
+                "INSERT OR REPLACE INTO guild_event_signups(event_id,member_id,source) VALUES(?,?,'Discord')",
+                [(event_id, row["id"]) for row in members],
+            )
+        actor = require_member_identity()
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "Event Calendar", "Discord signups synced", f"Event #{event_id}: {len(users)} interested"),
+        )
+        get_db().commit()
+        flash(f"Synced {len(users)} Discord signup(s).", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+
+    @app.post("/endgame/events/<int:event_id>/attendance")
+    @admin_required
+    def update_guild_event_attendance(event_id):
+        if not can_create_guild_events():
+            abort(403, description="Only designated event administrators can update attendance.")
+        if not get_db().execute("SELECT 1 FROM guild_events WHERE id=?", (event_id,)).fetchone():
+            abort(404)
+        updater = require_member_identity()
+        member_ids = {int(value) for value in request.form.getlist("member_ids") if value.isdigit()}
+        valid_ids = {row["id"] for row in get_db().execute("SELECT id FROM members").fetchall()}
+        member_ids &= valid_ids
+        get_db().execute("DELETE FROM guild_event_attendance WHERE event_id=?", (event_id,))
+        get_db().executemany(
+            "INSERT INTO guild_event_attendance(event_id,member_id,attended,updated_by) VALUES(?,?,1,?)",
+            [(event_id, member_id, updater["id"]) for member_id in sorted(member_ids)],
+        )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (updater["id"], "Event Attendance", "Attendance updated", f"Event #{event_id}: {len(member_ids)} attended"),
+        )
+        get_db().commit()
+        flash("Event attendance updated.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
 
     @app.get("/api/job-roster/members")
     def job_roster_members_api():
