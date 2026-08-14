@@ -19,6 +19,42 @@ BLUE_SPELL_MODS_SOURCE = f"{LSB_SQL_BASE}/blue_spell_mods.sql"
 BLUE_TRAITS_SOURCE = f"{LSB_SQL_BASE}/blue_traits.sql"
 BLUE_SPELL_SCRIPTS_API = "https://api.github.com/repos/LandSandBoat/server/contents/scripts/actions/spells/blue?ref=base"
 OUTPUT = Path("static/blue_spell_farming.json")
+HORIZON_SPELL_CARD_SOURCE = (
+    "https://drive.google.com/drive/folders/"
+    "1ywDWD8cixd0L-JW-pVmWa3EeHlF_R70s"
+)
+
+# Horizon's ToAU spell cards are newer than the retail/LSB metadata used to
+# seed this catalog. Values here intentionally win whenever the sources differ.
+# Normal traits use LSB's internal weight (card value / 4); Auto Refresh keeps
+# its raw card weight, matching the special scale used by blue_spellbook.js.
+HORIZON_SPELL_OVERRIDES = {
+    "auroral drape": {
+        "spell_level": 42, "set_points": 4, "set_stats": ["INT+1"],
+        "trait": "Fast Cast", "trait_weight": 1,
+    },
+    "blank gaze": {"trait": "Magic Attack Bonus", "trait_weight": 1},
+    "blitzstrahl": {"trait": "Magic Accuracy Bonus", "trait_weight": 1},
+    "blood drain": {"trait": "Conserve MP", "trait_weight": 1},
+    "blood saber": {
+        "set_points": 3, "trait": "Auto Refresh", "trait_weight": 4,
+    },
+    "bomb toss": {"trait": "Magic Accuracy Bonus", "trait_weight": 1},
+    "empty thrash": {
+        "spell_level": 34, "set_points": 3, "set_stats": ["STR+1"],
+        "trait": "Max HP Boost", "trait_weight": 1,
+    },
+    "geist wall": {"trait": "Auto Refresh", "trait_weight": 4},
+    "infrasonics": {"trait": "Magic Accuracy Bonus", "trait_weight": 1},
+    "metallic body": {
+        "set_points": 3, "set_stats": [], "trait": "Conserve MP",
+        "trait_weight": 1,
+    },
+    "occultation": {
+        "spell_level": 38, "set_points": 3, "set_stats": [],
+        "trait": "Evasion Bonus", "trait_weight": 1,
+    },
+}
 
 DENIED_ZONE_PARTS = (
     "abyssea", "escha", "reisenjima", "ceizak", "yahse", "foret de hennetiel",
@@ -280,9 +316,10 @@ def build(rows: list[dict], metadata: dict[str, dict] | None = None,
     catalog = []
     seen = set()
     for row in rows:
-        spell_level = clean_level(row.get("spell_level"))
-        zone = clean_zone(row.get("zone"))
         spell = " ".join(str(row.get("name") or "").split())
+        horizon_override = HORIZON_SPELL_OVERRIDES.get(spell.casefold(), {})
+        spell_level = horizon_override.get("spell_level", clean_level(row.get("spell_level")))
+        zone = clean_zone(row.get("zone"))
         monster = " ".join(str(row.get("monster_name") or "").split())
         if not spell_level or spell_level > 75 or not zone or not spell or not monster:
             continue
@@ -293,7 +330,11 @@ def build(rows: list[dict], metadata: dict[str, dict] | None = None,
             continue
         seen.add(key)
         cap = blue_magic_cap(spell_level)
-        spell_metadata = metadata.get(spell.casefold(), {})
+        spell_metadata = {
+            **metadata.get(spell.casefold(), {}),
+            **{key: value for key, value in horizon_override.items()
+               if key != "spell_level"},
+        }
         combat = combat_metadata.get(spell.casefold(), {})
         catalog.append({
             "spell": spell,
@@ -319,6 +360,7 @@ def build(rows: list[dict], metadata: dict[str, dict] | None = None,
     return {
         "source": SOURCE,
         "horizon_rule_source": "https://horizonffxi.wiki/Category:Blue_Magic",
+        "horizon_spell_card_source": HORIZON_SPELL_CARD_SOURCE,
         "blue_metadata_source": BLUE_SPELL_LIST_SOURCE,
         "combat_metadata_source": BLUE_SPELL_SCRIPTS_API,
         "era": "Original through Treasures of Aht Urhgan; level cap 75",
