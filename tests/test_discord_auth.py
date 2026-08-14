@@ -69,6 +69,7 @@ def test_existing_character_is_linked_without_duplicate(monkeypatch, tmp_path):
     mock_discord(monkeypatch, "imaven")
     response = client.get(f"/discord/callback?code=valid&state={state}", follow_redirects=True)
     assert b"Signed in with Discord as Imaven" in response.data
+    assert b"Linkshell Help Requests" in response.data
     assert b"Alliance Builder" in response.data
     assert b">Members</a>" not in response.data
     with client.session_transaction() as session:
@@ -187,12 +188,18 @@ def test_shared_member_password_is_disabled_when_discord_is_configured(tmp_path)
     assert "/discord/connect" in rejected.location
 
 
-def test_startup_removes_admin_access_from_everyone_except_imaven(tmp_path):
+def test_startup_limits_admin_access_to_verified_admin_characters(tmp_path):
     app = discord_app(tmp_path)
     database = sqlite3.connect(app.config["DATABASE"])
     database.execute("UPDATE members SET discord_admin=1")
     database.execute(
         "UPDATE members SET discord_user_id='discord-123' WHERE name='Imaven'"
+    )
+    database.execute(
+        "UPDATE members SET discord_user_id='discord-sexualpotato' WHERE name='Sexualpotato'"
+    )
+    database.execute(
+        "UPDATE members SET discord_user_id='discord-vlathgar' WHERE name='Vlathgar'"
     )
     database.commit()
     database.close()
@@ -203,4 +210,23 @@ def test_startup_removes_admin_access_from_everyone_except_imaven(tmp_path):
         "SELECT name FROM members WHERE discord_admin=1 ORDER BY name"
     ).fetchall()
     database.close()
-    assert admins == [("Imaven",)]
+    assert admins == [("Imaven",), ("Sexualpotato",), ("Vlathgar",)]
+
+
+def test_linked_privileged_character_signs_in_as_admin(monkeypatch, tmp_path):
+    app = discord_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute(
+        "UPDATE members SET discord_user_id='discord-vlathgar' WHERE name='Vlathgar'"
+    )
+    database.commit()
+    database.close()
+
+    client = app.test_client()
+    state = begin_discord_login(client)
+    mock_discord(monkeypatch, "Vlathgar", "discord-vlathgar")
+    response = client.get(f"/discord/callback?code=valid&state={state}")
+    assert response.status_code == 302
+    assert response.location.endswith("/help-requests")
+    with client.session_transaction() as session:
+        assert session["is_admin"] is True

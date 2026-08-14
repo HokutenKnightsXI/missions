@@ -1,13 +1,14 @@
 {% extends 'base.html' %}
 {% block title %}Help Requests · Missions{% endblock %}
 {% block content %}
+{% include '_request_tabs.html' %}
 <section class="help-hero">
   <div><p class="eyebrow">Linkshell help board</p><h1>Linkshell Help Requests</h1><p>Find a party, volunteer, or schedule help across any FFXI activity.</p></div>
   <div class="help-actions">
     {% if is_admin() %}
       <form method="post" action="{{ url_for('set_identity') }}" class="identity-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="next" value="{{ url_for('create_help_request') }}"><label>Character<select name="member_id" required><option value="">Create on behalf of…</option>{% for member in members %}<option value="{{ member.id }}" {{ 'selected' if current_member_id() == member.id }}>{{ member.name }}</option>{% endfor %}</select></label><button class="button primary">Create Request</button></form>
     {% elif is_editor() and current_member %}
-      <div class="signed-character"><span>Character</span><b>{{ current_member.name }}</b></div><a class="button" href="{{ url_for('my_help_requests') }}">My Requests</a><a class="button primary" href="{{ url_for('create_help_request') }}">Create Request</a>
+      <div class="signed-character"><span>Character</span><b>{{ current_member.name }}</b></div><a class="button primary" href="{{ url_for('create_help_request') }}">Create Request</a>
     {% else %}<a class="button primary" href="{{ url_for('login', next=url_for('create_help_request')) }}">Sign in to request help</a>{% endif %}
   </div>
 </section>

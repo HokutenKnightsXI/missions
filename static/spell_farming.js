@@ -2,6 +2,30 @@
   const body = document.querySelector("#spell-results");
   if (!body) return;
 
+  const learnedCollapse = document.querySelector("#learned-spells-collapse");
+  const learnedContent = document.querySelector("#learned-spells-content");
+  if (learnedCollapse && learnedContent) {
+    learnedCollapse.addEventListener("click", () => {
+      const isOpen = learnedCollapse.getAttribute("aria-expanded") === "true";
+      learnedCollapse.setAttribute("aria-expanded", String(!isOpen));
+      learnedCollapse.setAttribute("aria-label", `${isOpen ? "Expand" : "Collapse"} My Learned Spells`);
+      learnedCollapse.innerHTML = isOpen ? "&#9656;" : "&#9662;";
+      learnedContent.hidden = isOpen;
+    });
+  }
+
+  const filtersCollapse = document.querySelector("#spell-filters-collapse");
+  const filtersContent = document.querySelector("#spell-filters-content");
+  if (filtersCollapse && filtersContent) {
+    filtersCollapse.addEventListener("click", () => {
+      const isOpen = filtersCollapse.getAttribute("aria-expanded") === "true";
+      filtersCollapse.setAttribute("aria-expanded", String(!isOpen));
+      filtersCollapse.setAttribute("aria-label", `${isOpen ? "Expand" : "Collapse"} Search and Filters`);
+      filtersCollapse.innerHTML = isOpen ? "&#9656;" : "&#9662;";
+      filtersContent.hidden = isOpen;
+    });
+  }
+
   const form = document.querySelector("#spell-ownership-form");
   const learned = new Set(window.LEARNED_BLUE_SPELLS || []);
   const learnedList = document.querySelector("#learned-spells-list");

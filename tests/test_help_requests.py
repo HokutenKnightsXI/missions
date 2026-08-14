@@ -180,8 +180,22 @@ def test_my_requests_view_includes_created_requests(app):
     assert response.status_code == 200
     assert b"Requests You Made" in response.data
     assert b"Requests You Volunteered For" in response.data
+    assert b'class="request-subtabs"' in response.data
+    assert b">Help Requests</a>" in response.data
+    assert b">My Requests</a>" in response.data
     assert b"Under Observation" in response.data
     assert b"0 interested helpers" in response.data
+
+
+def test_requests_is_first_navigation_tab_and_brand_destination(app):
+    client = app.test_client()
+    owner = add_member(client, "Maven", RDM=75)
+    identify(client, owner)
+    response = client.get("/help-requests")
+    page = response.data.decode()
+    nav = page.split('<nav class="site-nav">', 1)[1].split("</nav>", 1)[0]
+    assert nav.index(">Requests</a>") < nav.index(">Missions</a>")
+    assert 'class="brand" href="/help-requests"' in page
 
 
 def test_my_requests_separates_volunteered_requests(app):

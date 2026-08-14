@@ -106,12 +106,14 @@ CREATE TABLE IF NOT EXISTS loot_ownership (
 CREATE TABLE IF NOT EXISTS alliance_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     owner_member_id INTEGER,
+    guild_event_id INTEGER,
     name TEXT NOT NULL,
     event_at TEXT,
     notes TEXT NOT NULL DEFAULT '',
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (owner_member_id) REFERENCES members(id) ON DELETE CASCADE
+    FOREIGN KEY (owner_member_id) REFERENCES members(id) ON DELETE CASCADE,
+    FOREIGN KEY (guild_event_id) REFERENCES guild_events(id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS alliance_slots (
@@ -127,6 +129,55 @@ CREATE TABLE IF NOT EXISTS alliance_slots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_alliance_events_date ON alliance_events(event_at, updated_at);
+
+CREATE TABLE IF NOT EXISTS guild_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    creator_member_id INTEGER NOT NULL,
+    name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    start_at TEXT NOT NULL,
+    end_at TEXT NOT NULL,
+    location TEXT NOT NULL DEFAULT 'Hokuten Knights',
+    status TEXT NOT NULL DEFAULT 'Scheduled',
+    discord_event_id TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (creator_member_id) REFERENCES members(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS guild_event_signups (
+    event_id INTEGER NOT NULL,
+    member_id INTEGER NOT NULL,
+    source TEXT NOT NULL DEFAULT 'Discord',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (event_id, member_id),
+    FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS guild_event_attendance (
+    event_id INTEGER NOT NULL,
+    member_id INTEGER NOT NULL,
+    attended INTEGER NOT NULL DEFAULT 1 CHECK(attended IN (0,1)),
+    updated_by INTEGER,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (event_id, member_id),
+    FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+    FOREIGN KEY (updated_by) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_guild_events_start ON guild_events(start_at, status);
+
+CREATE TABLE IF NOT EXISTS admin_change_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    actor_member_id INTEGER,
+    area TEXT NOT NULL,
+    action TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (actor_member_id) REFERENCES members(id) ON DELETE SET NULL
+);
 
 CREATE TABLE IF NOT EXISTS blue_spell_ownership (
     member_id INTEGER NOT NULL,

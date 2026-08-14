@@ -2,6 +2,7 @@
 {% block title %}My Requests · Hokuten Knights{% endblock %}
 {% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='my_requests.css') }}">{% endblock %}
 {% block content %}
+{% include '_request_tabs.html' %}
 <section class="help-hero my-requests-hero">
   <div>
     <p class="eyebrow">{{ member.name }}</p>
