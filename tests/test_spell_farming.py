@@ -3,7 +3,7 @@ import sqlite3
 from pathlib import Path
 
 from build_blue_spell_farming import (
-    blue_magic_cap, build, parse_blue_metadata, parse_combat_metadata,
+    HORIZON_SPELL_CARD_SOURCE, blue_magic_cap, build, parse_blue_metadata, parse_combat_metadata,
     parse_physical_damage_type, parse_spell_description, parse_spell_effects,
 )
 from missions import create_app
@@ -25,6 +25,34 @@ def test_catalog_excludes_post_toau_zones_and_derives_minimum_skill():
     ])
     assert len(payload["rows"]) == 1
     assert payload["rows"][0]["minimum_skill"] == 247
+
+
+def test_horizon_spell_cards_override_retail_blue_magic_metadata():
+    metadata = {
+        "blood saber": {"set_points": 2, "set_stats": ["HP-5", "MP+5"],
+                        "trait": None, "trait_weight": 0},
+        "geist wall": {"set_points": 3, "set_stats": ["HP-5", "MP+10"],
+                       "trait": None, "trait_weight": 0},
+        "occultation": {"set_points": 3, "set_stats": ["VIT+2"],
+                        "trait": None, "trait_weight": 0},
+    }
+    payload = build([
+        {"spell_level": 48, "name": "Blood Saber", "monster_name": "Skeleton",
+         "zone": "Gusgen Mines", "min_level": "20", "max_level": "24"},
+        {"spell_level": 46, "name": "Geist Wall", "monster_name": "Lizard",
+         "zone": "Yhoator Jungle", "min_level": "30", "max_level": "34"},
+        {"spell_level": 88, "name": "Occultation", "monster_name": "Seether",
+         "zone": "Promyvion - Dem", "min_level": "31", "max_level": "38"},
+    ], metadata)
+    spells = {row["spell"]: row for row in payload["rows"]}
+    assert spells["Blood Saber"]["set_points"] == 3
+    assert spells["Blood Saber"]["trait"] == "Auto Refresh"
+    assert spells["Blood Saber"]["trait_weight"] == 4
+    assert spells["Geist Wall"]["trait"] == "Auto Refresh"
+    assert spells["Geist Wall"]["trait_weight"] == 4
+    assert spells["Occultation"]["spell_level"] == 38
+    assert spells["Occultation"]["trait"] == "Evasion Bonus"
+    assert payload["horizon_spell_card_source"] == HORIZON_SPELL_CARD_SOURCE
 
 
 def test_blue_metadata_parser_adds_set_cost_stats_and_trait():
@@ -136,13 +164,20 @@ def test_spell_farming_page_and_generated_catalog(tmp_path):
 
     payload = json.loads(Path("static/blue_spell_farming.json").read_text(encoding="utf-8"))
     assert len(payload["rows"]) > 500
-    assert len({row["spell"] for row in payload["rows"]}) == 100
+    assert len({row["spell"] for row in payload["rows"]}) == 103
     assert all(row["spell_level"] <= 75 for row in payload["rows"])
     assert all(row["set_points"] is not None for row in payload["rows"])
     foot_kick = next(row for row in payload["rows"] if row["spell"] == "Foot Kick")
     assert foot_kick["set_points"] == 2
     assert foot_kick["set_stats"] == ["AGI+1"]
     assert foot_kick["trait"] == "Lizard Killer"
+    blood_saber = next(row for row in payload["rows"] if row["spell"] == "Blood Saber")
+    assert blood_saber["set_points"] == 3
+    assert blood_saber["trait"] == "Auto Refresh"
+    assert blood_saber["trait_weight"] == 4
+    assert {"Auroral Drape", "Empty Thrash", "Occultation"} <= {
+        row["spell"] for row in payload["rows"]
+    }
     head_butt = next(row for row in payload["rows"] if row["spell"] == "Head Butt")
     assert "Stun" in head_butt["description"]
     assert head_butt["effects"] == ["Stun"]
