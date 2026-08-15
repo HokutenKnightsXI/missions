@@ -52,6 +52,22 @@ def discord_bot_request(bot_token, method, path, payload=None):
     return json.loads(raw.decode("utf-8")) if raw else None
 
 
+def hokuten_event_bot_request(base_url, api_token, method, path, payload=None):
+    """Call the private Hokuten Event Bot API."""
+    body = json.dumps(payload).encode("utf-8") if payload is not None else None
+    api_request = Request(
+        f"{base_url.rstrip('/')}{path}", data=body, method=method,
+        headers={
+            "Authorization": f"Bearer {api_token}",
+            "Content-Type": "application/json",
+            "User-Agent": "HokutenKnightsDashboard/1.0",
+        },
+    )
+    with urlopen(api_request, timeout=25) as response:
+        raw = response.read()
+    return json.loads(raw.decode("utf-8")) if raw else None
+
+
 JOBS = (
     "WAR", "MNK", "WHM", "BLM", "RDM", "THF", "PLD", "DRK", "BST",
     "BRD", "RNG", "SAM", "NIN", "DRG", "SMN", "BLU", "COR", "PUP",
@@ -716,6 +732,8 @@ def create_app(test_config=None):
         DISCORD_ADMIN_USER_ID=os.environ.get("DISCORD_ADMIN_USER_ID", ""),
         DISCORD_BOT_TOKEN=os.environ.get("DISCORD_BOT_TOKEN", ""),
         DISCORD_EVENT_CHANNEL_ID=os.environ.get("DISCORD_EVENT_CHANNEL_ID", ""),
+        HOKUTEN_EVENT_BOT_API_URL=os.environ.get("HOKUTEN_EVENT_BOT_API_URL", ""),
+        HOKUTEN_EVENT_BOT_API_TOKEN=os.environ.get("HOKUTEN_EVENT_BOT_API_TOKEN", ""),
         CANONICAL_HOST=os.environ.get("CANONICAL_HOST", "hokutenknights.com"),
         ROSTER_REFRESH_TOKEN=os.environ.get("ROSTER_REFRESH_TOKEN", ""),
         PSXI_API_TOKEN=os.environ.get("PSXI_API_TOKEN", ""),
@@ -727,7 +745,7 @@ def create_app(test_config=None):
     if test_config:
         app.config.update(test_config)
         if test_config.get("TESTING"):
-            for key in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID", "DISCORD_REDIRECT_URI", "DISCORD_ADMIN_USER_ID", "DISCORD_BOT_TOKEN", "DISCORD_EVENT_CHANNEL_ID"):
+            for key in ("DISCORD_CLIENT_ID", "DISCORD_CLIENT_SECRET", "DISCORD_GUILD_ID", "DISCORD_REDIRECT_URI", "DISCORD_ADMIN_USER_ID", "DISCORD_BOT_TOKEN", "DISCORD_EVENT_CHANNEL_ID", "HOKUTEN_EVENT_BOT_API_URL", "HOKUTEN_EVENT_BOT_API_TOKEN"):
                 if key not in test_config:
                     app.config[key] = ""
     Path(app.instance_path).mkdir(parents=True, exist_ok=True)
@@ -1105,6 +1123,16 @@ def create_app(test_config=None):
             get_db().execute(
                 "ALTER TABLE guild_events ADD COLUMN discord_message_id TEXT NOT NULL DEFAULT ''"
             )
+        signup_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(guild_event_signups)")
+        }
+        for column, definition in (
+            ("rsvp_status", "TEXT NOT NULL DEFAULT 'going'"),
+            ("selected_job", "TEXT NOT NULL DEFAULT ''"),
+            ("discord_name", "TEXT NOT NULL DEFAULT ''"),
+        ):
+            if column not in signup_columns:
+                get_db().execute(f"ALTER TABLE guild_event_signups ADD COLUMN {column} {definition}")
         get_db().execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_members_discord_user_id "
             "ON members(discord_user_id) WHERE discord_user_id<>''"
@@ -1543,10 +1571,29 @@ def create_app(test_config=None):
             "SELECT id,name,start_at,location FROM guild_events WHERE status='Scheduled' ORDER BY start_at"
         ).fetchall():
             item = dict(row)
-            item["signup_ids"] = [signup["member_id"] for signup in db.execute(
-                "SELECT member_id FROM guild_event_signups WHERE event_id=?", (row["id"],)
-            ).fetchall()]
+            event_start = parse_local_datetime(item["start_at"])
+            item["is_upcoming"] = bool(
+                event_start and event_start >= datetime.now().replace(second=0, microsecond=0)
+            )
+            signups = db.execute(
+                """SELECT member_id,rsvp_status,selected_job,discord_name
+                   FROM guild_event_signups WHERE event_id=?""", (row["id"],)
+            ).fetchall()
+            item["signup_ids"] = [signup["member_id"] for signup in signups
+                                  if signup["rsvp_status"] in ("going", "maybe")]
+            item["signup_details"] = {
+                str(signup["member_id"]): {
+                    "status": signup["rsvp_status"], "job": signup["selected_job"],
+                    "discord_name": signup["discord_name"],
+                }
+                for signup in signups if signup["rsvp_status"] in ("going", "maybe")
+            }
             guild_events.append(item)
+        guild_events = (
+            sorted((item for item in guild_events if item["is_upcoming"]), key=lambda item: item["start_at"])
+            + sorted((item for item in guild_events if not item["is_upcoming"]),
+                     key=lambda item: item["start_at"], reverse=True)
+        )
         return render_template(
             "alliance_builder.html", events=events, event=event,
             assignments=assignments, roster=list(roster.values()), jobs=JOBS,
@@ -1866,6 +1913,8 @@ def create_app(test_config=None):
         for row in get_db().execute(
             """SELECT e.*, m.name creator_name,
                       COUNT(DISTINCT s.member_id) signup_count,
+                      COUNT(DISTINCT CASE WHEN s.rsvp_status='going' THEN s.member_id END) going_count,
+                      COUNT(DISTINCT CASE WHEN s.rsvp_status='maybe' THEN s.member_id END) maybe_count,
                       COUNT(DISTINCT CASE WHEN a.attended=1 THEN a.member_id END) attendance_count
                FROM guild_events e JOIN members m ON m.id=e.creator_member_id
                LEFT JOIN guild_event_signups s ON s.event_id=e.id
@@ -1878,9 +1927,34 @@ def create_app(test_config=None):
                 event_start and event_start >= datetime.now().replace(second=0, microsecond=0)
             )
             event_data["signups"] = [dict(item) for item in get_db().execute(
-                """SELECT m.id,m.name FROM guild_event_signups s JOIN members m ON m.id=s.member_id
+                """SELECT m.id,m.name,s.rsvp_status,s.selected_job,s.discord_name
+                   FROM guild_event_signups s JOIN members m ON m.id=s.member_id
                    WHERE s.event_id=? ORDER BY m.name COLLATE NOCASE""", (row["id"],)
             ).fetchall()]
+            role_groups = (
+                ("Tanks", ("NIN", "PLD")),
+                ("Damage Dealers", ("WAR", "SAM", "MNK", "DRK", "BST", "DRG")),
+                ("Ranged DD", ("RNG",)),
+                ("Healing", ("WHM", "RDM")),
+                ("Magic Damage", ("BLM",)),
+                ("Support", ("BRD",)),
+                ("Utility", ("SMN", "COR", "PUP", "BLU")),
+                ("Treasure Hunter", ("THF",)),
+                ("Job Not Selected", ("",)),
+            )
+            active_signups = [
+                signup for signup in event_data["signups"]
+                if signup["rsvp_status"] in ("going", "maybe")
+            ]
+            event_data["signup_groups"] = [
+                {"name": group_name, "members": [
+                    signup for signup in active_signups if signup["selected_job"] in group_jobs
+                ]}
+                for group_name, group_jobs in role_groups
+            ]
+            event_data["declined_signups"] = [
+                signup for signup in event_data["signups"] if signup["rsvp_status"] == "cant"
+            ]
             event_data["attendance"] = [item["member_id"] for item in get_db().execute(
                 "SELECT member_id FROM guild_event_attendance WHERE event_id=? AND attended=1", (row["id"],)
             ).fetchall()]
@@ -1981,7 +2055,10 @@ def create_app(test_config=None):
             calendar_members=calendar_members,
             pending_job_requests=pending_job_requests,
             own_job_request=dict(own_job_request) if own_job_request else None,
-            discord_events_enabled=bool(app.config.get("DISCORD_BOT_TOKEN")),
+            discord_events_enabled=bool(
+                app.config.get("HOKUTEN_EVENT_BOT_API_URL") and
+                app.config.get("HOKUTEN_EVENT_BOT_API_TOKEN")
+            ) or bool(app.config.get("DISCORD_BOT_TOKEN")),
             discord_announcements_enabled=bool(app.config.get("DISCORD_EVENT_CHANNEL_ID")),
             persistent_audit=persistent_audit,
             member_details=member_details,
@@ -1999,14 +2076,44 @@ def create_app(test_config=None):
         start_at = parse_local_datetime(request.form.get("start_at", ""))
         if not name or len(name) > 100 or not start_at or start_at.minute % 15:
             abort(400, description="Enter an event name and choose a start time in a 15-minute interval.")
+        if start_at.replace(tzinfo=EASTERN_TIME) <= datetime.now(EASTERN_TIME):
+            abort(400, description="Choose an event date and time in the future.")
         # Discord requires an end timestamp for external scheduled events.
         # Keep that implementation detail out of the form and use a standard window.
         end_at = start_at + timedelta(hours=3)
         discord_event_id = ""
         discord_message_id = ""
         token = app.config.get("DISCORD_BOT_TOKEN", "")
-        if token:
-            channel_id = str(app.config.get("DISCORD_EVENT_CHANNEL_ID", "")).strip()
+        channel_id = str(app.config.get("DISCORD_EVENT_CHANNEL_ID", "")).strip()
+        event_bot_api_url = str(app.config.get("HOKUTEN_EVENT_BOT_API_URL", "")).strip()
+        event_bot_api_token = str(app.config.get("HOKUTEN_EVENT_BOT_API_TOKEN", "")).strip()
+        if event_bot_api_url and event_bot_api_token:
+            api_payload = {
+                "name": name,
+                "description": description,
+                "date": start_at.strftime("%A %B %d %Y"),
+                "time": start_at.strftime("%I:%M %p").lstrip("0"),
+                "duration": "3",
+                "host": creator["name"],
+                "channel": "endgame-events-only",
+            }
+            try:
+                api_event = hokuten_event_bot_request(
+                    event_bot_api_url, event_bot_api_token, "POST", "/api/events", api_payload,
+                ) or {}
+                api_result = api_event.get("event", api_event)
+                discord_event_id = str(
+                    api_result.get("discord_event_id") or api_result.get("scheduled_event_id") or
+                    api_result.get("event_id") or ""
+                )
+                discord_message_id = str(
+                    api_result.get("discord_message_id") or api_result.get("message_id") or ""
+                )
+                if not discord_message_id:
+                    raise ValueError("The event bot response did not include a message ID.")
+            except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
+                flash("The website event was saved, but Hokuten Event Bot could not register it.", "error")
+        elif token:
             payload = {
                 "name": name, "description": description or None,
                 "privacy_level": 2, "entity_type": 3, "channel_id": None,
@@ -2078,7 +2185,7 @@ def create_app(test_config=None):
             (creator["id"], "Event Calendar", "Event created", f"{name} / {start_at.isoformat(timespec='minutes')}"),
         )
         get_db().commit()
-        flash(f"Created {name}{' in Discord and on the website' if discord_event_id else ' on the website'}.", "success")
+        flash(f"Created {name}{' in Discord and on the website' if (discord_event_id or discord_message_id) else ' on the website'}.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
 
     @app.post("/endgame/events/<int:event_id>/delete")
@@ -2134,34 +2241,70 @@ def create_app(test_config=None):
         event = get_db().execute("SELECT * FROM guild_events WHERE id=?", (event_id,)).fetchone()
         if not event:
             abort(404)
-        if not event["discord_event_id"] or not app.config.get("DISCORD_BOT_TOKEN"):
+        api_ready = bool(
+            event["discord_message_id"]
+            and app.config.get("HOKUTEN_EVENT_BOT_API_URL")
+            and app.config.get("HOKUTEN_EVENT_BOT_API_TOKEN")
+        )
+        discord_ready_for_sync = bool(event["discord_event_id"] and app.config.get("DISCORD_BOT_TOKEN"))
+        if not api_ready and not discord_ready_for_sync:
             abort(400, description="This event is not connected to Discord.")
         try:
-            users = discord_bot_request(
-                app.config["DISCORD_BOT_TOKEN"], "GET",
-                f"/guilds/{app.config['DISCORD_GUILD_ID']}/scheduled-events/{event['discord_event_id']}/users?limit=100&with_member=true",
-            ) or []
+            if api_ready:
+                api_result = hokuten_event_bot_request(
+                    app.config["HOKUTEN_EVENT_BOT_API_URL"],
+                    app.config["HOKUTEN_EVENT_BOT_API_TOKEN"], "GET",
+                    f"/api/events/{event['discord_message_id']}",
+                ) or {}
+                event_result = api_result.get("event", api_result)
+                players = event_result.get("players", {}) if isinstance(event_result, dict) else {}
+                users = [
+                    {"display_name": name, "status": details.get("status"), "job": details.get("job")}
+                    for name, details in players.items() if isinstance(details, dict)
+                ]
+            else:
+                users = discord_bot_request(
+                    app.config["DISCORD_BOT_TOKEN"], "GET",
+                    f"/guilds/{app.config['DISCORD_GUILD_ID']}/scheduled-events/{event['discord_event_id']}/users?limit=100&with_member=true",
+                ) or []
         except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
             flash("Discord signups could not be refreshed.", "error")
             return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
-        discord_ids = [str(item.get("user", {}).get("id", "")) for item in users]
         get_db().execute("DELETE FROM guild_event_signups WHERE event_id=? AND source='Discord'", (event_id,))
-        if discord_ids:
+        matched = []
+        if api_ready:
+            members_by_name = {
+                row["name"].casefold(): row for row in get_db().execute("SELECT id,name FROM members")
+            }
+            for item in users:
+                display_name = str(item.get("display_name", "")).strip()
+                member = members_by_name.get(display_name.casefold())
+                status = str(item.get("status") or "").strip().casefold()
+                status = {"yes": "going", "no": "cant", "can't": "cant", "cannot": "cant"}.get(status, status)
+                job = str(item.get("job") or "").strip().upper()
+                if member and status in ("going", "maybe", "cant"):
+                    matched.append((event_id, member["id"], status, job if job in JOBS else "", display_name))
+        else:
+            discord_ids = [str(item.get("user", {}).get("id", "")) for item in users]
             placeholders = ",".join("?" for _ in discord_ids)
             members = get_db().execute(
-                f"SELECT id FROM members WHERE discord_user_id IN ({placeholders})", discord_ids
-            ).fetchall()
+                f"SELECT id,name FROM members WHERE discord_user_id IN ({placeholders})", discord_ids
+            ).fetchall() if discord_ids else []
+            matched = [(event_id, row["id"], "going", "", row["name"]) for row in members]
+        if matched:
             get_db().executemany(
-                "INSERT OR REPLACE INTO guild_event_signups(event_id,member_id,source) VALUES(?,?,'Discord')",
-                [(event_id, row["id"]) for row in members],
+                """INSERT OR REPLACE INTO guild_event_signups
+                   (event_id,member_id,source,rsvp_status,selected_job,discord_name,updated_at)
+                   VALUES(?,?,'Discord',?,?,?,CURRENT_TIMESTAMP)""", matched,
             )
         actor = require_member_identity()
         get_db().execute(
             "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
-            (actor["id"], "Event Calendar", "Discord signups synced", f"Event #{event_id}: {len(users)} interested"),
+            (actor["id"], "Event Calendar", "Discord signups synced",
+             f"Event #{event_id}: {len(users)} responses, {len(matched)} matched members"),
         )
         get_db().commit()
-        flash(f"Synced {len(users)} Discord signup(s).", "success")
+        flash(f"Synced {len(users)} Discord response(s); matched {len(matched)} roster member(s).", "success")
         return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
 
     @app.post("/endgame/events/<int:event_id>/attendance")
@@ -2199,6 +2342,57 @@ def create_app(test_config=None):
         )
         get_db().commit()
         flash("Event attendance updated.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+
+    @app.post("/endgame/events/<int:event_id>/attendance/from-signups")
+    @admin_required
+    def sync_attendance_from_signups(event_id):
+        if not can_create_guild_events():
+            abort(403, description="Only designated event administrators can update attendance.")
+        db = get_db()
+        event = db.execute("SELECT id,name FROM guild_events WHERE id=?", (event_id,)).fetchone()
+        if not event:
+            abort(404)
+        going_ids = {
+            row["member_id"] for row in db.execute(
+                """SELECT member_id FROM guild_event_signups
+                   WHERE event_id=? AND rsvp_status='going'""", (event_id,),
+            ).fetchall()
+        }
+        missing_ids = {
+            int(value) for value in request.form.getlist("missing_ids") if value.isdigit()
+        } & going_ids
+        attended_ids = going_ids - missing_ids
+        previous_ids = {
+            row["member_id"] for row in db.execute(
+                "SELECT member_id FROM guild_event_attendance WHERE event_id=? AND attended=1",
+                (event_id,),
+            ).fetchall()
+        }
+        updater = require_member_identity()
+        db.execute("DELETE FROM guild_event_attendance WHERE event_id=?", (event_id,))
+        if attended_ids:
+            db.executemany(
+                """INSERT INTO guild_event_attendance(event_id,member_id,attended,updated_by)
+                   VALUES(?,?,1,?)""",
+                [(event_id, member_id, updater["id"]) for member_id in sorted(attended_ids)],
+            )
+        names = {row["id"]: row["name"] for row in db.execute("SELECT id,name FROM members")}
+        added = [names[item] for item in sorted(attended_ids - previous_ids) if item in names]
+        removed = [names[item] for item in sorted(previous_ids - attended_ids) if item in names]
+        missing = [names[item] for item in sorted(missing_ids) if item in names]
+        db.execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (updater["id"], "Event Attendance", "Attendance synced from Discord signups",
+             f"{event['name']} / Event #{event_id}: attended {len(attended_ids)}; "
+             f"missing {', '.join(missing) or 'none'}; added {', '.join(added) or 'none'}; "
+             f"removed {', '.join(removed) or 'none'}"),
+        )
+        db.commit()
+        flash(
+            f"Attendance synced: {len(attended_ids)} attending, {len(missing_ids)} marked missing.",
+            "success",
+        )
         return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
 
     @app.post("/endgame/job-change-requests")
