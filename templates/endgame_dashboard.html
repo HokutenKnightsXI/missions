@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Endgame Operations · Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=7) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=8) }}">{% endblock %}
 {% block content %}
 <section class="endgame-shell">
   <header class="endgame-hero">
     <div><p class="eyebrow">Hokuten Knights command board</p><h1>Endgame Operations</h1><p>One shared view for loot priority, attendance, awards, job registrations, and linkshell pop readiness.</p></div>
-    <div class="prototype-flag"><b>Interactive prototype</b><span>Spreadsheet snapshot · changes stay in this browser</span></div>
   </header>
 
   <nav class="endgame-view-tabs" aria-label="Endgame dashboard views">
