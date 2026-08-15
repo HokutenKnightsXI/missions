@@ -246,6 +246,90 @@ def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(m
     assert b"Sky Gods" in alliance.data
 
 
+def test_event_bot_rsvps_include_status_and_job_in_alliance_builder(monkeypatch, tmp_path):
+    import sqlite3
+    import missions
+
+    app = make_app(tmp_path)
+    app.config.update(
+        HOKUTEN_EVENT_BOT_API_URL="https://events.example.test",
+        HOKUTEN_EVENT_BOT_API_TOKEN="shared-secret",
+    )
+    database = sqlite3.connect(app.config["DATABASE"])
+    creator_id = database.execute("SELECT id FROM members WHERE name='Imaven'").fetchone()[0]
+    event_id = database.execute(
+        """INSERT INTO guild_events
+           (creator_member_id,name,start_at,end_at,discord_message_id)
+           VALUES(?,?,?,?,?)""",
+        (creator_id, "Sea Night", "2026-08-20T20:00", "2026-08-20T23:00", "message-1"),
+    ).lastrowid
+    database.commit()
+    database.close()
+
+    def fake_event_bot(_url, _token, method, path, payload=None):
+        assert (method, path, payload) == ("GET", "/api/events/message-1", None)
+        return {"success": True, "event": {"players": {
+            "Imaven": {"status": "going", "job": "BLM"},
+            "Sexualpotato": {"status": "maybe", "job": "RDM"},
+            "Vlathgar": {"status": "cant", "job": "PLD"},
+        }}}
+
+    monkeypatch.setattr(missions, "hokuten_event_bot_request", fake_event_bot)
+    client = app.test_client()
+    sign_in(client, admin=True)
+    response = client.post(f"/endgame/events/{event_id}/sync", data={"csrf_token": "token"})
+    assert response.status_code == 302
+
+    database = sqlite3.connect(app.config["DATABASE"])
+    rows = database.execute(
+        """SELECT m.name,s.rsvp_status,s.selected_job FROM guild_event_signups s
+           JOIN members m ON m.id=s.member_id WHERE s.event_id=? ORDER BY m.name""", (event_id,),
+    ).fetchall()
+    database.close()
+    assert rows == [
+        ("Imaven", "going", "BLM"),
+        ("Sexualpotato", "maybe", "RDM"),
+        ("Vlathgar", "cant", "PLD"),
+    ]
+
+    calendar = client.get("/endgame#event-calendar")
+    assert b"Discord Alliance Signups" in calendar.data
+    assert b"Magic Damage" in calendar.data
+    assert b"Healing" in calendar.data
+    assert b"Can't Attend (1)" in calendar.data
+    assert b"Sync Signups to Attendance" in calendar.data
+    assert b"Mark absent players as Missing" in calendar.data
+
+    database = sqlite3.connect(app.config["DATABASE"])
+    imaven_id = database.execute("SELECT id FROM members WHERE name='Imaven'").fetchone()[0]
+    database.close()
+    synced = client.post(
+        f"/endgame/events/{event_id}/attendance/from-signups",
+        data={"csrf_token": "token", "missing_ids": str(imaven_id)},
+    )
+    assert synced.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute(
+        "SELECT member_id FROM guild_event_attendance WHERE event_id=?", (event_id,),
+    ).fetchall() == []
+    audit = database.execute(
+        "SELECT action,details FROM admin_change_log ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    database.close()
+    assert audit[0] == "Attendance synced from Discord signups"
+    assert "missing Imaven" in audit[1]
+
+    alliance = client.get("/alliance-builder")
+    assert b'"status": "going"' in alliance.data
+    assert b'"job": "BLM"' in alliance.data
+    assert b'"status": "maybe"' in alliance.data
+    assert b'<optgroup label="Upcoming Events">' in alliance.data
+    assert b'<optgroup label="Past Events">' in alliance.data
+    script = client.get("/static/alliance_builder.js?v=5")
+    assert b"discord-selected-job" in script.data
+    assert b"Signed up as" in script.data
+
+
 def test_designated_admin_can_edit_archived_attendance_and_loot(tmp_path):
     import sqlite3
 
@@ -337,3 +421,70 @@ def test_admin_event_delete_removes_discord_event_and_database_record(monkeypatc
     database = sqlite3.connect(app.config["DATABASE"])
     assert database.execute("SELECT 1 FROM guild_events WHERE id=?", (event_id,)).fetchone() is None
     database.close()
+
+
+def test_event_creation_prefers_private_event_bot_api(monkeypatch, tmp_path):
+    import sqlite3
+    import missions
+
+    app = make_app(tmp_path)
+    app.config.update(
+        HOKUTEN_EVENT_BOT_API_URL="https://events.example.test",
+        HOKUTEN_EVENT_BOT_API_TOKEN="shared-secret",
+        DISCORD_EVENT_CHANNEL_ID="channel-id",
+        DISCORD_BOT_TOKEN="discord-token",
+    )
+    calls = []
+
+    def fake_event_api(base_url, token, method, path, payload=None):
+        calls.append((base_url, token, method, path, payload))
+        return {"success": True, "event": {
+            "scheduled_event_id": "scheduled-1", "message_id": "message-1",
+        }}
+
+    monkeypatch.setattr(missions, "hokuten_event_bot_request", fake_event_api)
+    monkeypatch.setattr(
+        missions, "discord_bot_request",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("direct Discord fallback used")),
+    )
+    client = app.test_client()
+    sign_in(client, admin=True)
+    response = client.post("/endgame/events/new", data={
+        "csrf_token": "token", "name": "API Sky", "description": "Test",
+        "start_at": "2026-08-20T20:00", "location": "Ru'Aun Gardens",
+    })
+    assert response.status_code == 302
+    assert calls[0][0:4] == (
+        "https://events.example.test", "shared-secret", "POST", "/api/events",
+    )
+    assert calls[0][4]["duration"] == "3"
+    assert calls[0][4]["date"] == "Thursday August 20 2026"
+    assert calls[0][4]["time"] == "8:00 PM"
+    assert calls[0][4]["channel"] == "endgame-events-only"
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute(
+        "SELECT discord_event_id,discord_message_id FROM guild_events WHERE name='API Sky'"
+    ).fetchone() == ("scheduled-1", "message-1")
+    database.close()
+
+
+def test_event_creation_rejects_past_time_before_calling_discord(monkeypatch, tmp_path):
+    import missions
+
+    app = make_app(tmp_path)
+    app.config.update(
+        HOKUTEN_EVENT_BOT_API_URL="https://events.example.test",
+        HOKUTEN_EVENT_BOT_API_TOKEN="shared-secret",
+    )
+    monkeypatch.setattr(
+        missions, "hokuten_event_bot_request",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("event API called")),
+    )
+    client = app.test_client()
+    sign_in(client, admin=True)
+    response = client.post("/endgame/events/new", data={
+        "csrf_token": "token", "name": "Past Event",
+        "start_at": "2020-01-01T20:00", "location": "Hokuten Knights",
+    })
+    assert response.status_code == 400
+    assert b"Choose an event date and time in the future" in response.data
