@@ -1969,10 +1969,17 @@ def create_app(test_config=None):
                    WHERE l.event_id=? ORDER BY l.id""", (row["id"],)
             ).fetchall()]
             guild_events.append(event_data)
-        completed_events = [event for event in guild_events if not event["is_upcoming"]]
+        # The Google roster is the authoritative two-event baseline through 2026-08-13.
+        # Only explicitly completed events after that snapshot extend the calculation.
+        completed_events = [
+            event for event in guild_events
+            if event["status"] == "Completed" and event["start_at"] > "2026-08-13T23:59"
+        ]
         for member in prototype_roster:
-            eligible = len(completed_events)
-            attended = sum(member["id"] in event["attendance"] for event in completed_events)
+            eligible = member["eligible"] + len(completed_events)
+            attended = member["attended"] + sum(
+                member["id"] in event["attendance"] for event in completed_events
+            )
             percentage = round(attended * 100 / eligible) if eligible else 0
             member.update({
                 "eligible": eligible,
@@ -2312,7 +2319,10 @@ def create_app(test_config=None):
     def update_guild_event_attendance(event_id):
         if not can_create_guild_events():
             abort(403, description="Only designated event administrators can update attendance.")
-        if not get_db().execute("SELECT 1 FROM guild_events WHERE id=?", (event_id,)).fetchone():
+        event = get_db().execute(
+            "SELECT id,start_at FROM guild_events WHERE id=?", (event_id,)
+        ).fetchone()
+        if not event:
             abort(404)
         updater = require_member_identity()
         member_ids = {int(value) for value in request.form.getlist("member_ids") if value.isdigit()}
@@ -2340,6 +2350,9 @@ def create_app(test_config=None):
             (updater["id"], "Event Attendance", "Attendance updated",
              f"Event #{event_id}: added {', '.join(added) or 'none'}; removed {', '.join(removed) or 'none'}; {len(member_ids)} attended"),
         )
+        event_start = parse_local_datetime(event["start_at"])
+        if event_start and event_start < datetime.now():
+            get_db().execute("UPDATE guild_events SET status='Completed' WHERE id=?", (event_id,))
         get_db().commit()
         flash("Event attendance updated.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
@@ -2350,7 +2363,9 @@ def create_app(test_config=None):
         if not can_create_guild_events():
             abort(403, description="Only designated event administrators can update attendance.")
         db = get_db()
-        event = db.execute("SELECT id,name FROM guild_events WHERE id=?", (event_id,)).fetchone()
+        event = db.execute(
+            "SELECT id,name,start_at FROM guild_events WHERE id=?", (event_id,)
+        ).fetchone()
         if not event:
             abort(404)
         going_ids = {
@@ -2388,6 +2403,9 @@ def create_app(test_config=None):
              f"missing {', '.join(missing) or 'none'}; added {', '.join(added) or 'none'}; "
              f"removed {', '.join(removed) or 'none'}"),
         )
+        event_start = parse_local_datetime(event["start_at"])
+        if event_start and event_start < datetime.now():
+            db.execute("UPDATE guild_events SET status='Completed' WHERE id=?", (event_id,))
         db.commit()
         flash(
             f"Attendance synced: {len(attended_ids)} attending, {len(missing_ids)} marked missing.",

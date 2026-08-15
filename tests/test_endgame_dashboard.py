@@ -72,8 +72,9 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert b"ENDGAME_MEMBER_DETAILS" in response.data
     assert b'data-name="alecy"' in response.data
     alecy_row = response.data.split(b'data-name="alecy"', 1)[1].split(b"</tr>", 1)[0]
-    assert b'data-attendance="100"' in alecy_row
-    assert b'data-tier="1"' in alecy_row
+    assert b'data-attendance="50"' in alecy_row
+    assert b"Interactive prototype" not in response.data
+    assert b'data-tier="2"' in alecy_row
     assert response.data.count(b"data-loot-sort=") == 7
 
 
@@ -173,6 +174,7 @@ def test_endgame_javascript_calculates_priority_and_pop_readiness(tmp_path):
     assert b"data-loot-filter" in script.data
     styles = client.get("/static/endgame_dashboard.css")
     assert b"[data-endgame-view-panel][hidden]{display:none!important}" in styles.data
+    assert b"#8d3540" in styles.data
 
 
 def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(monkeypatch, tmp_path):
