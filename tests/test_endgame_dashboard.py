@@ -425,6 +425,46 @@ def test_admin_event_delete_removes_discord_event_and_database_record(monkeypatc
     database.close()
 
 
+def test_event_delete_continues_when_discord_message_is_already_missing(monkeypatch, tmp_path):
+    import sqlite3
+    from urllib.error import HTTPError
+    import missions
+
+    app = make_app(tmp_path)
+    app.config.update(
+        DISCORD_BOT_TOKEN="bot-token", DISCORD_GUILD_ID="guild-id",
+        DISCORD_EVENT_CHANNEL_ID="channel-id",
+    )
+    calls = []
+
+    def fake_discord(_token, method, path, payload=None):
+        calls.append((method, path))
+        if "/messages/" in path:
+            raise HTTPError(path, 404, "Unknown Message", {}, None)
+        return None
+
+    monkeypatch.setattr(missions, "discord_bot_request", fake_discord)
+    database = sqlite3.connect(app.config["DATABASE"])
+    event_id = database.execute("SELECT id FROM guild_events ORDER BY id LIMIT 1").fetchone()[0]
+    database.execute(
+        "UPDATE guild_events SET discord_event_id='discord-event-1',discord_message_id='message-1' WHERE id=?",
+        (event_id,),
+    )
+    database.commit()
+    database.close()
+
+    client = app.test_client()
+    sign_in(client, admin=True)
+    response = client.post(f"/endgame/events/{event_id}/delete", data={"csrf_token": "token"})
+    assert response.status_code == 302
+    assert calls[-1] == (
+        "DELETE", "/guilds/guild-id/scheduled-events/discord-event-1",
+    )
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT 1 FROM guild_events WHERE id=?", (event_id,)).fetchone() is None
+    database.close()
+
+
 def test_event_creation_prefers_private_event_bot_api(monkeypatch, tmp_path):
     import sqlite3
     import missions

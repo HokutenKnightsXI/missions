@@ -2220,13 +2220,24 @@ def create_app(test_config=None):
                     )
                     message_id = str((match or {}).get("id", ""))
                 if message_id and channel_id:
+                    try:
+                        discord_bot_request(
+                            token, "DELETE", f"/channels/{channel_id}/messages/{message_id}",
+                        )
+                    except HTTPError as error:
+                        # Discord returns Unknown Message when a previous partial deletion
+                        # already removed the post. Continue with the scheduled event.
+                        if error.code != 404:
+                            raise
+                try:
                     discord_bot_request(
-                        token, "DELETE", f"/channels/{channel_id}/messages/{message_id}",
+                        token, "DELETE",
+                        f"/guilds/{app.config['DISCORD_GUILD_ID']}/scheduled-events/{event['discord_event_id']}",
                     )
-                discord_bot_request(
-                    token, "DELETE",
-                    f"/guilds/{app.config['DISCORD_GUILD_ID']}/scheduled-events/{event['discord_event_id']}",
-                )
+                except HTTPError as error:
+                    # Deletion is idempotent: an already-removed Discord event is success.
+                    if error.code != 404:
+                        raise
             except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
                 flash("Discord could not remove the full event and channel post, so the website event was preserved.", "error")
                 return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
