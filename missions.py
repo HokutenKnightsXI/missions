@@ -1171,6 +1171,17 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE alliance_events ADD COLUMN owner_member_id INTEGER")
         if "guild_event_id" not in alliance_columns:
             get_db().execute("ALTER TABLE alliance_events ADD COLUMN guild_event_id INTEGER")
+        for column, definition in (
+            ("share_token", "TEXT NOT NULL DEFAULT ''"),
+            ("share_enabled", "INTEGER NOT NULL DEFAULT 0"),
+            ("version", "INTEGER NOT NULL DEFAULT 1"),
+        ):
+            if column not in alliance_columns:
+                get_db().execute(f"ALTER TABLE alliance_events ADD COLUMN {column} {definition}")
+        get_db().execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_alliance_events_share_token "
+            "ON alliance_events(share_token) WHERE share_token<>''"
+        )
         slot_columns = {
             row["name"] for row in get_db().execute("PRAGMA table_info(alliance_slots)")
         }
@@ -1526,8 +1537,9 @@ def create_app(test_config=None):
         return render_template("members_admin.html", members=members)
 
     @app.get("/alliance-builder")
+    @app.get("/alliance-builder/shared/<share_token>")
     @editor_required
-    def alliance_builder():
+    def alliance_builder(share_token=""):
         owner = require_member_identity()
         db = get_db()
         events = db.execute(
@@ -1538,14 +1550,24 @@ def create_app(test_config=None):
             , (owner["id"],)
         ).fetchall()
         event = None
-        event_id = request.args.get("event", "")
-        if event_id.isdigit():
+        shared_mode = bool(share_token)
+        if shared_mode:
             event = db.execute(
-                "SELECT * FROM alliance_events WHERE id=? AND owner_member_id=?",
-                (event_id, owner["id"]),
+                """SELECT e.*,m.name owner_name FROM alliance_events e
+                   JOIN members m ON m.id=e.owner_member_id
+                   WHERE e.share_token=? AND e.share_enabled=1""", (share_token,),
             ).fetchone()
             if not event:
                 abort(404)
+        else:
+            event_id = request.args.get("event", "")
+            if event_id.isdigit():
+                event = db.execute(
+                    "SELECT e.*,m.name owner_name FROM alliance_events e JOIN members m ON m.id=e.owner_member_id WHERE e.id=? AND e.owner_member_id=?",
+                    (event_id, owner["id"]),
+                ).fetchone()
+                if not event:
+                    abort(404)
         slot_rows = db.execute(
             "SELECT party_number,slot_number,member_id,custom_name,job FROM alliance_slots WHERE event_id=?",
             (event["id"],),
@@ -1594,10 +1616,18 @@ def create_app(test_config=None):
             + sorted((item for item in guild_events if not item["is_upcoming"]),
                      key=lambda item: item["start_at"], reverse=True)
         )
+        change_history = [dict(row) for row in db.execute(
+            """SELECT l.action,l.details,l.created_at,COALESCE(m.name,'Unknown member') actor
+               FROM alliance_change_log l LEFT JOIN members m ON m.id=l.actor_member_id
+               WHERE l.event_id=? ORDER BY l.id DESC LIMIT 20""", (event["id"],),
+        ).fetchall()] if event else []
+        share_url = url_for("alliance_builder", share_token=event["share_token"], _external=True) \
+            if event and event["share_enabled"] and event["share_token"] else ""
         return render_template(
             "alliance_builder.html", events=events, event=event,
             assignments=assignments, roster=list(roster.values()), jobs=JOBS,
             role_jobs=ALLIANCE_ROLE_JOBS, owner=owner, guild_events=guild_events,
+            shared_mode=shared_mode, share_url=share_url, change_history=change_history,
         )
 
     @app.post("/alliance-builder/save")
@@ -1622,16 +1652,33 @@ def create_app(test_config=None):
                 abort(400, description="Choose a valid guild event.")
             guild_event_id = int(guild_event_value)
         event_id = request.form.get("event_id", "")
+        share_token = request.form.get("share_token", "").strip()
+        event_version = request.form.get("version", "")
         if event_id:
-            if not event_id.isdigit() or not db.execute(
-                    "SELECT 1 FROM alliance_events WHERE id=? AND owner_member_id=?",
-                    (event_id, owner["id"])).fetchone():
+            if not event_id.isdigit() or not event_version.isdigit():
                 abort(404)
-            db.execute(
-                "UPDATE alliance_events SET name=?,event_at=?,notes=?,guild_event_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND owner_member_id=?",
+            existing = db.execute(
+                "SELECT * FROM alliance_events WHERE id=?", (event_id,)
+            ).fetchone()
+            if not existing or not (
+                existing["owner_member_id"] == owner["id"]
+                or (share_token and existing["share_enabled"] and
+                    hmac.compare_digest(existing["share_token"], share_token))
+            ):
+                abort(404)
+            updated = db.execute(
+                """UPDATE alliance_events SET name=?,event_at=?,notes=?,guild_event_id=?,
+                          version=version+1,updated_at=CURRENT_TIMESTAMP
+                   WHERE id=? AND version=?""",
                 (name, event_at.isoformat(timespec="minutes") if event_at else None, notes, guild_event_id,
-                 event_id, owner["id"]),
+                 event_id, int(event_version)),
             )
+            if updated.rowcount != 1:
+                db.rollback()
+                flash("This shared alliance changed after you opened it. Reloaded the newest version; review it before saving again.", "error")
+                if share_token:
+                    return redirect(url_for("alliance_builder", share_token=share_token))
+                return redirect(url_for("alliance_builder", event=event_id))
             event_id = int(event_id)
         else:
             event_id = db.execute(
@@ -1672,11 +1719,100 @@ def create_app(test_config=None):
                 "INSERT INTO alliance_slots(event_id,party_number,slot_number,member_id,custom_name,job) VALUES(?,?,?,?,?,?)",
                 slots,
             )
+            db.execute(
+                """INSERT INTO alliance_change_log(event_id,actor_member_id,action,details)
+                   VALUES(?,?,?,?)""",
+                (event_id, owner["id"], "Layout saved", f"{len(slots)} of 18 slots assigned"),
+            )
             db.commit()
         except sqlite3.DatabaseError:
             db.rollback()
             raise
         flash(f"Saved alliance layout for {name}.", "success")
+        if share_token:
+            return redirect(url_for("alliance_builder", share_token=share_token))
+        return redirect(url_for("alliance_builder", event=event_id))
+
+    @app.post("/alliance-builder/<int:event_id>/share")
+    @editor_required
+    def share_alliance(event_id):
+        owner = require_member_identity()
+        db = get_db()
+        event = db.execute(
+            "SELECT * FROM alliance_events WHERE id=? AND owner_member_id=?",
+            (event_id, owner["id"]),
+        ).fetchone()
+        if not event:
+            abort(404)
+        token = event["share_token"]
+        if not token:
+            while True:
+                token = secrets.token_urlsafe(9)
+                if not db.execute(
+                    "SELECT 1 FROM alliance_events WHERE share_token=?", (token,)
+                ).fetchone():
+                    break
+        db.execute(
+            "UPDATE alliance_events SET share_token=?,share_enabled=1 WHERE id=?",
+            (token, event_id),
+        )
+        db.execute(
+            """INSERT INTO alliance_change_log(event_id,actor_member_id,action,details)
+               VALUES(?,?,?,?)""", (event_id, owner["id"], "Sharing enabled", "Collaborative link created"),
+        )
+        db.commit()
+        flash("Collaborative link enabled. Anyone signed into the linkshell site with the link can edit this layout.", "success")
+        return redirect(url_for("alliance_builder", share_token=token))
+
+    @app.post("/alliance-builder/<int:event_id>/share/revoke")
+    @editor_required
+    def revoke_alliance_share(event_id):
+        owner = require_member_identity()
+        db = get_db()
+        event = db.execute(
+            "SELECT name FROM alliance_events WHERE id=? AND owner_member_id=?",
+            (event_id, owner["id"]),
+        ).fetchone()
+        if not event:
+            abort(404)
+        db.execute(
+            "UPDATE alliance_events SET share_enabled=0,share_token='' WHERE id=?", (event_id,)
+        )
+        db.execute(
+            """INSERT INTO alliance_change_log(event_id,actor_member_id,action,details)
+               VALUES(?,?,?,?)""", (event_id, owner["id"], "Sharing revoked", "Collaborative link disabled"),
+        )
+        db.commit()
+        flash("Collaborative access was revoked. The old link no longer works.", "success")
+        return redirect(url_for("alliance_builder", event=event_id))
+
+    @app.post("/alliance-builder/shared/<share_token>/duplicate")
+    @editor_required
+    def duplicate_shared_alliance(share_token):
+        owner = require_member_identity()
+        db = get_db()
+        source = db.execute(
+            "SELECT * FROM alliance_events WHERE share_token=? AND share_enabled=1", (share_token,),
+        ).fetchone()
+        if not source:
+            abort(404)
+        event_id = db.execute(
+            """INSERT INTO alliance_events(owner_member_id,guild_event_id,name,event_at,notes)
+               VALUES(?,?,?,?,?)""",
+            (owner["id"], source["guild_event_id"], f"Copy of {source['name']}"[:80],
+             source["event_at"], source["notes"]),
+        ).lastrowid
+        db.execute(
+            """INSERT INTO alliance_slots(event_id,party_number,slot_number,member_id,custom_name,job)
+               SELECT ?,party_number,slot_number,member_id,custom_name,job
+               FROM alliance_slots WHERE event_id=?""", (event_id, source["id"]),
+        )
+        db.execute(
+            """INSERT INTO alliance_change_log(event_id,actor_member_id,action,details)
+               VALUES(?,?,?,?)""", (event_id, owner["id"], "Layout duplicated", f"Copied from {source['name']}"),
+        )
+        db.commit()
+        flash("Created a private copy in your saved layouts.", "success")
         return redirect(url_for("alliance_builder", event=event_id))
 
     @app.post("/alliance-builder/<int:event_id>/delete")
