@@ -158,3 +158,61 @@ def test_saved_alliances_are_private_and_deletable_from_loader(app):
         database = sqlite3.connect(app.config["DATABASE"])
         assert database.execute("SELECT COUNT(*) FROM alliance_events").fetchone()[0] == 0
         database.close()
+
+
+def test_collaborative_link_supports_shared_edits_copy_revoke_and_conflict_protection(app):
+    maven, lion = add_roster(app)
+    client = app.test_client()
+    identify(client, maven)
+    created = client.post("/alliance-builder/save", data={
+        "name": "Shared Dynamis", "member_1_1": str(maven), "job_1_1": "PLD",
+    })
+    event_id = int(created.location.split("event=")[-1])
+
+    shared = client.post(f"/alliance-builder/{event_id}/share")
+    assert shared.status_code == 302
+    assert "/alliance-builder/shared/" in shared.location
+    token = shared.location.rsplit("/", 1)[-1]
+    owner_shared_page = client.get(shared.location)
+    assert b"Shared layout is active" in owner_shared_page.data
+    assert b"Copy Link" in owner_shared_page.data
+
+    identify(client, lion)
+    collaborator_page = client.get(shared.location)
+    assert collaborator_page.status_code == 200
+    assert b"Shared by Imaven" in collaborator_page.data
+    assert b"Duplicate to My Layouts" in collaborator_page.data
+    assert f'name="share_token" value="{token}"'.encode() in collaborator_page.data
+
+    edited = client.post("/alliance-builder/save", data={
+        "event_id": str(event_id), "version": "1", "share_token": token,
+        "name": "Shared Dynamis - Updated",
+        "member_2_1": str(lion), "job_2_1": "WHM",
+    })
+    assert edited.status_code == 302 and f"/shared/{token}" in edited.location
+
+    stale = client.post("/alliance-builder/save", data={
+        "event_id": str(event_id), "version": "1", "share_token": token,
+        "name": "Stale overwrite",
+    }, follow_redirects=True)
+    assert b"changed after you opened it" in stale.data
+
+    duplicated = client.post(f"/alliance-builder/shared/{token}/duplicate")
+    assert duplicated.status_code == 302 and "event=" in duplicated.location
+    with app.app_context():
+        database = sqlite3.connect(app.config["DATABASE"])
+        assert database.execute(
+            "SELECT name,version FROM alliance_events WHERE id=?", (event_id,)
+        ).fetchone() == ("Shared Dynamis - Updated", 2)
+        assert database.execute(
+            "SELECT COUNT(*) FROM alliance_events WHERE owner_member_id=?", (lion,)
+        ).fetchone()[0] == 1
+        assert database.execute(
+            "SELECT COUNT(*) FROM alliance_change_log WHERE event_id=?", (event_id,)
+        ).fetchone()[0] >= 3
+        database.close()
+
+    identify(client, maven)
+    revoked = client.post(f"/alliance-builder/{event_id}/share/revoke")
+    assert revoked.status_code == 302
+    assert client.get(f"/alliance-builder/shared/{token}").status_code == 404

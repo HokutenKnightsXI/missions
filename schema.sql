@@ -110,6 +110,9 @@ CREATE TABLE IF NOT EXISTS alliance_events (
     name TEXT NOT NULL,
     event_at TEXT,
     notes TEXT NOT NULL DEFAULT '',
+    share_token TEXT NOT NULL DEFAULT '',
+    share_enabled INTEGER NOT NULL DEFAULT 0 CHECK(share_enabled IN (0,1)),
+    version INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (owner_member_id) REFERENCES members(id) ON DELETE CASCADE,
@@ -129,6 +132,19 @@ CREATE TABLE IF NOT EXISTS alliance_slots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_alliance_events_date ON alliance_events(event_at, updated_at);
+CREATE TABLE IF NOT EXISTS alliance_change_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    actor_member_id INTEGER,
+    action TEXT NOT NULL,
+    details TEXT NOT NULL DEFAULT '',
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES alliance_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (actor_member_id) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_alliance_change_log_event
+    ON alliance_change_log(event_id, id DESC);
 
 CREATE TABLE IF NOT EXISTS guild_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
