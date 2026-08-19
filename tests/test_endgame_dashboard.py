@@ -332,6 +332,83 @@ def test_event_bot_rsvps_include_status_and_job_in_alliance_builder(monkeypatch,
     assert b"Signed up as" in script.data
 
 
+def test_admin_can_import_discord_created_events_without_duplicates(monkeypatch, tmp_path):
+    import sqlite3
+    import missions
+
+    app = make_app(tmp_path)
+    app.config.update(
+        HOKUTEN_EVENT_BOT_API_URL="https://events.example.test",
+        HOKUTEN_EVENT_BOT_API_TOKEN="shared-secret",
+    )
+    calls = []
+
+    def fake_event_bot(_url, _token, method, path, payload=None):
+        calls.append((method, path, payload))
+        if path == "/api/events/discord-message-manual-1":
+            return {"success": True, "event": {"players": {
+                "Imaven": {"status": "going", "job": "BLM"},
+                "Sexualpotato": {"status": "maybe", "job": "RDM"},
+            }}}
+        return {"success": True, "events": [{
+            "message_id": "discord-message-manual-1",
+            "scheduled_event_id": "discord-event-manual-1",
+            "title": "⚔️ **Hokuten Knights — First LS Dynamis Run 8:00 PM EST**",
+            "date": "Wednesday August 19 2026", "time": "8:00 PM",
+            "description": "First linkshell Dynamis run", "location": "Ru'Lude Gardens",
+        }]}
+
+    monkeypatch.setattr(missions, "hokuten_event_bot_request", fake_event_bot)
+    client = app.test_client()
+    sign_in(client, admin=True)
+    page = client.get("/endgame")
+    assert b"Sync Events &amp; Signups" in page.data
+
+    first = client.post("/endgame/events/sync-discord", data={"csrf_token": "token"})
+    second = client.post("/endgame/events/sync-discord", data={"csrf_token": "token"})
+    assert first.status_code == 302 and second.status_code == 302
+    assert calls == [
+        ("GET", "/api/events", None),
+        ("GET", "/api/events/discord-message-manual-1", None),
+        ("GET", "/api/events", None),
+        ("GET", "/api/events/discord-message-manual-1", None),
+    ]
+
+    database = sqlite3.connect(app.config["DATABASE"])
+    rows = database.execute(
+        """SELECT name,start_at,location,discord_event_id,discord_message_id
+           FROM guild_events WHERE discord_message_id='discord-message-manual-1'"""
+    ).fetchall()
+    audit = database.execute(
+        "SELECT action,details FROM admin_change_log WHERE action='Discord events synchronized' ORDER BY id"
+    ).fetchall()
+    signups = database.execute(
+        """SELECT m.name,s.rsvp_status,s.selected_job FROM guild_event_signups s
+           JOIN members m ON m.id=s.member_id
+           WHERE s.event_id=(SELECT id FROM guild_events WHERE discord_message_id='discord-message-manual-1')
+           ORDER BY m.name"""
+    ).fetchall()
+    database.close()
+    assert rows == [(
+        "First LS Dynamis Run", "2026-08-19T20:00", "Ru'Lude Gardens",
+        "discord-event-manual-1", "discord-message-manual-1",
+    )]
+    assert audit[-1][1] == "0 imported / 0 linked / 0 skipped"
+    assert signups == [("Imaven", "going", "BLM"), ("Sexualpotato", "maybe", "RDM")]
+
+
+def test_discord_event_import_is_admin_only_and_requires_api_config(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=2, admin=False)
+    response = client.post("/endgame/events/sync-discord", data={"csrf_token": "token"})
+    assert response.status_code == 403
+    sign_in(client, admin=True)
+    assert client.post(
+        "/endgame/events/sync-discord", data={"csrf_token": "token"}
+    ).status_code == 400
+
+
 def test_designated_admin_can_edit_archived_attendance_and_loot(tmp_path):
     import sqlite3
 

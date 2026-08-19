@@ -146,6 +146,15 @@ CREATE TABLE IF NOT EXISTS alliance_change_log (
 CREATE INDEX IF NOT EXISTS idx_alliance_change_log_event
     ON alliance_change_log(event_id, id DESC);
 
+CREATE TABLE IF NOT EXISTS alliance_presence (
+    event_id INTEGER NOT NULL,
+    member_id INTEGER NOT NULL,
+    last_seen TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (event_id, member_id),
+    FOREIGN KEY (event_id) REFERENCES alliance_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS guild_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     creator_member_id INTEGER NOT NULL,

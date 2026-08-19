@@ -216,3 +216,67 @@ def test_collaborative_link_supports_shared_edits_copy_revoke_and_conflict_prote
     revoked = client.post(f"/alliance-builder/{event_id}/share/revoke")
     assert revoked.status_code == 302
     assert client.get(f"/alliance-builder/shared/{token}").status_code == 404
+
+
+def test_shared_alliance_live_sync_tracks_presence_attribution_and_conflicts(app):
+    maven, lion = add_roster(app)
+    client = app.test_client()
+    identify(client, maven)
+    created = client.post("/alliance-builder/save", data={
+        "name": "Live Dynamis", "member_1_1": str(maven), "job_1_1": "PLD",
+    })
+    event_id = int(created.location.split("event=")[-1])
+    shared = client.post(f"/alliance-builder/{event_id}/share")
+    token = shared.location.rsplit("/", 1)[-1]
+
+    first = client.get(f"/alliance-builder/shared/{token}/live").get_json()
+    assert first["version"] == 1
+    assert first["active_editors"][0]["name"] == "Imaven"
+
+    identify(client, lion)
+    live_page = client.get(f"/alliance-builder/shared/{token}")
+    assert b'"enabled": true' in live_page.data
+    assert b'id="alliance-live-indicator"' in live_page.data
+
+    update = client.post(
+        f"/alliance-builder/shared/{token}/live",
+        headers={"X-CSRF-Token": "test-token"},
+        json={
+            "version": 1,
+            "slots": [
+                {"party_number": 1, "slot_number": 1, "member_id": maven,
+                 "custom_name": "", "job": "PLD"},
+                {"party_number": 2, "slot_number": 1, "member_id": lion,
+                 "custom_name": "", "job": "WHM"},
+            ],
+        },
+    )
+    assert update.status_code == 200
+    payload = update.get_json()
+    assert payload["version"] == 2
+    changed = next(slot for slot in payload["slots"] if slot["party_number"] == 2)
+    assert changed["updated_by"] == lion
+    assert changed["updated_by_name"] == "Shiru"
+
+    stale = client.post(
+        f"/alliance-builder/shared/{token}/live",
+        json={"version": 1, "slots": []},
+    )
+    assert stale.status_code == 409
+    assert stale.get_json()["conflict"] is True
+    assert stale.get_json()["version"] == 2
+
+    identify(client, maven)
+    presence = client.get(f"/alliance-builder/shared/{token}/live").get_json()
+    assert {editor["name"] for editor in presence["active_editors"]} == {"Imaven", "Shiru"}
+    with app.app_context():
+        database = sqlite3.connect(app.config["DATABASE"])
+        assert database.execute(
+            "SELECT updated_by FROM alliance_slots WHERE event_id=? AND party_number=2",
+            (event_id,),
+        ).fetchone()[0] == lion
+        assert database.execute(
+            "SELECT COUNT(*) FROM alliance_change_log WHERE event_id=? AND action='Live party update'",
+            (event_id,),
+        ).fetchone()[0] == 1
+        database.close()
