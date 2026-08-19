@@ -131,7 +131,8 @@ def test_endgame_admin_controls_render_without_job_change_inbox(tmp_path):
     assert response.data.index(b">Member Detail</button>") < response.data.index(b">Item Eligibility</button>")
     assert b'class="active" type="button" data-endgame-tab="bidding-live"' in response.data
     assert b"Active Bidding" in response.data
-    assert b"Start 2-Minute Auction" in response.data
+    assert b"Auction timer" in response.data
+    assert b"Start Auction" in response.data
     roster_html = response.data.split(b'id="endgame-roster-body"', 1)[1]
     assert roster_html.index(b'data-name="alecy"') < roster_html.index(b'data-name="anonym"')
 
@@ -837,12 +838,13 @@ def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     database.close()
 
     started = client.post("/endgame/auctions", data={
-        "csrf_token": "token", "event_id": str(event_id), "boss": "Jailer of Love",
+        "csrf_token": "token", "event_id": str(event_id), "boss": "Jailer of Love", "duration_minutes": "5",
     })
     assert started.status_code == 302
     payload = client.get("/api/endgame/auctions").get_json()
     assert payload["my_balance"] == 6
     assert payload["auctions"][0]["boss"] == "Jailer of Love"
+    assert payload["auctions"][0]["ends_at"] > payload["auctions"][0]["starts_at"]
     novio = next(item for item in payload["auctions"][0]["items"] if item["item"] == "Novio Earring")
     novia = next(item for item in payload["auctions"][0]["items"] if item["item"] == "Novia Earring")
     love = next(item for item in payload["auctions"][0]["items"] if item["item"] == "Love Torque")

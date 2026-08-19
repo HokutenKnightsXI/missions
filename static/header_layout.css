@@ -26,6 +26,34 @@
   margin: 0;
 }
 
+.live-auction-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 235px;
+  margin-left: 14px;
+  padding: 7px 10px;
+  border: 1px solid #ff7373;
+  border-radius: 7px;
+  background: linear-gradient(105deg, #7b151b, #d32931, #fff0f0, #c21d28);
+  background-size: 280% 100%;
+  color: #fff;
+  font: 800 11px/1.1 Inter, sans-serif;
+  letter-spacing: .03em;
+  text-decoration: none;
+  box-shadow: 0 0 14px #ff253c88;
+  animation: live-auction-pulse 2.8s ease-in-out infinite, live-auction-sweep 5s linear infinite;
+}
+
+.live-auction-banner span { text-transform: uppercase; font-size: 9px; }
+.live-auction-banner b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.live-auction-banner em { color: #4e070b; font-style: normal; font-weight: 950; white-space: nowrap; }
+.live-auction-banner:hover { color: #fff; filter: brightness(1.12); }
+
+@keyframes live-auction-pulse { 50% { border-color: #fff; box-shadow: 0 0 23px #fff5, 0 0 30px #f52338aa; } }
+@keyframes live-auction-sweep { to { background-position: 280% 0; } }
+
 .site-nav .account-form {
   margin-left: 8px;
 }
@@ -146,6 +174,15 @@ main:has(.endgame-shell) {
     text-overflow: ellipsis;
     white-space: nowrap;
     font-size: clamp(16px, 5vw, 21px);
+  }
+
+  .live-auction-banner {
+    position: absolute;
+    top: calc(100% + 5px);
+    left: 14px;
+    right: 70px;
+    min-width: 0;
+    margin: 0;
   }
 
   .mobile-nav-toggle {
