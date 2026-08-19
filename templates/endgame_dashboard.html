@@ -35,7 +35,7 @@
     <article><span>Active roster</span><b>{{ roster|length }}</b><small>3 DKP earned per attended event</small></article>
     <article><span>Highest DKP</span><b>{{ dkp_highest }} DKP</b><small>Highest available member balance</small></article>
     <article><span>Average balance</span><b>{{ dkp_average }} DKP</b><small>Across the active roster</small></article>
-    <article><span>Bid Cap</span><b>{{ dkp_bid_cap }} DKP</b><small>Highest DKP minus average DKP</small></article>
+    <article><span>Bid Cap</span><b>{{ dkp_bid_cap }} DKP</b><small>Highest DKP minus average DKP · 20 DKP minimum</small></article>
   </div>
 
   <nav class="endgame-tabs dkp-loot-tabs" aria-label="DKP and loot sections">
@@ -74,7 +74,7 @@
       <input id="priority-major" type="hidden" value="major">
     </div>
     <div class="priority-tiers" id="priority-tiers"></div>
-    <div class="dkp-cap-visual"><div><span>Bid Cap</span><b>{{ dkp_bid_cap }} DKP</b></div><div class="dkp-cap-track"><i style="width:{{ (dkp_average / dkp_highest * 100) if dkp_highest else 0 }}%"></i></div><p>Highest <strong>{{ dkp_highest }} DKP</strong> − Average <strong>{{ dkp_average }} DKP</strong></p></div>
+    <div class="dkp-cap-visual"><div><span>Bid Cap</span><b>{{ dkp_bid_cap }} DKP</b></div><div class="dkp-cap-track"><i style="width:{{ (dkp_average / dkp_highest * 100) if dkp_highest else 0 }}%"></i></div><p>Highest <strong>{{ dkp_highest }} DKP</strong> − Average <strong>{{ dkp_average }} DKP</strong> · minimum <strong>20 DKP</strong></p></div>
     <div class="priority-summary"><div><span>Calculated order</span><b id="priority-title">Black Cloak · BLM</b></div><p id="priority-note">Eligible registered BLMs ranked under the current rules.</p></div>
     <div class="endgame-table-wrap"><table class="endgame-table priority-table"><thead><tr><th>Rank</th><th>Member</th><th>Priority tier / job</th><th>DKP</th><th>Bid status</th><th>Why here</th></tr></thead><tbody id="priority-body"></tbody></table></div>
   </section>

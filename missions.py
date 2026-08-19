@@ -117,6 +117,10 @@ ENDGAME_BASELINE_ATTENDANCE = {
     "imaven": 2, "tarantula": 2,
 }
 
+# Keeps early-event auctions meaningful while the regular highest-minus-average
+# calculation naturally takes over as DKP balances grow.
+ENDGAME_MINIMUM_BID_CAP = 20
+
 
 def discord_bot_request(bot_token, method, path, payload=None):
     """Call Discord's bot REST API and decode its JSON response."""
@@ -2572,7 +2576,7 @@ def create_app(test_config=None):
         dkp_values = [member["dkp"] for member in prototype_roster]
         dkp_highest = int(round(max(dkp_values, default=0)))
         dkp_average = int(round(sum(dkp_values) / len(dkp_values))) if dkp_values else 0
-        dkp_bid_cap = max(0, dkp_highest - dkp_average)
+        dkp_bid_cap = max(ENDGAME_MINIMUM_BID_CAP, dkp_highest - dkp_average)
         persistent_loot = [dict(row) for row in get_db().execute(
             """SELECT substr(e.start_at,6,2)||'/'||substr(e.start_at,9,2)||'/'||substr(e.start_at,1,4) date,
                       m.name player,l.item,l.family,l.classification='Major Loot' major,
@@ -2707,7 +2711,8 @@ def create_app(test_config=None):
         values = [entry["balance"] for entry in balances.values()]
         highest = max(values, default=0)
         average = int(round(sum(values) / len(values))) if values else 0
-        return {"highest": highest, "average": average, "cap": max(0, highest - average)}
+        return {"highest": highest, "average": average,
+                "cap": max(ENDGAME_MINIMUM_BID_CAP, highest - average)}
 
     def auction_item_family(name):
         lowered = name.casefold()
