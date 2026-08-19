@@ -46,6 +46,8 @@
   animation: live-auction-pulse 2.8s ease-in-out infinite, live-auction-sweep 5s linear infinite;
 }
 
+.live-auction-banner[hidden] { display: none; }
+
 .live-auction-banner span { text-transform: uppercase; font-size: 9px; }
 .live-auction-banner b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .live-auction-banner em { color: #4e070b; font-style: normal; font-weight: 950; white-space: nowrap; }
