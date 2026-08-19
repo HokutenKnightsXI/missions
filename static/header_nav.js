@@ -21,3 +21,34 @@
   });
   document.addEventListener("keydown", event => { if (event.key === "Escape") close(); });
 })();
+
+(() => {
+  const banner = document.querySelector("#live-auction-banner");
+  if (!banner) return;
+  const boss = banner.querySelector("[data-live-auction-boss]");
+  const timer = banner.querySelector("[data-live-auction-time]");
+  let activeAuction = null;
+
+  const secondsLeft = endsAt => Math.max(0, Math.ceil((Date.parse(`${endsAt}Z`) - Date.now()) / 1000));
+  const render = () => {
+    if (!activeAuction) return;
+    const seconds = secondsLeft(activeAuction.ends_at);
+    if (!seconds) { banner.hidden = true; activeAuction = null; return; }
+    boss.textContent = activeAuction.boss;
+    timer.textContent = `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+    banner.hidden = false;
+  };
+  const refresh = async () => {
+    try {
+      const response = await fetch("/api/endgame/auctions", {headers: {Accept: "application/json"}});
+      if (!response.ok) return;
+      const payload = await response.json();
+      activeAuction = payload.auctions?.find(auction => auction.status === "Active" && !auction.paused) || null;
+      banner.hidden = !activeAuction;
+      render();
+    } catch (_) { banner.hidden = true; }
+  };
+  refresh();
+  setInterval(refresh, 5000);
+  setInterval(render, 1000);
+})();

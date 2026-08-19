@@ -22,6 +22,7 @@
   <header class="site-header {{ 'signed-in-header' if is_editor() else 'public-header' }}">
     {% if is_editor() %}
     <a class="brand" href="{{ url_for('help_board') }}"><span class="crystal">◆</span> Hokuten Knights</a>
+    <a class="live-auction-banner" id="live-auction-banner" href="{{ url_for('endgame_dashboard', _anchor='bidding-live') }}" hidden aria-live="polite"><span>Live Auction</span><b data-live-auction-boss></b><em data-live-auction-time></em></a>
     <button class="mobile-nav-toggle" type="button" aria-expanded="false" aria-controls="site-navigation" aria-label="Open navigation"><span></span><span></span><span></span></button>
     <nav class="site-nav" id="site-navigation">
       <a class="{{ 'active' if request.endpoint in ('help_board', 'create_help_request', 'edit_help_request', 'help_request_detail', 'my_help_requests') }}" href="{{ url_for('help_board') }}">Requests</a>
@@ -42,6 +43,6 @@
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
-  <script src="{{ url_for('static', filename='header_nav.js', v=1) }}"></script>
+  <script src="{{ url_for('static', filename='header_nav.js', v=2) }}"></script>
 </body>
 </html>

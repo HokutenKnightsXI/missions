@@ -2794,7 +2794,8 @@ def create_app(test_config=None):
                     bid["tier"] = auction_priority_tier(item, bid["job"])
                     bid["balance"] = balances.get(bid["member_id"], {}).get("balance", 0)
                     bids.append(bid)
-                bids.sort(key=lambda bid: (-bid["amount"], bid["tier"] or 99, -bid["balance"], bid["updated_at"]))
+                # Priority eligibility always comes before bid amount: P1, P2, P3, then Freelot.
+                bids.sort(key=lambda bid: (bid["tier"] or 99, -bid["amount"], -bid["balance"], bid["updated_at"]))
                 item["bids"] = bids
                 item["suggested_winner_id"] = bids[0]["member_id"] if bids else None
                 item["my_bid"] = next((bid for bid in bids if bid["member_id"] == actor_id), None)
@@ -2840,6 +2841,9 @@ def create_app(test_config=None):
             abort(403)
         event_id = request.form.get("event_id", type=int)
         boss = request.form.get("boss", "").strip()
+        duration_minutes = request.form.get("duration_minutes", type=int)
+        if duration_minutes not in range(3, 11):
+            abort(400, description="Choose an auction duration between 3 and 10 minutes.")
         boss_items = [dict(item) for item in ENDGAME_PRIORITY_ITEMS if item["source"] == boss]
         event = get_db().execute("SELECT * FROM guild_events WHERE id=?", (event_id,)).fetchone()
         if not event or not is_endgame_guild_event(event) or not boss_items:
@@ -2853,7 +2857,7 @@ def create_app(test_config=None):
             """INSERT INTO endgame_auctions(event_id,area,boss,starts_at,ends_at,created_by)
                VALUES(?,?,?,?,?,?)""",
             (event_id, boss_items[0]["area"], boss, now.isoformat(timespec="seconds"),
-             (now + timedelta(minutes=2)).isoformat(timespec="seconds"), actor["id"]),
+             (now + timedelta(minutes=duration_minutes)).isoformat(timespec="seconds"), actor["id"]),
         )
         auction_id = cursor.lastrowid
         required_levels = gear_required_levels(str(Path(app.root_path) / "static" / "gear_catalog.json"))
@@ -2867,10 +2871,10 @@ def create_app(test_config=None):
             )
         get_db().execute(
             "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
-            (actor["id"], "DKP Auction", "Auction started", f"{boss} / {event['name']} / 2 minutes"),
+            (actor["id"], "DKP Auction", "Auction started", f"{boss} / {event['name']} / {duration_minutes} minutes"),
         )
         get_db().commit()
-        flash(f"Started a two-minute {boss} auction.", "success")
+        flash(f"Started a {duration_minutes}-minute {boss} auction.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
 
     @app.post("/api/endgame/auction-items/<int:item_id>/bid")
@@ -3008,6 +3012,25 @@ def create_app(test_config=None):
         )
         get_db().commit()
         flash(f"Confirmed {awards} auction awards and deducted the winning DKP.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
+
+    @app.post("/endgame/auctions/<int:auction_id>/delete")
+    @admin_required
+    def delete_endgame_auction(auction_id):
+        if not can_create_guild_events():
+            abort(403)
+        refresh_auction_statuses()
+        auction = get_db().execute("SELECT * FROM endgame_auctions WHERE id=?", (auction_id,)).fetchone()
+        if not auction or auction["status"] != "Closed":
+            abort(400, description="Only a closed, unconfirmed auction can be discarded.")
+        actor = require_member_identity()
+        get_db().execute("DELETE FROM endgame_auctions WHERE id=?", (auction_id,))
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "DKP Auction", "Auction discarded", auction["boss"]),
+        )
+        get_db().commit()
+        flash(f"Discarded the closed {auction['boss']} auction. No DKP was deducted.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
 
     def is_endgame_guild_event(event):

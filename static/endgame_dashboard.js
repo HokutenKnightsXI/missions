@@ -78,6 +78,27 @@
       const pauseControl = active && payload.is_admin ? `<form class="auction-pause-form" method="post" action="/endgame/auctions/${auction.id}/pause"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button type="submit">${auction.paused ? "Resume Auction" : "Pause Auction"}</button></form>` : "";
       return `<section class="auction-card ${active ? "active" : "closed"} ${auction.paused ? "paused" : ""}"><header><div><span>${safeText(auction.area)} · ${safeText(auction.event_name)}</span><h3>${safeText(auction.boss)}</h3>${pauseControl}</div><div class="auction-clock"><small>${auction.paused ? "Countdown frozen" : (active ? "Bidding closes in" : "Bidding closed")}</small><b data-auction-ends="${auction.ends_at}" data-auction-paused="${auction.paused ? "true" : "false"}">${auction.paused ? "PAUSED" : (active ? countdownText(auction.ends_at) : "00:00")}</b></div></header>${!active && payload.is_admin ? `<form id="confirm-auction-${auction.id}" class="auction-confirm-form" method="post" action="/endgame/auctions/${auction.id}/confirm"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><p>Review the suggested winners, then confirm the items that actually dropped.</p></form>` : ""}<div class="auction-item-grid">${items}</div>${!active && payload.is_admin ? `<button class="button primary auction-confirm-button" type="submit" form="confirm-auction-${auction.id}">Confirm Winners &amp; Deduct DKP</button>` : ""}</section>`;
     }).join("") : '<p class="event-empty">No active or recently closed auctions. An administrator can start one for an Endgame event above.</p>';
+    // Closed auctions are deliberately kept until an administrator confirms them.
+    // A separate discard control makes it safe to clear test auctions without touching DKP.
+    if (payload.is_admin) {
+      const closedCards = [...auctionRoot.querySelectorAll(".auction-card.closed")];
+      payload.auctions.filter(auction => auction.status === "Closed").forEach((auction, index) => {
+        const card = closedCards[index];
+        if (!card) return;
+        const actions = document.createElement("form");
+        actions.className = "auction-discard-form";
+        actions.method = "post";
+        actions.action = `/endgame/auctions/${auction.id}/delete`;
+        actions.innerHTML = `<input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button type="submit">Discard Auction</button>`;
+        actions.addEventListener("submit", event => {
+          if (!confirm("Discard this closed test auction? No DKP will be deducted.")) event.preventDefault();
+        });
+        card.querySelector("header > div")?.append(actions);
+      });
+    }
+    auctionRoot.querySelectorAll(".auction-bid-list li span, .auction-winner-select option").forEach(entry => {
+      entry.innerHTML = entry.innerHTML.replace("PFree", "Freelot");
+    });
     const recent = document.querySelector("#recent-auction-bids");
     recent.innerHTML = payload.recent_bids.length ? payload.recent_bids.map(bid => `<article><span><b>${safeText(bid.name)}</b> bid on ${safeText(bid.item)}<small>${safeText(bid.boss)} · ${safeText(bid.job)}</small></span><strong>${bid.amount} DKP</strong></article>`).join("") : '<p class="event-empty">No bids have been placed.</p>';
   };
