@@ -310,7 +310,7 @@ def test_endgame_javascript_calculates_priority_and_pop_readiness(tmp_path):
     assert b">= Number(item.required_level" in script.data
     assert b"rankKey" in script.data
     assert b"displayedRank" in script.data
-    assert b"hokuten-pop-prototype" in script.data
+    assert b'"/api/endgame/pops"' in script.data
     assert b"pop-readiness" in script.data
     assert b"hokuten-job-change-log" in script.data
     assert b"dataset.jobHistory" in script.data

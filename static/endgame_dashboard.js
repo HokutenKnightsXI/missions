@@ -54,6 +54,9 @@
   const priorityLabel = value => ({"Main priority":"P1","Secondary priority":"P2","P1 Auction":"P1","P2 Auction":"P2","P3 Auction":"P3"}[value] || value || "Freelot");
   const auctionRoot = document.querySelector("#active-auctions");
   let auctionEditingUntil = 0;
+  const auctionEditing = () => Date.now() < auctionEditingUntil || Boolean(
+    document.activeElement?.closest?.(".auction-bid-form, .auction-winner-select")
+  );
   let auctionTooltips = {};
   const auctionError = message => `<p class="auction-message error">${safeText(message)}</p>`;
   const countdownText = endsAt => {
@@ -104,12 +107,12 @@
   };
   const loadAuctions = async () => {
     if (!auctionRoot) return;
-    if (Date.now() < auctionEditingUntil || document.activeElement?.closest?.(".auction-bid-form")) return;
+    if (auctionEditing()) return;
     try {
       const response = await fetch("/api/endgame/auctions", {headers: {"Accept": "application/json"}});
       if (!response.ok) throw new Error("Could not refresh bidding.");
       const payload = await response.json();
-      if (Date.now() < auctionEditingUntil || document.activeElement?.closest?.(".auction-bid-form")) return;
+      if (auctionEditing()) return;
       renderAuctions(payload);
       const state = document.querySelector("#auction-refresh-state");
       if (state) state.textContent = `Updated ${new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"})}`;
@@ -131,7 +134,10 @@
   });
   if (auctionRoot) {
     auctionRoot.addEventListener("input", event => { if (event.target.closest(".auction-bid-form")) auctionEditingUntil = Date.now() + 15000; });
-    auctionRoot.addEventListener("change", event => { if (event.target.closest(".auction-bid-form")) auctionEditingUntil = Date.now() + 15000; });
+    auctionRoot.addEventListener("change", event => {
+      if (event.target.closest(".auction-bid-form")) auctionEditingUntil = Date.now() + 15000;
+      if (event.target.closest(".auction-winner-select")) auctionEditingUntil = Date.now() + 600000;
+    });
     loadAuctions();
     setInterval(loadAuctions, 3000);
     setInterval(() => document.querySelectorAll("[data-auction-ends]").forEach(clock => { if (clock.dataset.auctionPaused !== "true") clock.textContent = countdownText(clock.dataset.auctionEnds); }), 1000);
@@ -559,9 +565,10 @@
   recordLootDialog?.querySelector(".record-loot-close")?.addEventListener("click", () => recordLootDialog.close());
   [recordLootItem, recordLootMember, recordLootJob].filter(Boolean).forEach(control => control.addEventListener("change", updateLootDefaults));
 
+  if (false) { // Linkshell Pops now runs in its own isolated script below the dashboard.
   let popArea = "Sky";
   const popItems = window.POP_ITEMS || [], popTargets = window.POP_TARGETS || [];
-  const saved = JSON.parse(localStorage.getItem("hokuten-pop-prototype") || "{}");
+  let saved = {};
   const holder = document.querySelector("#pop-holder");
   const quantity = (name, key) => Number(saved[name]?.[key] || 0);
   const totals = () => Object.keys(saved).reduce((result, name) => { Object.entries(saved[name]).forEach(([key, value]) => result[key] = (result[key] || 0) + Number(value)); return result; }, {});
@@ -574,6 +581,32 @@
   };
   document.querySelectorAll("[data-pop-area]").forEach(button => button.addEventListener("click", () => { popArea = button.dataset.popArea; document.querySelectorAll("[data-pop-area]").forEach(row => row.classList.toggle("active", row === button)); renderPops(); }));
   holder.addEventListener("change", renderPops);
-  document.querySelector("#pop-inventory").addEventListener("click", event => { const button = event.target.closest("[data-pop-change]"); if (!button) return; saved[holder.value] ||= {}; saved[holder.value][button.dataset.key] = Math.max(0, quantity(holder.value, button.dataset.key) + Number(button.dataset.popChange)); localStorage.setItem("hokuten-pop-prototype", JSON.stringify(saved)); renderPops(); });
+  const loadPops = async () => {
+    try {
+      const response = await fetch("/api/endgame/pops", {headers: {Accept: "application/json"}});
+      if (!response.ok) throw new Error();
+      saved = (await response.json()).inventory || {};
+    } catch (_) { saved = {}; }
+    renderPops();
+  };
+  document.querySelector("#pop-inventory").addEventListener("click", async event => {
+    const button = event.target.closest("[data-pop-change]");
+    if (!button) return;
+    button.disabled = true;
+    try {
+      const response = await fetch("/api/endgame/pops", {
+        method: "POST",
+        headers: {"Content-Type": "application/json", "X-CSRF-Token": window.ENDGAME_CSRF},
+        body: JSON.stringify({holder: holder.value, item_key: button.dataset.key, delta: Number(button.dataset.popChange)}),
+      });
+      if (!response.ok) throw new Error("Could not save the pop inventory update.");
+      saved = (await response.json()).inventory || {};
+      renderPops();
+    } catch (error) { alert(error.message); button.disabled = false; }
+  });
+  // Render the complete Sky list immediately; shared quantities hydrate right after.
+  // This keeps all pop requirements usable even if the inventory request is delayed.
   renderPops();
+  loadPops();
+  }
 })();

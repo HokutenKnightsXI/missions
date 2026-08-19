@@ -2844,6 +2844,60 @@ def create_app(test_config=None):
     def get_endgame_auctions():
         return jsonify(auction_payload())
 
+    def endgame_pop_inventory_payload():
+        rows = get_db().execute(
+            """SELECT m.name,i.item_key,i.quantity FROM endgame_pop_inventory i
+               JOIN members m ON m.id=i.member_id WHERE i.quantity > 0"""
+        ).fetchall()
+        inventory = {}
+        for row in rows:
+            inventory.setdefault(row["name"], {})[row["item_key"]] = row["quantity"]
+        return {"inventory": inventory}
+
+    @app.get("/api/endgame/pops")
+    @editor_required
+    def get_endgame_pop_inventory():
+        return jsonify(endgame_pop_inventory_payload())
+
+    @app.post("/api/endgame/pops")
+    @editor_required
+    def update_endgame_pop_inventory():
+        actor = require_member_identity()
+        payload = request.get_json(silent=True) or request.form
+        holder_name = str(payload.get("holder", "")).strip()
+        item_key = str(payload.get("item_key", "")).strip()
+        try:
+            delta = int(payload.get("delta", 0))
+        except (TypeError, ValueError):
+            abort(400, description="Pop quantity changes must be whole items.")
+        if not holder_name or not re.fullmatch(r"[a-z0-9-]{2,80}", item_key, re.I) or delta not in (-1, 1):
+            abort(400, description="Invalid pop inventory update.")
+        holder = get_db().execute(
+            "SELECT id,name FROM members WHERE name=? COLLATE NOCASE", (holder_name,)
+        ).fetchone()
+        if not holder:
+            abort(404, description="Selected holder was not found.")
+        existing = get_db().execute(
+            "SELECT quantity FROM endgame_pop_inventory WHERE member_id=? AND item_key=?",
+            (holder["id"], item_key),
+        ).fetchone()
+        quantity = max(0, int(existing["quantity"] if existing else 0) + delta)
+        if quantity:
+            get_db().execute(
+                """INSERT INTO endgame_pop_inventory(member_id,item_key,quantity,updated_by,updated_at)
+                   VALUES(?,?,?,?,CURRENT_TIMESTAMP)
+                   ON CONFLICT(member_id,item_key) DO UPDATE SET quantity=excluded.quantity,
+                   updated_by=excluded.updated_by,updated_at=CURRENT_TIMESTAMP""",
+                (holder["id"], item_key, quantity, actor["id"]),
+            )
+        else:
+            get_db().execute(
+                "DELETE FROM endgame_pop_inventory WHERE member_id=? AND item_key=?",
+                (holder["id"], item_key),
+            )
+        get_db().commit()
+        return jsonify(endgame_pop_inventory_payload())
+
     @app.post("/endgame/auctions")
     @admin_required
     def create_endgame_auction():
