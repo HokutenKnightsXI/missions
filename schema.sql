@@ -308,6 +308,19 @@ CREATE TABLE IF NOT EXISTS endgame_auction_bids (
 CREATE INDEX IF NOT EXISTS idx_endgame_auction_status ON endgame_auctions(status, ends_at);
 CREATE INDEX IF NOT EXISTS idx_endgame_auction_bids_item ON endgame_auction_bids(auction_item_id, amount DESC);
 
+CREATE TABLE IF NOT EXISTS endgame_pop_inventory (
+    member_id INTEGER NOT NULL,
+    item_key TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 0 CHECK(quantity >= 0),
+    updated_by INTEGER,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (member_id, item_key),
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+    FOREIGN KEY (updated_by) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_endgame_pop_inventory_item ON endgame_pop_inventory(item_key);
+
 CREATE TABLE IF NOT EXISTS blue_spell_ownership (
     member_id INTEGER NOT NULL,
     spell TEXT NOT NULL,
