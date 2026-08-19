@@ -264,6 +264,50 @@ CREATE TABLE IF NOT EXISTS endgame_event_job_snapshots (
 
 CREATE INDEX IF NOT EXISTS idx_endgame_loot_event ON endgame_loot_awards(event_id, awarded_at);
 
+CREATE TABLE IF NOT EXISTS endgame_auctions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    area TEXT NOT NULL CHECK(area IN ('Sky','Sea')),
+    boss TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Active' CHECK(status IN ('Active','Closed','Confirmed','Cancelled')),
+    starts_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    ends_at TEXT NOT NULL,
+    paused_at TEXT,
+    created_by INTEGER NOT NULL,
+    confirmed_at TEXT,
+    FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES members(id) ON DELETE RESTRICT
+);
+
+CREATE TABLE IF NOT EXISTS endgame_auction_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    auction_id INTEGER NOT NULL,
+    item TEXT NOT NULL,
+    target_item TEXT NOT NULL DEFAULT '',
+    family TEXT NOT NULL DEFAULT 'Other',
+    p1 TEXT NOT NULL DEFAULT '',
+    p2 TEXT NOT NULL DEFAULT '',
+    p3 TEXT NOT NULL DEFAULT '',
+    required_level INTEGER NOT NULL DEFAULT 1,
+    FOREIGN KEY (auction_id) REFERENCES endgame_auctions(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS endgame_auction_bids (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    auction_item_id INTEGER NOT NULL,
+    member_id INTEGER NOT NULL,
+    job TEXT NOT NULL,
+    amount INTEGER NOT NULL CHECK(amount >= 0),
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (auction_item_id, member_id),
+    FOREIGN KEY (auction_item_id) REFERENCES endgame_auction_items(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_endgame_auction_status ON endgame_auctions(status, ends_at);
+CREATE INDEX IF NOT EXISTS idx_endgame_auction_bids_item ON endgame_auction_bids(auction_item_id, amount DESC);
+
 CREATE TABLE IF NOT EXISTS blue_spell_ownership (
     member_id INTEGER NOT NULL,
     spell TEXT NOT NULL,

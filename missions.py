@@ -40,6 +40,15 @@ def gear_required_levels(catalog_path):
     return levels
 
 
+@lru_cache(maxsize=2)
+def gear_catalog_by_name(catalog_path):
+    try:
+        rows = json.loads(Path(catalog_path).read_text(encoding="utf-8")).get("rows", [])
+    except (OSError, ValueError, json.JSONDecodeError):
+        return {}
+    return {str(item.get("name", "")).casefold(): item for item in rows if item.get("name")}
+
+
 def load_local_env():
     """Load an ignored local .env file without overriding host-provided variables."""
     env_path = Path(__file__).with_name(".env")
@@ -57,6 +66,56 @@ def load_local_env():
 
 
 load_local_env()
+
+
+ENDGAME_PRIORITY_ITEMS = (
+    {"area": "Sky", "source": "Byakko", "name": "Byakko's Haidate", "p1": ("NIN", "WAR", "SAM", "MNK"), "p2": ("BST", "BRD"), "p3": ()},
+    {"area": "Sky", "source": "Byakko", "name": "Byakko's Axe", "p1": ("WAR",), "p2": (), "p3": ()},
+    {"area": "Sky", "source": "Byakko", "name": "Hecatomb Mittens", "p1": ("THF", "WAR"), "p2": ("DRK",), "p3": ("BRD",)},
+    {"area": "Sky", "source": "Byakko", "name": "Shura Haidate", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
+    {"area": "Sky", "source": "Byakko", "name": "Adaman Sollerets", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
+    {"area": "Sky", "source": "Seiryu", "name": "Zenith Crown", "p1": ("BLM",), "p2": ("RDM", "WHM", "SMN"), "p3": ("BRD",)},
+    {"area": "Sky", "source": "Seiryu", "name": "Seiryu's Kote", "p1": ("RNG",), "p2": ("SAM", "NIN"), "p3": ()},
+    {"area": "Sky", "source": "Seiryu", "name": "Seiryu's Sword", "p1": (), "p2": (), "p3": (), "freelot": True},
+    {"area": "Sky", "source": "Seiryu", "name": "Crimson Finger Gauntlets", "p1": ("COR", "RNG"), "p2": ("RDM",), "p3": ("DRK",)},
+    {"area": "Sky", "source": "Suzaku", "name": "Zenith Slacks", "p1": ("BLM",), "p2": ("RDM", "SMN"), "p3": ("BRD",)},
+    {"area": "Sky", "source": "Suzaku", "name": "Shura Zunari Kabuto", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
+    {"area": "Sky", "source": "Suzaku", "name": "Koenig Schaller", "p1": ("PLD",), "p2": ("WAR",), "p3": ()},
+    {"area": "Sky", "source": "Suzaku", "name": "Suzaku's Sune-Ate", "p1": ("BRD",), "p2": ("RNG", "SAM", "NIN"), "p3": ()},
+    {"area": "Sky", "source": "Genbu", "name": "Hecatomb Leggings", "p1": ("THF", "DRK", "WAR"), "p2": ("BRD",), "p3": ()},
+    {"area": "Sky", "source": "Genbu", "name": "Shura Kote", "p1": ("MNK", "SAM", "NIN"), "p2": (), "p3": ()},
+    {"area": "Sky", "source": "Genbu", "name": "Adaman Celata", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
+    {"area": "Sky", "source": "Genbu", "name": "Genbu's Shield", "p1": ("RDM",), "p2": ("WHM", "BLU"), "p3": ()},
+    {"area": "Sky", "source": "Genbu", "name": "Genbu's Kabuto", "p1": ("WAR", "MNK"), "p2": ("BRD",), "p3": ()},
+    {"area": "Sky", "source": "Genbu", "name": "Zenith Mitts", "p1": ("BLM",), "p2": ("RDM",), "p3": ("SMN",)},
+    {"area": "Sky", "source": "Genbu", "name": "Koenig Handschuhs", "p1": ("PLD",), "p2": ("WAR",), "p3": ()},
+    {"area": "Sky", "source": "Genbu", "name": "Crimson Greaves", "p1": ("PLD",), "p2": ("RDM", "RNG"), "p3": ()},
+    {"area": "Sky", "source": "Kirin", "name": "Kirin's Osode", "p1": ("RNG", "SAM"), "p2": ("WAR",), "p3": ("BRD", "NIN")},
+    {"area": "Sky", "source": "Kirin", "name": "Kirin's Pole", "p1": ("BLM",), "p2": ("RDM",), "p3": ("MNK",)},
+    {"area": "Sky", "source": "Kirin", "name": "Shura Togi", "p1": ("MNK",), "p2": ("SAM",), "p3": ()},
+    {"area": "Sky", "source": "Kirin", "name": "Hecatomb Harness", "p1": ("THF", "DRK"), "p2": ("WAR",), "p3": ()},
+    {"area": "Sky", "source": "Kirin", "name": "Crimson Cuisses", "p1": ("PLD",), "p2": ("RDM",), "p3": ("RNG", "COR")},
+    {"area": "Sea", "source": "Jailer of Faith", "name": "Faith Torque", "p1": ("MNK",), "p2": ("RNG", "COR"), "p3": ("THF", "WHM")},
+    {"area": "Sea", "source": "Jailer of Justice", "name": "Justice Torque", "p1": ("DRK", "SAM"), "p2": (), "p3": ()},
+    {"area": "Sea", "source": "Jailer of Hope", "name": "Hope Torque", "p1": ("NIN", "RNG"), "p2": ("THF",), "p3": ("SAM",)},
+    {"area": "Sea", "source": "Jailer of Prudence", "name": "Prudence Torque", "p1": ("DRK", "BLM"), "p2": ("RDM",), "p3": ("BLU",)},
+    {"area": "Sea", "source": "Jailer of Fortitude", "name": "Fortitude Torque", "p1": ("WAR",), "p2": ("DRK", "BLU"), "p3": ("RDM",)},
+    {"area": "Sea", "source": "Jailer of Temperance", "name": "Temperance Torque", "p1": ("BST",), "p2": ("WAR",), "p3": ()},
+    {"area": "Sea", "source": "Jailer of Love", "name": "Love Torque", "p1": ("DRG", "THF"), "p2": ("COR",), "p3": ("BRD",)},
+    {"area": "Sea", "source": "Jailer of Love", "name": "Novio Earring", "p1": ("BLM",), "p2": ("RDM", "BLU", "NIN", "COR"), "p3": ()},
+    {"area": "Sea", "source": "Jailer of Love", "name": "Novia Earring", "p1": ("WHM",), "p2": ("PLD", "THF", "NIN"), "p3": ("RDM", "SMN")},
+)
+
+ENDGAME_BASELINE_ATTENDANCE = {
+    "sexualpotato": 2, "vlathgar": 2, "soyabean": 2, "chickenbanana": 2,
+    "alecy": 1, "rhode": 1, "shiru": 0, "venenua": 2, "teeje": 2, "mygas": 2,
+    "starnack": 0, "hmp": 0, "ivalin": 2, "cartuja": 2, "thorkell": 0,
+    "shurgajoe": 2, "zanth": 0, "zaelin": 0, "kaeru": 1, "firewater": 2,
+    "anonym": 2, "ramenwarrior": 2, "kalindra": 0, "eunos": 1, "brewski": 0,
+    "bodom": 2, "werx": 0, "hikari": 2, "gravekeeper": 1, "boshu": 2,
+    "chonk": 1, "desier": 1, "wizzaro": 1, "anshul": 1, "escii": 1,
+    "imaven": 2, "tarantula": 2,
+}
 
 
 def discord_bot_request(bot_token, method, path, payload=None):
@@ -1272,6 +1331,18 @@ def create_app(test_config=None):
             get_db().execute(
                 "ALTER TABLE endgame_loot_awards ADD COLUMN dkp_cost REAL NOT NULL DEFAULT 0"
             )
+        auction_item_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(endgame_auction_items)")
+        }
+        if auction_item_columns and "target_item" not in auction_item_columns:
+            get_db().execute(
+                "ALTER TABLE endgame_auction_items ADD COLUMN target_item TEXT NOT NULL DEFAULT ''"
+            )
+        auction_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(endgame_auctions)")
+        }
+        if auction_columns and "paused_at" not in auction_columns:
+            get_db().execute("ALTER TABLE endgame_auctions ADD COLUMN paused_at TEXT")
         signup_columns = {
             row["name"] for row in get_db().execute("PRAGMA table_info(guild_event_signups)")
         }
@@ -2380,6 +2451,7 @@ def create_app(test_config=None):
             {"area": "Sea", "source": "Jailer of Love", "name": "Novio Earring", "p1": ("BLM",), "p2": ("RDM", "BLU", "NIN", "COR"), "p3": ()},
             {"area": "Sea", "source": "Jailer of Love", "name": "Novia Earring", "p1": ("WHM",), "p2": ("PLD", "THF", "NIN"), "p3": ("RDM", "SMN")},
         )
+        priority_items = [dict(item) for item in ENDGAME_PRIORITY_ITEMS]
         item_families = {
             "Byakko's Haidate": "Legs", "Byakko's Axe": "Weapons", "Hecatomb Mittens": "Hands", "Shura Haidate": "Legs",
             "Zenith Crown": "Head", "Seiryu's Kote": "Hands", "Seiryu's Sword": "Weapons", "Crimson Finger Gauntlets": "Hands",
@@ -2504,7 +2576,8 @@ def create_app(test_config=None):
         persistent_loot = [dict(row) for row in get_db().execute(
             """SELECT substr(e.start_at,6,2)||'/'||substr(e.start_at,9,2)||'/'||substr(e.start_at,1,4) date,
                       m.name player,l.item,l.family,l.classification='Major Loot' major,
-                      l.job,l.distribution award,l.dkp_cost,e.name event_name,l.id
+                       l.job,l.distribution award,l.dkp_cost,e.name event_name,e.id event_id,
+                       l.recipient_member_id,l.id
                FROM endgame_loot_awards l JOIN guild_events e ON e.id=l.event_id
                JOIN members m ON m.id=l.recipient_member_id ORDER BY e.start_at DESC,l.id DESC"""
         ).fetchall()]
@@ -2551,12 +2624,19 @@ def create_app(test_config=None):
                 if event["event_kind"] != "Endgame":
                     continue
                 attended = member["id"] in event["attendance"]
+                signup = next(
+                    (row for row in event["signups"] if row["id"] == member["id"]), None
+                )
+                signed_up = bool(
+                    signup and signup["rsvp_status"] in ("going", "maybe")
+                )
                 event_main, event_secondary = job_snapshots.get(
                     (event["id"], member["id"]), (member["main_job"], member["secondary_job"])
                 )
                 event_history.append({
                     "id": event["id"], "name": event["name"], "start_at": event["start_at"],
-                    "attended": attended, "main_job": event_main,
+                    "attended": attended, "is_upcoming": event["is_upcoming"],
+                    "signed_up": signed_up, "main_job": event_main,
                     "secondary_job": event_secondary,
                 })
                 for award in event["loot"]:
@@ -2595,6 +2675,340 @@ def create_app(test_config=None):
             dkp_highest=dkp_highest, dkp_average=dkp_average,
             dkp_bid_cap=dkp_bid_cap,
         )
+
+    def current_dkp_balances():
+        """Calculate available DKP from endgame attendance minus recorded awards."""
+        members = get_db().execute("SELECT id,name FROM members ORDER BY name COLLATE NOCASE").fetchall()
+        earned = {
+            row["id"]: ENDGAME_BASELINE_ATTENDANCE.get(row["name"].casefold(), 0) * 3
+            for row in members
+        }
+        for event in get_db().execute("SELECT * FROM guild_events").fetchall():
+            if (not is_endgame_guild_event(event) or event["status"] != "Completed"
+                    or event["start_at"] <= "2026-08-13T23:59"):
+                continue
+            for attendee in get_db().execute(
+                "SELECT member_id FROM guild_event_attendance WHERE event_id=? AND attended=1",
+                (event["id"],),
+            ).fetchall():
+                earned[attendee["member_id"]] = earned.get(attendee["member_id"], 0) + int(round(event["dkp_value"]))
+        spent = {
+            row["member_id"]: int(round(row["spent"] or 0))
+            for row in get_db().execute(
+                "SELECT recipient_member_id member_id,SUM(dkp_cost) spent FROM endgame_loot_awards GROUP BY recipient_member_id"
+            ).fetchall()
+        }
+        return {
+            row["id"]: {"name": row["name"], "balance": earned.get(row["id"], 0) - spent.get(row["id"], 0)}
+            for row in members
+        }
+
+    def current_bid_cap(balances):
+        values = [entry["balance"] for entry in balances.values()]
+        highest = max(values, default=0)
+        average = int(round(sum(values) / len(values))) if values else 0
+        return {"highest": highest, "average": average, "cap": max(0, highest - average)}
+
+    def auction_item_family(name):
+        lowered = name.casefold()
+        for family, words in {
+            "Weapons": ("axe", "sword", "pole"), "Head": ("crown", "kabuto", "celata", "schaller"),
+            "Hands": ("mittens", "kote", "gauntlets", "handschuhs", "mitts"),
+            "Body": ("osode", "togi", "harness"), "Legs": ("haidate", "slacks", "cuisses"),
+            "Feet": ("leggings", "sune-ate", "sollerets", "greaves"), "Accessories": ("torque", "earring"),
+        }.items():
+            if any(word in lowered for word in words):
+                return family
+        return "Other"
+
+    def auction_drop_name(item_name):
+        abjurations = {
+            "Hecatomb Mittens": "Neptunal Abjuration: Hands", "Shura Haidate": "Dryadic Abjuration: Legs",
+            "Adaman Sollerets": "Martial Abjuration: Feet", "Zenith Crown": "Aquarian Abjuration: Head",
+            "Crimson Finger Gauntlets": "Wyrmal Abjuration: Hands", "Zenith Slacks": "Aquarian Abjuration: Legs",
+            "Shura Zunari Kabuto": "Dryadic Abjuration: Head", "Koenig Schaller": "Martial Abjuration: Head",
+            "Hecatomb Leggings": "Neptunal Abjuration: Feet", "Shura Kote": "Dryadic Abjuration: Hands",
+            "Adaman Celata": "Martial Abjuration: Head", "Zenith Mitts": "Aquarian Abjuration: Hands",
+            "Koenig Handschuhs": "Martial Abjuration: Hands", "Crimson Greaves": "Wyrmal Abjuration: Feet",
+            "Shura Togi": "Dryadic Abjuration: Body", "Hecatomb Harness": "Neptunal Abjuration: Body",
+            "Crimson Cuisses": "Wyrmal Abjuration: Legs",
+        }
+        return abjurations.get(item_name, item_name)
+
+    def auction_priority_tier(item, job):
+        for tier in (1, 2, 3):
+            if job in tuple(filter(None, str(item[f"p{tier}"] or "").split(","))):
+                return tier
+        return 4 if not any(item[f"p{tier}"] for tier in (1, 2, 3)) else None
+
+    def refresh_auction_statuses():
+        get_db().execute(
+            "UPDATE endgame_auctions SET status='Closed' WHERE status='Active' AND paused_at IS NULL AND ends_at<=?",
+            (datetime.utcnow().isoformat(timespec="seconds"),),
+        )
+        get_db().commit()
+
+    def auction_payload():
+        refresh_auction_statuses()
+        balances = current_dkp_balances()
+        cap = current_bid_cap(balances)
+        actor_id = current_member_id()
+        catalog = gear_catalog_by_name(str(Path(app.root_path) / "static" / "gear_catalog.json"))
+        my_reserved = 0
+        if actor_id:
+            reserved = get_db().execute(
+                """SELECT COALESCE(SUM(b.amount),0) reserved FROM endgame_auction_bids b
+                   JOIN endgame_auction_items i ON i.id=b.auction_item_id
+                   JOIN endgame_auctions a ON a.id=i.auction_id
+                   WHERE b.member_id=? AND a.status='Active'""", (actor_id,)
+            ).fetchone()
+            my_reserved = int(reserved["reserved"] or 0)
+        auctions = []
+        rows = get_db().execute(
+            """SELECT a.*,e.name event_name FROM endgame_auctions a
+               JOIN guild_events e ON e.id=a.event_id
+               WHERE a.status IN ('Active','Closed') ORDER BY a.id DESC LIMIT 8"""
+        ).fetchall()
+        for row in rows:
+            auction = dict(row)
+            auction["paused"] = bool(auction.get("paused_at"))
+            auction["items"] = []
+            for item_row in get_db().execute(
+                "SELECT * FROM endgame_auction_items WHERE auction_id=? ORDER BY id", (row["id"],)
+            ).fetchall():
+                item = dict(item_row)
+                tooltip_item = catalog.get((item.get("target_item") or item["item"]).casefold(), {})
+                item["tooltip"] = {
+                    "item_id": tooltip_item.get("item_id"), "name": tooltip_item.get("name") or item.get("target_item") or item["item"],
+                    "level": tooltip_item.get("level") or item["required_level"], "slots": tooltip_item.get("slots", []),
+                    "jobs": tooltip_item.get("jobs", []), "description": tooltip_item.get("description", "No item stats available."),
+                    "rare": bool(tooltip_item.get("rare")), "ex": bool(tooltip_item.get("ex")),
+                }
+                bids = []
+                for bid_row in get_db().execute(
+                    """SELECT b.*,m.name FROM endgame_auction_bids b
+                       JOIN members m ON m.id=b.member_id WHERE b.auction_item_id=?""",
+                    (item["id"],),
+                ).fetchall():
+                    bid = dict(bid_row)
+                    bid["tier"] = auction_priority_tier(item, bid["job"])
+                    bid["balance"] = balances.get(bid["member_id"], {}).get("balance", 0)
+                    bids.append(bid)
+                bids.sort(key=lambda bid: (-bid["amount"], bid["tier"] or 99, -bid["balance"], bid["updated_at"]))
+                item["bids"] = bids
+                item["suggested_winner_id"] = bids[0]["member_id"] if bids else None
+                item["my_bid"] = next((bid for bid in bids if bid["member_id"] == actor_id), None)
+                current_amount = item["my_bid"]["amount"] if item["my_bid"] else 0
+                actor_balance = balances.get(actor_id, {}).get("balance", 0)
+                item["max_bid"] = max(0, min(cap["cap"], actor_balance))
+                eligible_jobs = []
+                if actor_id:
+                    levels = {
+                        level["job"]: level["level"] for level in get_db().execute(
+                            "SELECT job,level FROM member_jobs WHERE member_id=?", (actor_id,)
+                        ).fetchall()
+                    }
+                    for job, level in levels.items():
+                        tier = auction_priority_tier(item, job)
+                        if tier and level >= item["required_level"]:
+                            eligible_jobs.append({"job": job, "level": level, "tier": tier})
+                item["eligible_jobs"] = sorted(eligible_jobs, key=lambda entry: (entry["tier"], entry["job"]))
+                auction["items"].append(item)
+            auctions.append(auction)
+        recent = [dict(row) for row in get_db().execute(
+            """SELECT b.amount,b.job,b.updated_at,m.name,i.item,a.boss,a.status
+               FROM endgame_auction_bids b JOIN members m ON m.id=b.member_id
+               JOIN endgame_auction_items i ON i.id=b.auction_item_id
+               JOIN endgame_auctions a ON a.id=i.auction_id
+               ORDER BY b.updated_at DESC,b.id DESC LIMIT 20"""
+        ).fetchall()]
+        my_balance = balances.get(actor_id, {}).get("balance", 0)
+        return {"auctions": auctions, "recent_bids": recent, "dkp": cap,
+                "my_balance": my_balance, "my_reserved": my_reserved,
+                "my_available": max(0, my_balance - my_reserved),
+                "is_admin": can_create_guild_events(), "server_time": datetime.utcnow().isoformat(timespec="seconds") + "Z"}
+
+    @app.get("/api/endgame/auctions")
+    @editor_required
+    def get_endgame_auctions():
+        return jsonify(auction_payload())
+
+    @app.post("/endgame/auctions")
+    @admin_required
+    def create_endgame_auction():
+        if not can_create_guild_events():
+            abort(403)
+        event_id = request.form.get("event_id", type=int)
+        boss = request.form.get("boss", "").strip()
+        boss_items = [dict(item) for item in ENDGAME_PRIORITY_ITEMS if item["source"] == boss]
+        event = get_db().execute("SELECT * FROM guild_events WHERE id=?", (event_id,)).fetchone()
+        if not event or not is_endgame_guild_event(event) or not boss_items:
+            abort(400, description="Choose an Endgame event and a valid Sky or Sea boss.")
+        refresh_auction_statuses()
+        if get_db().execute("SELECT 1 FROM endgame_auctions WHERE status='Active'").fetchone():
+            abort(400, description="Finish the current auction before starting another.")
+        actor = require_member_identity()
+        now = datetime.utcnow()
+        cursor = get_db().execute(
+            """INSERT INTO endgame_auctions(event_id,area,boss,starts_at,ends_at,created_by)
+               VALUES(?,?,?,?,?,?)""",
+            (event_id, boss_items[0]["area"], boss, now.isoformat(timespec="seconds"),
+             (now + timedelta(minutes=2)).isoformat(timespec="seconds"), actor["id"]),
+        )
+        auction_id = cursor.lastrowid
+        required_levels = gear_required_levels(str(Path(app.root_path) / "static" / "gear_catalog.json"))
+        for item in boss_items:
+            get_db().execute(
+                """INSERT INTO endgame_auction_items(auction_id,item,target_item,family,p1,p2,p3,required_level)
+                   VALUES(?,?,?,?,?,?,?,?)""",
+                (auction_id, auction_drop_name(item["name"]), item["name"], auction_item_family(item["name"]),
+                 ",".join(item["p1"]), ",".join(item["p2"]), ",".join(item["p3"]),
+                 required_levels.get(item["name"], 1)),
+            )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "DKP Auction", "Auction started", f"{boss} / {event['name']} / 2 minutes"),
+        )
+        get_db().commit()
+        flash(f"Started a two-minute {boss} auction.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
+
+    @app.post("/api/endgame/auction-items/<int:item_id>/bid")
+    @editor_required
+    def place_endgame_bid(item_id):
+        member = require_member_identity()
+        payload = request.get_json(silent=True) or request.form
+        try:
+            amount = int(payload.get("amount", 0))
+        except (TypeError, ValueError):
+            abort(400, description="Enter a whole-number DKP bid.")
+        job = str(payload.get("job", "")).strip().upper()
+        item = get_db().execute(
+            """SELECT i.*,a.status,a.ends_at,a.paused_at FROM endgame_auction_items i
+               JOIN endgame_auctions a ON a.id=i.auction_id WHERE i.id=?""", (item_id,)
+        ).fetchone()
+        if not item or item["status"] != "Active" or item["paused_at"] or item["ends_at"] <= datetime.utcnow().isoformat(timespec="seconds"):
+            abort(400, description="Bidding for this item is closed.")
+        level = get_db().execute(
+            "SELECT level FROM member_jobs WHERE member_id=? AND job=?", (member["id"], job)
+        ).fetchone()
+        tier = auction_priority_tier(item, job)
+        if not level or level["level"] < item["required_level"] or not tier:
+            abort(403, description="You do not have an eligible job leveled high enough to equip this item.")
+        balances = current_dkp_balances()
+        bid_cap = current_bid_cap(balances)["cap"]
+        balance = balances.get(member["id"], {}).get("balance", 0)
+        maximum = min(balance, bid_cap)
+        if amount < 1 or amount > maximum:
+            abort(400, description=f"Your bid must be between 1 and {max(0, maximum)} DKP.")
+        get_db().execute(
+            """INSERT INTO endgame_auction_bids(auction_item_id,member_id,job,amount)
+               VALUES(?,?,?,?) ON CONFLICT(auction_item_id,member_id) DO UPDATE SET
+               job=excluded.job,amount=excluded.amount,updated_at=CURRENT_TIMESTAMP""",
+            (item_id, member["id"], job, amount),
+        )
+        active_bids = get_db().execute(
+            """SELECT b.id,b.auction_item_id,b.amount,i.item FROM endgame_auction_bids b
+               JOIN endgame_auction_items i ON i.id=b.auction_item_id
+               JOIN endgame_auctions a ON a.id=i.auction_id
+               WHERE b.member_id=? AND a.status='Active' ORDER BY b.updated_at DESC,b.id DESC""",
+            (member["id"],),
+        ).fetchall()
+        overflow = max(0, sum(row["amount"] for row in active_bids) - balance)
+        adjusted = []
+        for other in active_bids:
+            if not overflow or other["auction_item_id"] == item_id:
+                continue
+            reduction = min(overflow, other["amount"])
+            next_amount = other["amount"] - reduction
+            if next_amount:
+                get_db().execute(
+                    "UPDATE endgame_auction_bids SET amount=?,updated_at=CURRENT_TIMESTAMP WHERE id=?",
+                    (next_amount, other["id"]),
+                )
+            else:
+                get_db().execute("DELETE FROM endgame_auction_bids WHERE id=?", (other["id"],))
+            adjusted.append({"item": other["item"], "from": other["amount"], "to": next_amount})
+            overflow -= reduction
+        get_db().commit()
+        return jsonify({"ok": True, "adjusted": adjusted, "auction": auction_payload()})
+
+    @app.post("/endgame/auctions/<int:auction_id>/pause")
+    @admin_required
+    def toggle_endgame_auction_pause(auction_id):
+        if not can_create_guild_events():
+            abort(403)
+        refresh_auction_statuses()
+        auction = get_db().execute(
+            "SELECT * FROM endgame_auctions WHERE id=?", (auction_id,)
+        ).fetchone()
+        if not auction or auction["status"] != "Active":
+            abort(400, description="Only an active auction can be paused or resumed.")
+        actor = require_member_identity()
+        now = datetime.utcnow()
+        if auction["paused_at"]:
+            paused_at = datetime.fromisoformat(auction["paused_at"])
+            ends_at = datetime.fromisoformat(auction["ends_at"]) + (now - paused_at)
+            get_db().execute(
+                "UPDATE endgame_auctions SET paused_at=NULL,ends_at=? WHERE id=?",
+                (ends_at.isoformat(timespec="seconds"), auction_id),
+            )
+            action = "Auction resumed"
+        else:
+            get_db().execute(
+                "UPDATE endgame_auctions SET paused_at=? WHERE id=?",
+                (now.isoformat(timespec="seconds"), auction_id),
+            )
+            action = "Auction paused"
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "DKP Auction", action, auction["boss"]),
+        )
+        get_db().commit()
+        return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
+
+    @app.post("/endgame/auctions/<int:auction_id>/confirm")
+    @admin_required
+    def confirm_endgame_auction(auction_id):
+        if not can_create_guild_events():
+            abort(403)
+        refresh_auction_statuses()
+        auction = get_db().execute("SELECT * FROM endgame_auctions WHERE id=?", (auction_id,)).fetchone()
+        if not auction or auction["status"] != "Closed":
+            abort(400, description="Wait for the countdown to finish before confirming winners.")
+        actor = require_member_identity()
+        balances = current_dkp_balances()
+        awards = 0
+        for item in get_db().execute("SELECT * FROM endgame_auction_items WHERE auction_id=?", (auction_id,)).fetchall():
+            winner_id = request.form.get(f"winner_{item['id']}", type=int)
+            if not winner_id:
+                continue
+            bid = get_db().execute(
+                "SELECT * FROM endgame_auction_bids WHERE auction_item_id=? AND member_id=?",
+                (item["id"], winner_id),
+            ).fetchone()
+            if not bid or bid["amount"] > balances.get(winner_id, {}).get("balance", 0):
+                abort(400, description=f"The selected winner for {item['item']} no longer has enough DKP.")
+            tier = auction_priority_tier(item, bid["job"])
+            get_db().execute(
+                """INSERT INTO endgame_loot_awards
+                   (event_id,recipient_member_id,item,job,family,distribution,classification,dkp_cost,recorded_by)
+                   VALUES(?,?,?,?,?,?, 'Major Loot',?,?)""",
+                (auction["event_id"], winner_id, item["item"], bid["job"], item["family"],
+                 f"{'Freelot' if tier == 4 else f'P{tier}'}", bid["amount"], actor["id"]),
+            )
+            balances[winner_id]["balance"] -= bid["amount"]
+            awards += 1
+        get_db().execute(
+            "UPDATE endgame_auctions SET status='Confirmed',confirmed_at=CURRENT_TIMESTAMP WHERE id=?", (auction_id,)
+        )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "DKP Auction", "Winners confirmed", f"{auction['boss']}: {awards} loot awards"),
+        )
+        get_db().commit()
+        flash(f"Confirmed {awards} auction awards and deducted the winning DKP.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
 
     def is_endgame_guild_event(event):
         """Classify an event by its Discord source while preserving the two archives."""
@@ -3229,7 +3643,7 @@ def create_app(test_config=None):
         ).fetchone() if member_id.isdigit() else None
         if (not recipient or not item or job not in JOBS or family not in
                 {"Weapons", "Head", "Body", "Hands", "Legs", "Feet", "Accessories", "Other"}
-                or distribution not in {"Main priority", "Secondary priority", "Freelot"}
+                or distribution not in {"P1", "P2", "P3", "Freelot"}
                 or classification not in {"Major Loot", "Standard"} or not 0 <= dkp_cost <= 999):
             abort(400, description="Complete the loot award using valid selections.")
         recorder = require_member_identity()
@@ -3275,7 +3689,7 @@ def create_app(test_config=None):
             dkp_cost = -1
         if (not recipient or not item or job not in JOBS or family not in
                 {"Weapons", "Head", "Body", "Hands", "Legs", "Feet", "Accessories", "Other"}
-                or distribution not in {"Main priority", "Secondary priority", "Freelot"}
+                or distribution not in {"P1", "P2", "P3", "Freelot"}
                 or classification not in {"Major Loot", "Standard"} or not 0 <= dkp_cost <= 999):
             abort(400, description="Complete the loot award using valid selections.")
         editor = require_member_identity()
@@ -3290,7 +3704,7 @@ def create_app(test_config=None):
         )
         get_db().commit()
         flash("Loot award updated.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor="events"))
+        return redirect(url_for("endgame_dashboard", _anchor=("loot" if request.form.get("return_to") == "loot" else "events")))
 
     @app.post("/endgame/loot/<int:award_id>/delete")
     @admin_required
@@ -3298,7 +3712,8 @@ def create_app(test_config=None):
         if not can_create_guild_events():
             abort(403, description="Only designated administrators can remove loot.")
         award = get_db().execute(
-            "SELECT item FROM endgame_loot_awards WHERE id=?", (award_id,)
+            """SELECT l.item,l.dkp_cost,m.name FROM endgame_loot_awards l
+               JOIN members m ON m.id=l.recipient_member_id WHERE l.id=?""", (award_id,)
         ).fetchone()
         if not award:
             abort(404)
@@ -3309,8 +3724,8 @@ def create_app(test_config=None):
             (editor["id"], "Event Loot", "Award removed", f"Award #{award_id}: {award['item']}"),
         )
         get_db().commit()
-        flash("Loot award removed.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor="events"))
+        flash(f"Removed {award['item']} and restored {int(round(award['dkp_cost']))} DKP to {award['name']}.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor=("loot" if request.form.get("return_to") == "loot" else "events")))
 
     @app.get("/api/job-roster/members")
     def job_roster_members_api():

@@ -105,8 +105,8 @@ def test_header_uses_single_yellow_account_control(tmp_path):
     ))
     assert b"Help Requests" not in nav
     assert b"My Requests" not in nav
-    assert b'class="nav-section-break"' in nav
-    assert b">Operations</span>" in nav
+    assert b'class="nav-section-break"' not in nav
+    assert b">Operations</span>" not in nav
     assert b">Members</a>" not in nav
 
     with client.session_transaction() as session:

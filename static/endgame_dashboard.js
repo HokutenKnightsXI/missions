@@ -9,8 +9,11 @@
     viewPanels.forEach(panel => { panel.hidden = panel.dataset.endgameViewPanel !== name; });
   };
   viewTabs.forEach(tab => tab.addEventListener("click", () => {
-    const name = tab.dataset.endgameView; activateView(name);
-    history.replaceState(null, "", name === "event-calendar" ? "#event-calendar" : "#priority");
+    const name = tab.dataset.endgameView;
+    activateView(name);
+    if (name === "dkp-loot") activate("bidding-live");
+    else if (name === "operations") activate("events");
+    else history.replaceState(null, "", "#calendar");
   }));
   const activate = name => {
     tabs.forEach(tab => tab.classList.toggle("active", tab.dataset.endgameTab === name));
@@ -19,8 +22,9 @@
   };
   tabs.forEach(tab => tab.addEventListener("click", () => activate(tab.dataset.endgameTab)));
   const requested = location.hash.slice(1);
-  if (tabs.some(tab => tab.dataset.endgameTab === requested)) { activateView("operations"); activate(requested); }
-  else activateView("event-calendar");
+  if (["bidding-live", "jobs", "priority", "loot"].includes(requested)) { activateView("dkp-loot"); activate(requested); }
+  else if (["events", "pops", "admin-audit"].includes(requested)) { activateView("operations"); activate(requested); }
+  else activateView("calendar");
   const guildDateInput = document.querySelector('.event-create-form .native-date-input');
   const guildDateDisplay = document.querySelector('#guild-event-date-display');
   const guildDateButton = document.querySelector('#pick-guild-event-date');
@@ -47,6 +51,89 @@
   const adminAudit = [...(window.ENDGAME_SERVER_AUDIT || []), ...JSON.parse(localStorage.getItem(adminAuditKey) || "[]")];
   let auditSort = {key: "at", direction: -1};
   const safeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
+  const priorityLabel = value => ({"Main priority":"P1","Secondary priority":"P2","P1 Auction":"P1","P2 Auction":"P2","P3 Auction":"P3"}[value] || value || "Freelot");
+  const auctionRoot = document.querySelector("#active-auctions");
+  let auctionEditingUntil = 0;
+  let auctionTooltips = {};
+  const auctionError = message => `<p class="auction-message error">${safeText(message)}</p>`;
+  const countdownText = endsAt => {
+    const seconds = Math.max(0, Math.ceil((Date.parse(`${endsAt}Z`) - Date.now()) / 1000));
+    return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  };
+  const renderAuctions = payload => {
+    if (!auctionRoot) return;
+    document.querySelector("#auction-my-dkp").textContent = `${payload.my_available} DKP${payload.my_reserved ? ` (${payload.my_reserved} committed)` : ""}`;
+    document.querySelector("#auction-bid-cap").textContent = `${payload.dkp.cap} DKP`;
+    document.querySelector("#auction-highest-dkp").textContent = `${payload.dkp.highest} DKP`;
+    auctionTooltips = Object.fromEntries(payload.auctions.flatMap(auction => auction.items.map(item => [String(item.id), item.tooltip || {}])));
+    auctionRoot.innerHTML = payload.auctions.length ? payload.auctions.map(auction => {
+      const active = auction.status === "Active";
+      const acceptingBids = active && !auction.paused;
+      const items = auction.items.map(item => {
+        const bids = item.bids.length ? item.bids.map((bid, index) => `<li class="${index === 0 ? "leading" : ""}"><span><b>${safeText(bid.name)}</b> ${safeText(bid.job)} · P${bid.tier === 4 ? "Free" : bid.tier}</span><strong>${bid.amount} DKP</strong></li>`).join("") : '<li class="no-bids">No bids yet</li>';
+        const jobOptions = item.eligible_jobs.map(entry => `<option value="${entry.job}" ${item.my_bid?.job === entry.job ? "selected" : ""}>${entry.job} · Lv.${entry.level} · ${entry.tier === 4 ? "Freelot" : `P${entry.tier}`}</option>`).join("");
+        const bidderOptions = item.bids.map(bid => `<option value="${bid.member_id}" ${bid.member_id === item.suggested_winner_id ? "selected" : ""}>${safeText(bid.name)} · ${bid.job} · ${bid.amount} DKP · P${bid.tier === 4 ? "Free" : bid.tier}</option>`).join("");
+        return `<article class="auction-item-card"><header><div><h4><button class="auction-tooltip-target" type="button" data-auction-tooltip="${item.id}">${safeText(item.item)}</button></h4><small>${item.target_item && item.target_item !== item.item ? `${safeText(item.target_item)} · ` : ""}${safeText(item.family)} · Lv.${item.required_level}</small></div><b>${item.bids.length} bid${item.bids.length === 1 ? "" : "s"}</b></header><ol class="auction-bid-list">${bids}</ol>${acceptingBids ? (jobOptions ? `<form class="auction-bid-form" data-auction-item="${item.id}"><select name="job" required><option value="">Eligible job</option>${jobOptions}</select><input type="number" name="amount" min="1" max="${item.max_bid}" value="${item.my_bid?.amount || ""}" placeholder="DKP" required><button type="submit">${item.my_bid ? "Update Bid" : "Place Bid"}</button><small class="auction-bid-budget">Up to ${item.max_bid} DKP; increasing this may reduce other active bids</small></form>` : '<p class="auction-ineligible">No eligible leveled job for this item.</p>') : (active ? '<p class="auction-paused-note">Bidding is paused by leadership.</p>' : `<label class="auction-winner-select">Confirmed winner<select name="winner_${item.id}" form="confirm-auction-${auction.id}"><option value="">No award</option>${bidderOptions}</select></label>`)}</article>`;
+      }).join("");
+      const pauseControl = active && payload.is_admin ? `<form class="auction-pause-form" method="post" action="/endgame/auctions/${auction.id}/pause"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button type="submit">${auction.paused ? "Resume Auction" : "Pause Auction"}</button></form>` : "";
+      return `<section class="auction-card ${active ? "active" : "closed"} ${auction.paused ? "paused" : ""}"><header><div><span>${safeText(auction.area)} · ${safeText(auction.event_name)}</span><h3>${safeText(auction.boss)}</h3>${pauseControl}</div><div class="auction-clock"><small>${auction.paused ? "Countdown frozen" : (active ? "Bidding closes in" : "Bidding closed")}</small><b data-auction-ends="${auction.ends_at}" data-auction-paused="${auction.paused ? "true" : "false"}">${auction.paused ? "PAUSED" : (active ? countdownText(auction.ends_at) : "00:00")}</b></div></header>${!active && payload.is_admin ? `<form id="confirm-auction-${auction.id}" class="auction-confirm-form" method="post" action="/endgame/auctions/${auction.id}/confirm"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><p>Review the suggested winners, then confirm the items that actually dropped.</p></form>` : ""}<div class="auction-item-grid">${items}</div>${!active && payload.is_admin ? `<button class="button primary auction-confirm-button" type="submit" form="confirm-auction-${auction.id}">Confirm Winners &amp; Deduct DKP</button>` : ""}</section>`;
+    }).join("") : '<p class="event-empty">No active or recently closed auctions. An administrator can start one for an Endgame event above.</p>';
+    const recent = document.querySelector("#recent-auction-bids");
+    recent.innerHTML = payload.recent_bids.length ? payload.recent_bids.map(bid => `<article><span><b>${safeText(bid.name)}</b> bid on ${safeText(bid.item)}<small>${safeText(bid.boss)} · ${safeText(bid.job)}</small></span><strong>${bid.amount} DKP</strong></article>`).join("") : '<p class="event-empty">No bids have been placed.</p>';
+  };
+  const loadAuctions = async () => {
+    if (!auctionRoot) return;
+    if (Date.now() < auctionEditingUntil || document.activeElement?.closest?.(".auction-bid-form")) return;
+    try {
+      const response = await fetch("/api/endgame/auctions", {headers: {"Accept": "application/json"}});
+      if (!response.ok) throw new Error("Could not refresh bidding.");
+      const payload = await response.json();
+      if (Date.now() < auctionEditingUntil || document.activeElement?.closest?.(".auction-bid-form")) return;
+      renderAuctions(payload);
+      const state = document.querySelector("#auction-refresh-state");
+      if (state) state.textContent = `Updated ${new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"})}`;
+    } catch (error) { auctionRoot.innerHTML = auctionError(error.message); }
+  };
+  document.addEventListener("submit", async event => {
+    const form = event.target.closest(".auction-bid-form");
+    if (!form) return;
+    event.preventDefault();
+    const button = form.querySelector("button"); button.disabled = true;
+    try {
+      const values = new FormData(form);
+      const response = await fetch(`/api/endgame/auction-items/${form.dataset.auctionItem}/bid`, {method: "POST", headers: {"Content-Type": "application/json", "X-CSRF-Token": window.ENDGAME_CSRF}, body: JSON.stringify({job: values.get("job"), amount: values.get("amount")})});
+      if (!response.ok) { const text = await response.text(); throw new Error(text.match(/<p>(.*?)<\/p>/s)?.[1] || "The bid could not be placed."); }
+      const result = await response.json();
+      renderAuctions(result.auction);
+      if (result.adjusted?.length) alert(`Bid updated. To keep your total within your DKP, these bids were adjusted:\n${result.adjusted.map(row => `${row.item}: ${row.from} → ${row.to} DKP`).join("\n")}`);
+    } catch (error) { alert(error.message); button.disabled = false; }
+  });
+  if (auctionRoot) {
+    auctionRoot.addEventListener("input", event => { if (event.target.closest(".auction-bid-form")) auctionEditingUntil = Date.now() + 15000; });
+    auctionRoot.addEventListener("change", event => { if (event.target.closest(".auction-bid-form")) auctionEditingUntil = Date.now() + 15000; });
+    loadAuctions();
+    setInterval(loadAuctions, 3000);
+    setInterval(() => document.querySelectorAll("[data-auction-ends]").forEach(clock => { if (clock.dataset.auctionPaused !== "true") clock.textContent = countdownText(clock.dataset.auctionEnds); }), 1000);
+  }
+  const auctionTooltip = document.querySelector("#auction-item-tooltip");
+  const placeAuctionTooltip = (x, y) => {
+    if (!auctionTooltip || auctionTooltip.hidden) return;
+    const gap = 14, width = auctionTooltip.offsetWidth, height = auctionTooltip.offsetHeight;
+    auctionTooltip.style.left = `${Math.max(10, Math.min(innerWidth - width - 10, x + gap))}px`;
+    auctionTooltip.style.top = `${Math.max(10, Math.min(innerHeight - height - 10, y + gap))}px`;
+  };
+  const showAuctionTooltip = (target, x, y) => {
+    const item = auctionTooltips[target.dataset.auctionTooltip];
+    if (!auctionTooltip || !item) return;
+    const rarity = [item.rare ? "Rare" : "", item.ex ? "Ex" : ""].filter(Boolean).join("/");
+    auctionTooltip.innerHTML = `${item.item_id ? `<img src="https://static.ffxiah.com/images/icon/${item.item_id}.png" alt="">` : ""}<div><strong>${safeText(item.name)}</strong><span>${rarity ? `${rarity} · ` : ""}Level ${item.level || "—"} · ${safeText((item.slots || []).join(" / "))}</span><p>${safeText(item.description || "No item stats available.")}</p><small>${safeText((item.jobs || []).join(" / "))}</small></div>`;
+    auctionTooltip.hidden = false; placeAuctionTooltip(x, y);
+  };
+  document.addEventListener("pointerover", event => { const target = event.target.closest("[data-auction-tooltip]"); if (target) showAuctionTooltip(target, event.clientX, event.clientY); });
+  document.addEventListener("pointermove", event => placeAuctionTooltip(event.clientX, event.clientY));
+  document.addEventListener("pointerout", event => { if (event.target.closest("[data-auction-tooltip]") && !event.relatedTarget?.closest?.("[data-auction-tooltip]")) auctionTooltip.hidden = true; });
+  document.addEventListener("focusin", event => { const target = event.target.closest("[data-auction-tooltip]"); if (target) { const box = target.getBoundingClientRect(); showAuctionTooltip(target, box.right, box.top); } });
+  document.addEventListener("focusout", event => { if (event.target.closest("[data-auction-tooltip]") && auctionTooltip) auctionTooltip.hidden = true; });
   const renderAdminAudit = () => {
     const body = document.querySelector("#admin-audit-body");
     if (!body) return;
@@ -171,7 +258,6 @@
   rankMatrixPriority();
 
   const rosterSearch = document.querySelector("#endgame-roster-search");
-  const tierFilter = document.querySelector("#endgame-tier-filter");
   const columnFilters = [...document.querySelectorAll("[data-roster-filter]")];
   const filterRoster = () => document.querySelectorAll("#endgame-roster-body tr").forEach(row => {
     const query = rosterSearch.value.toLowerCase();
@@ -181,13 +267,9 @@
       const actual = (row.dataset[control.dataset.rosterFilter] || "").toLowerCase();
       return control.dataset.filterMode === "min" ? Number(actual) >= Number(wanted) : actual.includes(wanted);
     });
-    row.hidden = !(`${row.dataset.name} ${row.dataset.jobs}`.includes(query) && (!tierFilter.value || Number(row.dataset.dkp) >= Number(tierFilter.value)) && columnMatch);
+    row.hidden = !(`${row.dataset.name} ${row.dataset.jobs}`.includes(query) && columnMatch);
   });
-  [rosterSearch, tierFilter, ...columnFilters].forEach(control => control.addEventListener("input", filterRoster));
-  document.querySelector(".clear-roster-filters").addEventListener("click", () => {
-    columnFilters.forEach(control => { control.value = ""; });
-    rosterSearch.value = ""; tierFilter.value = ""; filterRoster();
-  });
+  [rosterSearch, ...columnFilters].filter(Boolean).forEach(control => control.addEventListener("input", filterRoster));
   let rosterSort = {key: "name", direction: 1};
   document.querySelectorAll("[data-roster-sort]").forEach(button => button.addEventListener("click", () => {
     const key = button.dataset.rosterSort;
@@ -210,19 +292,20 @@
     defaultRosterSort.classList.add("active");
     defaultRosterSort.querySelector("span").textContent = "ASC";
   }
-  const lootSearch = document.querySelector("#loot-log-search"), lootMajor = document.querySelector("#loot-major-filter");
+  const lootSearch = document.querySelector("#loot-log-search");
   const lootColumnFilters = [...document.querySelectorAll("[data-loot-filter]")];
   const filterLoot = () => document.querySelectorAll("#loot-log-body tr").forEach(row => {
     const columnMatch = lootColumnFilters.every(control => {
       const wanted = control.value.trim().toLowerCase();
-      return !wanted || (row.dataset[control.dataset.lootFilter] || "").includes(wanted);
+      const actual = (row.dataset[control.dataset.lootFilter] || "").toLowerCase();
+      return !wanted || (control.dataset.filterMode === "min" ? Number(actual) >= Number(wanted) : actual.includes(wanted));
     });
-    row.hidden = !(row.dataset.search.includes(lootSearch.value.toLowerCase()) && (!lootMajor.value || row.dataset.major === lootMajor.value) && columnMatch);
+    row.hidden = !(row.dataset.search.includes(lootSearch.value.toLowerCase()) && columnMatch);
   });
-  [lootSearch, lootMajor, ...lootColumnFilters].forEach(control => control.addEventListener("input", filterLoot));
-  document.querySelector(".clear-loot-filters").addEventListener("click", () => {
+  [lootSearch, ...lootColumnFilters].filter(Boolean).forEach(control => control.addEventListener("input", filterLoot));
+  document.querySelector(".clear-loot-filters")?.addEventListener("click", () => {
     lootColumnFilters.forEach(control => { control.value = ""; });
-    lootSearch.value = ""; lootMajor.value = ""; filterLoot();
+    lootSearch.value = ""; filterLoot();
   });
   let lootSort = {key: "date", direction: -1};
   document.querySelectorAll("[data-loot-sort]").forEach(button => button.addEventListener("click", () => {
@@ -279,7 +362,7 @@
       ? attendanceRows.map(member => `<div class="event-admin-row"><label><input type="checkbox" data-event-attendee="${safeText(member.name)}" ${attendeeNames.has(member.name) ? "checked" : ""}><b>${safeText(member.name)}</b></label><span>${safeText(member.main_job || "Unassigned")}</span></div>`).join("")
       : attendanceRows.map(member => `<tr><td><b>${safeText(member.name)}</b></td><td>${safeText(member.main_job || "Unassigned")}</td><td><span class="attendance-mark">Attended</span></td></tr>`).join("");
     const lootContent = window.ENDGAME_IS_ADMIN
-      ? state.loot.map((row, index) => `<div class="event-loot-editor" data-event-loot-row="${index}"><input name="item" value="${safeText(row.item)}" aria-label="Item"><select name="player" aria-label="Recipient">${memberOptions(row.player)}</select><select name="job" aria-label="Job">${jobOptions(row.job)}</select><select name="award" aria-label="Distribution"><option ${row.award === "Main priority" ? "selected" : ""}>Main priority</option><option ${row.award === "Secondary priority" ? "selected" : ""}>Secondary priority</option><option ${row.award === "Freelot" ? "selected" : ""}>Freelot</option></select><select name="major" aria-label="Classification"><option value="major" ${row.major ? "selected" : ""}>Major</option><option value="normal" ${!row.major ? "selected" : ""}>Standard</option></select><span><button type="button" data-save-event-loot="${index}">Save</button><button class="remove-event-loot" type="button" data-remove-event-loot="${index}">Remove</button></span></div>`).join("")
+      ? state.loot.map((row, index) => `<div class="event-loot-editor" data-event-loot-row="${index}"><input name="item" value="${safeText(row.item)}" aria-label="Item"><select name="player" aria-label="Recipient">${memberOptions(row.player)}</select><select name="job" aria-label="Job">${jobOptions(row.job)}</select><select name="award" aria-label="Priority">${["P1","P2","P3","Freelot"].map(value => `<option ${priorityLabel(row.award) === value ? "selected" : ""}>${value}</option>`).join("")}</select><span><button type="button" data-save-event-loot="${index}">Save</button><button class="remove-event-loot" type="button" data-remove-event-loot="${index}">Remove</button></span></div>`).join("")
       : state.loot.map(row => `<tr><td class="event-loot-item"><b>${safeText(row.item)}</b><small>${safeText(row.family)} / ${row.major ? "Major Loot" : "Standard"}</small></td><td>${safeText(row.player)}</td><td><span class="job-badge main">${safeText(row.job)}</span></td><td>${safeText(row.award)}</td></tr>`).join("");
     dialogEyebrow.textContent = `${date} / Endgame event`;
     dialogTitle.textContent = eventButton.dataset.eventName;
@@ -292,7 +375,7 @@
       }));
       dialogContent.querySelectorAll("[data-save-event-loot]").forEach(button => button.addEventListener("click", () => {
         const index = Number(button.dataset.saveEventLoot), editor = button.closest("[data-event-loot-row]"), previous = {...state.loot[index]};
-        state.loot[index] = {...previous, item: editor.querySelector('[name="item"]').value.trim(), player: editor.querySelector('[name="player"]').value, job: editor.querySelector('[name="job"]').value, award: editor.querySelector('[name="award"]').value, major: editor.querySelector('[name="major"]').value === "major"};
+        state.loot[index] = {...previous, item: editor.querySelector('[name="item"]').value.trim(), player: editor.querySelector('[name="player"]').value, job: editor.querySelector('[name="job"]').value, award: editor.querySelector('[name="award"]').value};
         saveEventState(); recordAdminChange("Event Loot", "Drop updated", `${previous.item} / ${previous.player} to ${state.loot[index].item} / ${state.loot[index].player} (${date})`); renderEventDetail(eventButton);
       }));
       dialogContent.querySelectorAll("[data-remove-event-loot]").forEach(button => button.addEventListener("click", () => {
@@ -337,11 +420,18 @@
       const rosterMember = roster.find(row => row.name.toLowerCase() === memberCell.closest("tr").dataset.name);
       const member = rosterMember ? (window.ENDGAME_MEMBER_DETAILS || {})[String(rosterMember.id)] : null;
       if (!member) return;
-      const eventRows = member.events.map(row => `<tr><td><button class="member-event-link" type="button" data-member-event-link="${row.id}">${safeText(row.start_at.slice(0,10))}<small>${safeText(row.name)}</small></button></td><td><span class="attendance-result ${row.attended ? "attended" : "missed"}">${row.attended ? "✓ Attended" : "✕ Not attended"}</span></td></tr>`).join("");
-      const lootRows = member.loot.map(row => `<tr><td><button class="member-loot-link" type="button" data-member-loot-link="${row.event_id}"><b>${safeText(row.item)}</b><small>${safeText(row.family)} / ${row.major ? "Major Loot" : "Standard"}</small></button></td><td><button class="member-event-link" type="button" data-member-event-link="${row.event_id}">${safeText(row.event_date)}<small>${safeText(row.event_name)}</small></button></td><td>${Number(row.dkp_cost || 0)} DKP</td></tr>`).join("");
+      const eventRows = member.events.map(row => {
+        const positive = row.is_upcoming ? row.signed_up : row.attended;
+        const status = row.is_upcoming
+          ? (row.signed_up ? "✓ Signed Up" : "✕ Not Signed Up")
+          : (row.attended ? "✓ Attended" : "✕ Not Attended");
+        return `<tr><td><button class="member-event-link" type="button" data-member-event-link="${row.id}">${safeText(row.start_at.slice(0,10))}<small>${safeText(row.name)}</small></button></td><td><span class="attendance-result ${positive ? "attended" : "missed"}">${status}</span></td></tr>`;
+      }).join("");
+      const lootRows = member.loot.map(row => `<tr><td><button class="member-loot-link" type="button" data-member-loot-link="${row.event_id}"><b>${safeText(row.item)}</b><small>${safeText(priorityLabel(row.award))}</small></button></td><td><button class="member-event-link" type="button" data-member-event-link="${row.event_id}">${safeText(row.event_date)}<small>${safeText(row.event_name)}</small></button></td><td>${Number(row.dkp_cost || 0)} DKP</td></tr>`).join("");
       dialogEyebrow.textContent = "Member event and award history";
       dialogTitle.textContent = member.name;
-      dialogContent.innerHTML = `<div class="member-history-summary dkp-member-summary"><span>DKP balance <b>${member.dkp}</b></span><span>Total spent <b>${member.total_spent}</b></span><span>Lifetime earned <b>${member.lifetime_earned}</b></span><span>Last event <b>${safeText(member.last_event)}</b></span></div><section class="member-history-section"><header><h3>Event Attendance</h3><span>${member.events.filter(row => row.attended).length}/${member.events.length} attended</span></header><div class="endgame-table-wrap"><table class="endgame-table member-history-table"><thead><tr><th>Event</th><th>Attendance</th></tr></thead><tbody>${eventRows}</tbody></table></div></section><section class="member-history-section"><header><h3>Loot Wins</h3><span>${member.loot.length} awards</span></header><div class="endgame-table-wrap">${lootRows ? `<table class="endgame-table member-history-table"><thead><tr><th>Item</th><th>Event</th><th>DKP spent</th></tr></thead><tbody>${lootRows}</tbody></table>` : '<p class="event-empty">No loot wins recorded.</p>'}</div></section>`;
+      const completedEvents = member.events.filter(row => !row.is_upcoming);
+      dialogContent.innerHTML = `<div class="member-history-summary dkp-member-summary"><span>DKP balance <b>${member.dkp}</b></span><span>Total spent <b>${member.total_spent}</b></span><span>Lifetime earned <b>${member.lifetime_earned}</b></span><span>Last event <b>${safeText(member.last_event)}</b></span></div><section class="member-history-section"><header><h3>Event Attendance</h3><span>${completedEvents.filter(row => row.attended).length}/${completedEvents.length} attended</span></header><div class="endgame-table-wrap"><table class="endgame-table member-history-table"><thead><tr><th>Event</th><th>Status</th></tr></thead><tbody>${eventRows}</tbody></table></div></section><section class="member-history-section"><header><h3>Loot Wins</h3><span>${member.loot.length} awards</span></header><div class="endgame-table-wrap">${lootRows ? `<table class="endgame-table member-history-table"><thead><tr><th>Item</th><th>Event</th><th>DKP spent</th></tr></thead><tbody>${lootRows}</tbody></table>` : '<p class="event-empty">No loot wins recorded.</p>'}</div></section>`;
       dialog.classList.add("member-history-dialog");
       dialog.showModal();
       return;
@@ -353,10 +443,9 @@
       const awards = selected.loot || [];
       const allMembers = window.ENDGAME_MEMBERS || [];
       const csrf = safeText(document.querySelector('input[name="csrf_token"]')?.value || window.ENDGAME_CSRF || "");
-      const familyOptions = ["Weapons", "Head", "Body", "Hands", "Legs", "Feet", "Accessories", "Other"];
       const lootPanel = window.ENDGAME_IS_ADMIN
-        ? awards.map(row => `<form method="post" action="/endgame/loot/${row.id}/update" class="event-loot-persistent-editor"><input type="hidden" name="csrf_token" value="${csrf}"><input name="item" value="${safeText(row.item)}" aria-label="Item"><select name="member_id" aria-label="Recipient">${allMembers.map(member => `<option value="${member.id}" ${member.name === row.player ? "selected" : ""}>${safeText(member.name)}</option>`).join("")}</select><select name="job" aria-label="Receiving job">${jobs.map(job => `<option ${job === row.job ? "selected" : ""}>${job}</option>`).join("")}</select><select name="family" aria-label="Item family">${familyOptions.map(family => `<option ${family === row.family ? "selected" : ""}>${family}</option>`).join("")}</select><select name="distribution" aria-label="Award category"><option ${row.award === "Main priority" ? "selected" : ""}>Main priority</option><option ${row.award === "Secondary priority" ? "selected" : ""}>Secondary priority</option><option ${row.award === "Freelot" ? "selected" : ""}>Freelot</option></select><select name="classification" aria-label="Classification"><option ${row.major ? "selected" : ""}>Major Loot</option><option ${!row.major ? "selected" : ""}>Standard</option></select><div><button type="submit">Save</button><button class="danger" type="submit" formaction="/endgame/loot/${row.id}/delete">Remove</button></div></form>`).join("") || '<p class="event-empty">No loot was recorded for this event.</p>'
-        : awards.length ? `<table class="event-detail-table"><thead><tr><th>Item</th><th>Recipient</th><th>Job</th><th>Award</th></tr></thead><tbody>${awards.map(row => `<tr><td class="event-loot-item"><b>${safeText(row.item)}</b><small>${safeText(row.family)} / ${row.major ? "Major Loot" : "Standard"}</small></td><td>${safeText(row.player)}</td><td><span class="job-badge main">${safeText(row.job)}</span></td><td>${safeText(row.award)}</td></tr>`).join("")}</tbody></table>` : '<p class="event-empty">No loot was recorded for this event.</p>';
+        ? awards.map(row => `<form method="post" action="/endgame/loot/${row.id}/update" class="event-loot-persistent-editor"><input type="hidden" name="csrf_token" value="${csrf}"><input type="hidden" name="family" value="${safeText(row.family || "Other")}"><input type="hidden" name="classification" value="Major Loot"><input name="item" value="${safeText(row.item)}" aria-label="Item"><select name="member_id" aria-label="Recipient">${allMembers.map(member => `<option value="${member.id}" ${member.name === row.player ? "selected" : ""}>${safeText(member.name)}</option>`).join("")}</select><select name="job" aria-label="Receiving job">${jobs.map(job => `<option ${job === row.job ? "selected" : ""}>${job}</option>`).join("")}</select><select name="distribution" aria-label="Priority">${["P1","P2","P3","Freelot"].map(value => `<option ${priorityLabel(row.award) === value ? "selected" : ""}>${value}</option>`).join("")}</select><input type="number" name="dkp_cost" min="0" max="999" step="1" value="${Number(row.dkp_cost || 0)}" aria-label="DKP spent"><div><button type="submit">Save</button><button class="danger" type="submit" formaction="/endgame/loot/${row.id}/delete">Remove &amp; Restore DKP</button></div></form>`).join("") || '<p class="event-empty">No loot was recorded for this event.</p>'
+        : awards.length ? `<table class="event-detail-table"><thead><tr><th>Item</th><th>Recipient</th><th>Job</th><th>Priority</th><th>DKP</th></tr></thead><tbody>${awards.map(row => `<tr><td class="event-loot-item"><b>${safeText(row.item)}</b></td><td>${safeText(row.player)}</td><td><span class="job-badge main">${safeText(row.job)}</span></td><td>${safeText(priorityLabel(row.award))}</td><td>${Number(row.dkp_cost || 0)}</td></tr>`).join("")}</tbody></table>` : '<p class="event-empty">No loot was recorded for this event.</p>';
       dialogEyebrow.textContent = `${selected.start_at.slice(0, 10)} / Endgame event`;
       dialogTitle.textContent = `${selected.name} / Loot`;
       dialogContent.innerHTML = `<section class="event-detail-column event-loot-only"><header><h3>Event Loot</h3><span>${awards.length} awards</span></header><div class="event-detail-scroll">${lootPanel}</div></section>`;
