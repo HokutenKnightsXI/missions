@@ -151,6 +151,23 @@ def test_catalog_decodes_rare_and_ex_item_flags():
     assert rows["Optical Hat"]["ex"] is True
 
 
+def test_catalog_applies_horizon_stats_to_reclaimed_and_changed_items():
+    items = (
+        '[11494] = {id=11494,en="Circe\'s Hat",category="Armor",flags=0,'
+        'jobs=8388606,level=30,races=510,slots=16,type=5},\n'
+        '[13830] = {id=13830,en="Lgn. Circlet",category="Armor",flags=0,'
+        'jobs=8388606,level=30,races=510,slots=16,type=5},\n'
+    )
+    descriptions = (
+        '[11494] = {id=11494,en="Retail-era description"},\n'
+        '[13830] = {id=13830,en="DEF:10 Wind Resistance+4 Earth Resistance+4"},\n'
+    )
+    rows = {item["name"]: item for item in build_catalog(items, descriptions, {}).get("rows", [])}
+    assert rows["Circe's Hat"]["stats"] == {"DEF": 8, "MP": 6, "MND": 2}
+    assert rows["Lgn. Circlet"]["stats"]["MND"] == 1
+    assert rows["Lgn. Circlet"]["stats"]["MP"] == 5
+
+
 def test_catalog_assigns_psxi_auction_house_categories():
     items = (
         '[18254] = {id=18254,en="Tiphia Sting",category="Weapon",flags=34820,'
@@ -198,6 +215,13 @@ def test_bundled_catalog_has_level_75_gear_and_searchable_stats():
     assert len(lightning_items) > 100
     assert all(1 <= item["level"] <= 75 for item in payload["rows"])
     assert all(item["jobs"] and item["races"] and item["slots"] for item in payload["rows"])
+    rows = {item["name"]: item for item in payload["rows"]}
+    for name, mnd in (("Circe's Hat", 2), ("Lgn. Circlet", 1)):
+        assert rows[name]["level"] <= 38
+        assert "BLU" in rows[name]["jobs"]
+        assert "Tarutaru Female" in rows[name]["races"]
+        assert "Head" in rows[name]["slots"]
+        assert rows[name]["stats"]["MND"] == mnd
 
 
 def test_normalize_horizon_item_uses_live_metadata():

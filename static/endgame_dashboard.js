@@ -1,4 +1,5 @@
 (() => {
+  document.querySelectorAll('input[name="dkp_cost"]').forEach(input => { input.step = "1"; });
   const tabs = [...document.querySelectorAll("[data-endgame-tab]")];
   const panels = [...document.querySelectorAll("[data-endgame-panel]")];
   const viewTabs = [...document.querySelectorAll("[data-endgame-view]")];
@@ -44,11 +45,17 @@
   const jobChanges = JSON.parse(localStorage.getItem(jobChangeKey) || "[]");
   const adminAuditKey = "hokuten-admin-audit";
   const adminAudit = [...(window.ENDGAME_SERVER_AUDIT || []), ...JSON.parse(localStorage.getItem(adminAuditKey) || "[]")];
+  let auditSort = {key: "at", direction: -1};
   const safeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
   const renderAdminAudit = () => {
     const body = document.querySelector("#admin-audit-body");
     if (!body) return;
-    body.innerHTML = adminAudit.length ? adminAudit.slice().reverse().map(row => `<tr><td>${safeText(row.at)}</td><td><b>${safeText(row.actor)}</b></td><td>${safeText(row.area)}</td><td>${safeText(row.action)}</td><td>${safeText(row.details)}</td></tr>`).join("") : '<tr><td colspan="5">No administrator changes have been recorded in this browser yet.</td></tr>';
+    const filters = [...document.querySelectorAll("[data-audit-filter]")].reduce((values, control) => ({...values, [control.dataset.auditFilter]: control.value.trim().toLowerCase()}), {});
+    const rows = adminAudit.filter(row => Object.entries(filters).every(([key, wanted]) => !wanted || String(row[key] ?? "").toLowerCase().includes(wanted))).sort((left, right) => {
+      if (auditSort.key === "at") return ((Date.parse(left.at) || 0) - (Date.parse(right.at) || 0)) * auditSort.direction;
+      return String(left[auditSort.key] ?? "").localeCompare(String(right[auditSort.key] ?? ""), undefined, {numeric: true}) * auditSort.direction;
+    });
+    body.innerHTML = rows.length ? rows.map(row => `<tr><td>${safeText(row.at)}</td><td><b>${safeText(row.actor)}</b></td><td>${safeText(row.area)}</td><td>${safeText(row.action)}</td><td>${safeText(row.details)}</td></tr>`).join("") : '<tr><td colspan="5">No administrator changes match the current filters.</td></tr>';
   };
   const recordAdminChange = (area, action, details) => {
     adminAudit.push({at: new Date().toLocaleString(), actor: window.ENDGAME_ACTOR || "Administrator", area, action, details});
@@ -56,6 +63,30 @@
     renderAdminAudit();
   };
   renderAdminAudit();
+  const auditFilters = [...document.querySelectorAll("[data-audit-filter]")];
+  auditFilters.forEach(control => control.addEventListener("input", renderAdminAudit));
+  document.querySelector(".clear-audit-filters")?.addEventListener("click", () => {
+    auditFilters.forEach(control => { control.value = ""; });
+    renderAdminAudit();
+  });
+  document.querySelectorAll("[data-audit-sort]").forEach(button => button.addEventListener("click", () => {
+    const key = button.dataset.auditSort;
+    auditSort = {key, direction: auditSort.key === key ? -auditSort.direction : 1};
+    document.querySelectorAll("[data-audit-sort]").forEach(control => {
+      control.classList.toggle("active", control === button);
+      control.querySelector("span").textContent = control === button ? (auditSort.direction > 0 ? "ASC" : "DESC") : "Sort";
+    });
+    renderAdminAudit();
+  }));
+  const refreshJobCooldowns = () => document.querySelectorAll("[data-job-cooldown-until]").forEach(label => {
+    const remaining = Math.max(0, Date.parse(label.dataset.jobCooldownUntil) - Date.now());
+    if (!remaining) { label.hidden = true; return; }
+    const days = Math.floor(remaining / 86400000);
+    const hours = Math.floor((remaining % 86400000) / 3600000);
+    label.textContent = `Job change: ${days}d ${hours}h remaining`;
+  });
+  refreshJobCooldowns();
+  setInterval(refreshJobCooldowns, 60000);
   const jobHistory = (member, slot) => jobChanges.filter(row => row.member === member && row.slot === slot);
   const jobHistoryLabel = (member, slot) => {
     const changes = jobHistory(member, slot);
@@ -106,31 +137,35 @@
     const item = priorityItems.find(row => row.name === priorityItem.value);
     if (!item) {
       document.querySelector("#priority-source").value = "";
-      document.querySelector("#priority-family").value = "";
       document.querySelector("#priority-title").textContent = "Select an item";
       document.querySelector("#priority-note").textContent = "Source, item family, job tiers, and calculated priority will appear automatically.";
       document.querySelector("#priority-tiers").innerHTML = "";
       priorityBody.innerHTML = '<tr><td colspan="8">Select a Sky or Sea drop to calculate priority.</td></tr>';
       return;
     }
-    const major = priorityMajor.value === "major";
     const tierFor = job => item.freelot ? 4 : item.p1.includes(job) ? 1 : item.p2.includes(job) ? 2 : item.p3.includes(job) ? 3 : 99;
     const candidates = roster.map(member => {
-      const mainTier = tierFor(member.main_job), secondaryTier = tierFor(member.secondary_job);
+      const canEquip = job => job && Number((member.job_levels || {})[job] || 0) >= Number(item.required_level || 1);
+      const mainTier = canEquip(member.main_job) ? tierFor(member.main_job) : 99;
+      const secondaryTier = canEquip(member.secondary_job) ? tierFor(member.secondary_job) : 99;
       const useMain = mainTier <= secondaryTier;
       return {...member, priorityTier: Math.min(mainTier, secondaryTier), jobStatus: useMain ? 1 : 2, eligibleJob: useMain ? member.main_job : member.secondary_job};
     }).filter(member => member.priorityTier < 99 && (item.freelot || member.eligibleJob))
-      .sort((a, b) => a.priorityTier - b.priorityTier || a.jobStatus - b.jobStatus || a.tier - b.tier || (major ? Number(a.cooldown) - Number(b.cooldown) : 0) || a.major_wins - b.major_wins || lastDate(a.last_major_win) - lastDate(b.last_major_win) || a.name.localeCompare(b.name));
+      .sort((a, b) => a.priorityTier - b.priorityTier || b.dkp - a.dkp || a.name.localeCompare(b.name));
     document.querySelector("#priority-source").value = `${item.area} / ${item.source}`;
-    document.querySelector("#priority-family").value = item.family;
     document.querySelector("#priority-title").textContent = `${item.name} / ${item.source}`;
-    document.querySelector("#priority-note").textContent = candidates.length ? `${candidates.length} registered candidates ranked from the supplied job-priority matrix.` : "No member has an eligible registered job for this item.";
+    document.querySelector("#priority-note").textContent = candidates.length ? `${candidates.length} candidates meet the Lv.${item.required_level || 1} equipment requirement, grouped by P1/P2/P3 and sorted by DKP. Only P1 candidates may bid.` : `No registered member has an eligible job at Lv.${item.required_level || 1}.`;
     document.querySelector("#priority-tiers").innerHTML = item.freelot ? '<article class="freelot"><span>Distribution</span><b>Freelot</b><small>Attendance and general eligibility still apply.</small></article>' : [1,2,3].map(tier => `<article><span>P${tier}</span><b>${(item[`p${tier}`] || []).join(" / ") || "None"}</b><small>${tier === 1 ? "First consideration" : tier === 2 ? "After eligible P1 jobs" : "After eligible P1 and P2 jobs"}</small></article>`).join("");
+    let previousRankKey = "", displayedRank = 0;
     priorityBody.innerHTML = candidates.map((member, index) => {
+      const rankKey = `${member.priorityTier}|${member.dkp}`;
+      if (rankKey !== previousRankKey) displayedRank = index + 1;
+      previousRankKey = rankKey;
       const label = item.freelot ? "Freelot" : `P${member.priorityTier}`;
-      const explanation = item.freelot ? `Freelot / Tier ${member.tier} attendance` : `${label} ${member.eligibleJob} / ${member.jobStatus === 1 ? "Main" : "Secondary"} registration`;
-      return `<tr><td><span class="rank-number ${index === 0 ? "top" : ""}">${index + 1}</span></td><td><b>${member.name}</b></td><td><span class="job-badge ${member.jobStatus === 1 ? "main" : ""}">${label} / ${member.jobStatus === 1 ? "Main" : "Secondary"} ${member.eligibleJob || ""}</span></td><td><span class="tier tier-${member.tier}">Tier ${member.tier} / ${member.attendance}%</span></td><td><span class="cooldown ${member.cooldown ? "locked" : "ready"}">${member.cooldown ? "Cooldown" : "Ready"}</span></td><td>${member.major_wins}</td><td>${member.last_major_win}</td><td><small>${explanation}</small></td></tr>`;
-    }).join("") || '<tr><td colspan="8">No eligible registered members for this item.</td></tr>';
+      const canBid = item.freelot || member.priorityTier === 1;
+      const explanation = item.freelot ? "Freelot; normal event rules apply" : canBid ? `P1 ${member.eligibleJob}; eligible to bid up to available DKP` : `${label} fallback; P1 must clear first`;
+      return `<tr><td><span class="rank-number ${displayedRank === 1 ? "top" : ""}">${displayedRank}</span></td><td><b>${member.name}</b></td><td><span class="job-badge ${member.priorityTier === 1 ? "main" : ""}">${label} / ${member.eligibleJob || ""} Lv.${(member.job_levels || {})[member.eligibleJob] || 0}</span></td><td><strong class="dkp-balance">${member.dkp}</strong></td><td><span class="dkp-bid-status ${canBid ? "eligible" : "waiting"}">${canBid ? "May bid" : "Waiting tier"}</span></td><td><small>${explanation}</small></td></tr>`;
+    }).join("") || '<tr><td colspan="6">No eligible registered members for this item.</td></tr>';
   };
   [priorityItem, priorityMajor].forEach(control => control.addEventListener("input", rankMatrixPriority));
   rankMatrixPriority();
@@ -146,7 +181,7 @@
       const actual = (row.dataset[control.dataset.rosterFilter] || "").toLowerCase();
       return control.dataset.filterMode === "min" ? Number(actual) >= Number(wanted) : actual.includes(wanted);
     });
-    row.hidden = !(`${row.dataset.name} ${row.dataset.jobs}`.includes(query) && (!tierFilter.value || row.dataset.tier === tierFilter.value) && columnMatch);
+    row.hidden = !(`${row.dataset.name} ${row.dataset.jobs}`.includes(query) && (!tierFilter.value || Number(row.dataset.dkp) >= Number(tierFilter.value)) && columnMatch);
   });
   [rosterSearch, tierFilter, ...columnFilters].forEach(control => control.addEventListener("input", filterRoster));
   document.querySelector(".clear-roster-filters").addEventListener("click", () => {
@@ -170,6 +205,11 @@
       return left.localeCompare(right, undefined, {numeric: true}) * rosterSort.direction;
     }).forEach(row => body.appendChild(row));
   }));
+  const defaultRosterSort = document.querySelector('[data-roster-sort="name"]');
+  if (defaultRosterSort) {
+    defaultRosterSort.classList.add("active");
+    defaultRosterSort.querySelector("span").textContent = "ASC";
+  }
   const lootSearch = document.querySelector("#loot-log-search"), lootMajor = document.querySelector("#loot-major-filter");
   const lootColumnFilters = [...document.querySelectorAll("[data-loot-filter]")];
   const filterLoot = () => document.querySelectorAll("#loot-log-body tr").forEach(row => {
@@ -297,11 +337,11 @@
       const rosterMember = roster.find(row => row.name.toLowerCase() === memberCell.closest("tr").dataset.name);
       const member = rosterMember ? (window.ENDGAME_MEMBER_DETAILS || {})[String(rosterMember.id)] : null;
       if (!member) return;
-      const eventRows = member.events.map(row => `<tr><td><button class="member-event-link" type="button" data-member-event-link="${row.id}">${safeText(row.start_at.slice(0,10))}<small>${safeText(row.name)}</small></button></td><td><span class="attendance-result ${row.attended ? "attended" : "missed"}">${row.attended ? "✓ Attended" : "✕ Not attended"}</span></td><td><span class="job-badge main">${safeText(row.main_job || "Unassigned")}</span></td><td><span class="job-badge">${safeText(row.secondary_job || "None")}</span></td></tr>`).join("");
-      const lootRows = member.loot.map(row => `<tr><td><button class="member-loot-link" type="button" data-member-loot-link="${row.event_id}"><b>${safeText(row.item)}</b><small>${safeText(row.family)} / ${row.major ? "Major Loot" : "Standard"}</small></button></td><td><button class="member-event-link" type="button" data-member-event-link="${row.event_id}">${safeText(row.event_date)}<small>${safeText(row.event_name)}</small></button></td><td><span class="job-badge main">${safeText(row.job)}</span></td><td>${safeText(row.award)}</td><td>${safeText(row.main_job || "Unassigned")} / ${safeText(row.secondary_job || "None")}</td></tr>`).join("");
+      const eventRows = member.events.map(row => `<tr><td><button class="member-event-link" type="button" data-member-event-link="${row.id}">${safeText(row.start_at.slice(0,10))}<small>${safeText(row.name)}</small></button></td><td><span class="attendance-result ${row.attended ? "attended" : "missed"}">${row.attended ? "✓ Attended" : "✕ Not attended"}</span></td></tr>`).join("");
+      const lootRows = member.loot.map(row => `<tr><td><button class="member-loot-link" type="button" data-member-loot-link="${row.event_id}"><b>${safeText(row.item)}</b><small>${safeText(row.family)} / ${row.major ? "Major Loot" : "Standard"}</small></button></td><td><button class="member-event-link" type="button" data-member-event-link="${row.event_id}">${safeText(row.event_date)}<small>${safeText(row.event_name)}</small></button></td><td>${Number(row.dkp_cost || 0)} DKP</td></tr>`).join("");
       dialogEyebrow.textContent = "Member event and award history";
       dialogTitle.textContent = member.name;
-      dialogContent.innerHTML = `<div class="member-history-summary"><span>Registered priorities</span><b>${safeText(member.main_job || "Unassigned")} / ${safeText(member.secondary_job || "None")}</b></div><section class="member-history-section"><header><h3>Event Attendance</h3><span>${member.events.filter(row => row.attended).length}/${member.events.length} attended</span></header><div class="endgame-table-wrap"><table class="endgame-table member-history-table"><thead><tr><th>Event</th><th>Attendance</th><th>Main job</th><th>Secondary job</th></tr></thead><tbody>${eventRows}</tbody></table></div></section><section class="member-history-section"><header><h3>Loot Wins</h3><span>${member.loot.length} awards</span></header><div class="endgame-table-wrap">${lootRows ? `<table class="endgame-table member-history-table"><thead><tr><th>Item</th><th>Event</th><th>Receiving job</th><th>Award</th><th>Registered main / secondary</th></tr></thead><tbody>${lootRows}</tbody></table>` : '<p class="event-empty">No loot wins recorded.</p>'}</div></section>`;
+      dialogContent.innerHTML = `<div class="member-history-summary dkp-member-summary"><span>DKP balance <b>${member.dkp}</b></span><span>Total spent <b>${member.total_spent}</b></span><span>Lifetime earned <b>${member.lifetime_earned}</b></span><span>Last event <b>${safeText(member.last_event)}</b></span></div><section class="member-history-section"><header><h3>Event Attendance</h3><span>${member.events.filter(row => row.attended).length}/${member.events.length} attended</span></header><div class="endgame-table-wrap"><table class="endgame-table member-history-table"><thead><tr><th>Event</th><th>Attendance</th></tr></thead><tbody>${eventRows}</tbody></table></div></section><section class="member-history-section"><header><h3>Loot Wins</h3><span>${member.loot.length} awards</span></header><div class="endgame-table-wrap">${lootRows ? `<table class="endgame-table member-history-table"><thead><tr><th>Item</th><th>Event</th><th>DKP spent</th></tr></thead><tbody>${lootRows}</tbody></table>` : '<p class="event-empty">No loot wins recorded.</p>'}</div></section>`;
       dialog.classList.add("member-history-dialog");
       dialog.showModal();
       return;
@@ -380,8 +420,6 @@
     if (wins) { const rows = loot.filter(row => row.player === wins.dataset.wins); dialogEyebrow.textContent = "Loot history"; dialogTitle.textContent = wins.dataset.wins; dialogContent.innerHTML = rows.length ? `<div class="dialog-list">${rows.map(row => `<article><div><b>${row.item}</b><small>${row.date} · ${row.job} · ${row.award}</small></div><span>${row.major ? "Major" : "Standard"}</span></article>`).join("")}</div>` : "<p>No awards are recorded for this member.</p>"; dialog.showModal(); }
   });
 
-  const jobRequestDialog = document.querySelector("#job-request-dialog");
-  document.querySelector("#request-job-change")?.addEventListener("click", () => jobRequestDialog.showModal());
   jobRequestDialog?.querySelector(".job-request-close")?.addEventListener("click", () => jobRequestDialog.close());
   jobRequestDialog?.addEventListener("click", event => {
     if (event.target === jobRequestDialog) jobRequestDialog.close();

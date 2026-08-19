@@ -166,6 +166,8 @@ CREATE TABLE IF NOT EXISTS guild_events (
     status TEXT NOT NULL DEFAULT 'Scheduled',
     discord_event_id TEXT NOT NULL DEFAULT '',
     discord_message_id TEXT NOT NULL DEFAULT '',
+    discord_channel TEXT NOT NULL DEFAULT 'endgame-events-only',
+    dkp_value REAL NOT NULL DEFAULT 3 CHECK(dkp_value >= 0),
     created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (creator_member_id) REFERENCES members(id) ON DELETE RESTRICT
@@ -241,6 +243,7 @@ CREATE TABLE IF NOT EXISTS endgame_loot_awards (
     family TEXT NOT NULL,
     distribution TEXT NOT NULL,
     classification TEXT NOT NULL CHECK(classification IN ('Major Loot','Standard')),
+    dkp_cost REAL NOT NULL DEFAULT 0 CHECK(dkp_cost >= 0),
     awarded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     recorded_by INTEGER,
     FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,

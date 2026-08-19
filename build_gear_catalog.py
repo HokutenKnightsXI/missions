@@ -58,6 +58,14 @@ ARMOR_AH_CATEGORIES = {
 }
 TWO_HANDED_WEAPON_SKILLS = {1, 4, 6, 7, 8, 10, 12}
 
+# Windower describes current retail equipment. Horizon reclaims some later item IDs
+# for custom classic-era drops and changes a small number of item descriptions.
+# Keep confirmed Horizon differences explicit so rebuilding the catalog is repeatable.
+HORIZON_ITEM_OVERRIDES = {
+    11494: {"description": "DEF:8 MP+6 MND+2"},  # Circe's Hat
+    13830: {"description": "DEF:10 MP+5 MND+1 Wind Resistance+4 Earth Resistance+4"},
+}
+
 
 def fetch_text(url: str) -> str:
     request = Request(url, headers={"User-Agent": "HokutenGearCatalog/1.0"})
@@ -84,7 +92,7 @@ def bit_values(mask: int, values: dict[int, str]) -> list[str]:
 def classic_era_item(item_id: int) -> bool:
     # Original through ToAU equipment occupies the original armor/weapon DAT ranges.
     # Later expansions largely moved equipment into lower reclaimed and higher ranges.
-    return 12416 <= item_id <= 19199
+    return 12416 <= item_id <= 19199 or item_id in HORIZON_ITEM_OVERRIDES
 
 
 def auction_house_category(category: str, slots: list[str], skill: int) -> str:
@@ -178,7 +186,8 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str],
         slots = bit_values(lua_int(record, "slots"), SLOTS)
         if not jobs or not races or not slots:
             continue
-        description = descriptions.get(item_id, "")
+        override = HORIZON_ITEM_OVERRIDES.get(item_id, {})
+        description = override.get("description", descriptions.get(item_id, ""))
         flags = lua_int(record, "flags")
         weapon_skill = lua_int(record, "skill")
         for glyph, label in ELEMENT_GLYPHS.items():
@@ -211,6 +220,7 @@ def build(items_lua: str, descriptions_lua: str, keys: dict[int, str],
         "era": "Original through Treasures of Aht Urhgan; level cap 75",
         "items_source": ITEMS_SOURCE,
         "descriptions_source": DESCRIPTIONS_SOURCE,
+        "horizon_overrides": sorted(HORIZON_ITEM_OVERRIDES),
         "stats": stats,
         "rows": rows,
     }
