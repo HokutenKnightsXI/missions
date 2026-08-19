@@ -30,8 +30,13 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     sign_in(client, admin=True)
     response = client.get("/endgame")
     assert response.status_code == 200
+    assert response.data.count(b"data-endgame-view=") == 3
+    for view in (b">Calendar</button>", b">DKP/Loot</button>", b">Operations</button>"):
+        assert view in response.data
+    assert b">Event Calendar</button>" not in response.data
+    assert b">Endgame Operations</button>" not in response.data
     for label in (
-        b"Priority Calculator", b"Member Detail", b"Event Log",
+        b"Item Eligibility", b"Member Detail", b"Event Log",
         b"Linkshell Loot", b"Linkshell Pops",
     ):
         assert label in response.data
@@ -92,7 +97,7 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert b'"required_level": 73' in response.data
     assert b"P1 may bid" in response.data
     assert b">Cooldown</th>" not in response.data
-    assert response.data.count(b"data-loot-sort=") == 7
+    assert response.data.count(b"data-loot-sort=") == 6
 
 
 def test_endgame_admin_controls_render_without_job_change_inbox(tmp_path):
@@ -123,8 +128,10 @@ def test_endgame_admin_controls_render_without_job_change_inbox(tmp_path):
     assert response.data.count(b"data-audit-sort=") == 5
     assert response.data.count(b"data-audit-filter=") == 5
     assert b"clear-audit-filters" in response.data
-    assert response.data.index(b">Member Detail</button>") < response.data.index(b">Priority Calculator</button>")
-    assert b'class="active" type="button" data-endgame-tab="jobs"' in response.data
+    assert response.data.index(b">Member Detail</button>") < response.data.index(b">Item Eligibility</button>")
+    assert b'class="active" type="button" data-endgame-tab="bidding-live"' in response.data
+    assert b"Active Bidding" in response.data
+    assert b"Start 2-Minute Auction" in response.data
     roster_html = response.data.split(b'id="endgame-roster-body"', 1)[1]
     assert roster_html.index(b'data-name="alecy"') < roster_html.index(b'data-name="anonym"')
 
@@ -140,8 +147,8 @@ def test_only_designated_admins_can_create_guild_events(tmp_path):
     sign_in(client, member_id=ordinary_id, admin=True)
     page = client.get("/endgame").data
     assert b"Create Guild Event" not in page
-    assert b"Endgame Operations</button>" in page
-    assert b"Priority Calculator" in page
+    assert b">Operations</button>" in page
+    assert b"Item Eligibility" in page
     assert b"Linkshell Loot" in page
     assert b"Linkshell Pops" in page
     assert b"Admin Audit" not in page
@@ -602,7 +609,7 @@ def test_designated_admin_can_edit_archived_attendance_and_loot(tmp_path):
     assert response.status_code == 302
     response = client.post(f"/endgame/loot/{award_id}/update", data={
         "csrf_token": "token", "member_id": str(member_id), "item": "Byakko's Haidate",
-        "job": "NIN", "family": "Legs", "distribution": "Secondary priority",
+            "job": "NIN", "family": "Legs", "distribution": "P2",
         "classification": "Major Loot", "dkp_cost": "2",
     })
     assert response.status_code == 302
@@ -613,7 +620,7 @@ def test_designated_admin_can_edit_archived_attendance_and_loot(tmp_path):
     assert database.execute(
         "SELECT recipient_member_id,item,job,family,distribution,classification,dkp_cost FROM endgame_loot_awards WHERE id=?",
         (award_id,),
-    ).fetchone() == (member_id, "Byakko's Haidate", "NIN", "Legs", "Secondary priority", "Major Loot", 2.0)
+    ).fetchone() == (member_id, "Byakko's Haidate", "NIN", "Legs", "P2", "Major Loot", 2.0)
     database.close()
     alecy_row = client.get("/endgame").data.split(b'data-name="alecy"', 1)[1].split(b"</tr>", 1)[0]
     assert b'data-dkp="1"' in alecy_row
@@ -783,3 +790,139 @@ def test_event_creation_rejects_past_time_before_calling_discord(monkeypatch, tm
     })
     assert response.status_code == 400
     assert b"Choose an event date and time in the future" in response.data
+def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    database = sqlite3.connect(app.config["DATABASE"])
+    event_id = database.execute(
+        "SELECT id FROM guild_events WHERE name='Sky Operations' ORDER BY id LIMIT 1"
+    ).fetchone()[0]
+    second_event_id = database.execute(
+        "SELECT id FROM guild_events WHERE name='Sky Operations' ORDER BY id DESC LIMIT 1"
+    ).fetchone()[0]
+    database.execute(
+        "INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'','BLM',75)"
+    )
+    database.execute(
+        "INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'','RDM',75)"
+    )
+    database.execute(
+        "INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'','DRG',75)"
+    )
+    database.execute(
+        "INSERT OR REPLACE INTO guild_event_attendance(event_id,member_id,attended) VALUES(?,1,1)",
+        (event_id,),
+    )
+    database.execute(
+        "INSERT OR REPLACE INTO guild_event_attendance(event_id,member_id,attended) VALUES(?,1,1)",
+        (second_event_id,),
+    )
+    database.execute(
+        "INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(2,'','BLM',75)"
+    )
+    database.execute(
+        "INSERT OR REPLACE INTO guild_event_attendance(event_id,member_id,attended) VALUES(?,2,1)",
+        (event_id,),
+    )
+    database.execute(
+        """INSERT INTO endgame_loot_awards
+           (event_id,recipient_member_id,item,job,family,distribution,classification,dkp_cost,recorded_by)
+           VALUES(?,2,'Prior Award','BLM','Accessories','Freelot','Standard',2,1)""",
+        (event_id,),
+    )
+    database.commit()
+    database.close()
+
+    started = client.post("/endgame/auctions", data={
+        "csrf_token": "token", "event_id": str(event_id), "boss": "Jailer of Love",
+    })
+    assert started.status_code == 302
+    payload = client.get("/api/endgame/auctions").get_json()
+    assert payload["my_balance"] == 6
+    assert payload["auctions"][0]["boss"] == "Jailer of Love"
+    novio = next(item for item in payload["auctions"][0]["items"] if item["item"] == "Novio Earring")
+    novia = next(item for item in payload["auctions"][0]["items"] if item["item"] == "Novia Earring")
+    love = next(item for item in payload["auctions"][0]["items"] if item["item"] == "Love Torque")
+    assert novio["eligible_jobs"][0]["job"] == "BLM"
+    assert novio["tooltip"]["name"] == "Novio Earring"
+    assert novio["tooltip"]["description"]
+    denied = client.post(f"/api/endgame/auction-items/{novia['id']}/bid", json={
+        "job": "BLM", "amount": 1,
+    }, headers={"X-CSRF-Token": "token"})
+    assert denied.status_code == 403
+
+    bid = client.post(f"/api/endgame/auction-items/{novio['id']}/bid", json={
+        "job": "BLM", "amount": 2,
+    }, headers={"X-CSRF-Token": "token"})
+    assert bid.status_code == 200
+    assert bid.get_json()["auction"]["auctions"][0]["items"][1]["bids"] or bid.get_json()["auction"]["recent_bids"]
+    second_bid = client.post(f"/api/endgame/auction-items/{novia['id']}/bid", json={
+        "job": "RDM", "amount": 2,
+    }, headers={"X-CSRF-Token": "token"})
+    assert second_bid.status_code == 200
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute(
+        """INSERT INTO endgame_loot_awards
+           (event_id,recipient_member_id,item,job,family,distribution,classification,dkp_cost,recorded_by)
+           VALUES(?,1,'Balance Adjustment','BLM','Other','Standard','Standard',1,1)""",
+        (event_id,),
+    )
+    database.commit()
+    database.close()
+    rebalanced = client.post(f"/api/endgame/auction-items/{love['id']}/bid", json={
+        "job": "DRG", "amount": 2,
+    }, headers={"X-CSRF-Token": "token"})
+    assert rebalanced.status_code == 200
+    assert rebalanced.get_json()["adjusted"] == [{
+        "item": "Novia Earring", "from": 2, "to": 1,
+    }]
+    committed = client.get("/api/endgame/auctions").get_json()
+    assert committed["my_reserved"] == 5
+    assert committed["my_available"] == 0
+
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute(
+        "INSERT INTO endgame_auction_bids(auction_item_id,member_id,job,amount) VALUES(?,2,'BLM',2)",
+        (novio["id"],),
+    )
+    database.commit()
+    database.close()
+    tied = client.get("/api/endgame/auctions").get_json()["auctions"][0]
+    tied_novio = next(item for item in tied["items"] if item["id"] == novio["id"])
+    assert tied_novio["suggested_winner_id"] == 1
+
+    paused = client.post(f"/endgame/auctions/{tied['id']}/pause", data={"csrf_token": "token"})
+    assert paused.status_code == 302
+    assert client.get("/api/endgame/auctions").get_json()["auctions"][0]["paused"] is True
+    blocked_while_paused = client.post(f"/api/endgame/auction-items/{novio['id']}/bid", json={
+        "job": "BLM", "amount": 3,
+    }, headers={"X-CSRF-Token": "token"})
+    assert blocked_while_paused.status_code == 400
+    resumed = client.post(f"/endgame/auctions/{tied['id']}/pause", data={"csrf_token": "token"})
+    assert resumed.status_code == 302
+    assert client.get("/api/endgame/auctions").get_json()["auctions"][0]["paused"] is False
+
+    database = sqlite3.connect(app.config["DATABASE"])
+    auction_id = database.execute("SELECT id FROM endgame_auctions ORDER BY id DESC LIMIT 1").fetchone()[0]
+    database.execute("UPDATE endgame_auctions SET ends_at='2000-01-01T00:00:00' WHERE id=?", (auction_id,))
+    database.commit()
+    database.close()
+    closed = client.get("/api/endgame/auctions").get_json()["auctions"][0]
+    assert closed["status"] == "Closed"
+
+    confirmed = client.post(f"/endgame/auctions/{auction_id}/confirm", data={
+        "csrf_token": "token", f"winner_{novio['id']}": "1",
+    })
+    assert confirmed.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    award = database.execute(
+        "SELECT item,dkp_cost,distribution FROM endgame_loot_awards WHERE item='Novio Earring' ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    status = database.execute("SELECT status FROM endgame_auctions WHERE id=?", (auction_id,)).fetchone()[0]
+    database.close()
+    assert award == ("Novio Earring", 2.0, "P1")
+    assert status == "Confirmed"
+    assert client.get("/api/endgame/auctions").get_json()["my_balance"] == 3

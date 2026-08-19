@@ -30,7 +30,6 @@
       <a class="{{ 'active' if request.endpoint in ('spell_farming', 'save_blue_spell_template', 'delete_blue_spell_template') }}" href="{{ url_for('spell_farming') }}">Blue Mage Tools</a>
       <a class="{{ 'active' if request.endpoint == 'gear_optimizer' }}" href="{{ url_for('gear_optimizer') }}">Gear Optimizer</a>
       <a class="{{ 'active' if request.endpoint == 'job_roster' }}" href="{{ url_for('job_roster') }}">Job Roster</a>
-      <span class="nav-section-break" aria-hidden="true">Operations</span>
       <a class="operations-nav-link {{ 'active' if request.endpoint == 'endgame_dashboard' }}" href="{{ url_for('endgame_dashboard') }}">Endgame</a>
       {% if is_editor() and current_member_id() %}<a class="operations-nav-link {{ 'active' if request.endpoint == 'alliance_builder' }}" href="{{ url_for('alliance_builder') }}">Alliance Builder</a>{% endif %}
       <form class="account-form" method="post" action="{{ url_for('logout') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button account-button" type="submit">Sign Out ({{ current_member_name() }})</button></form>
