@@ -867,6 +867,11 @@ def eastern_today():
     return datetime.now(EASTERN_TIME).date()
 
 
+def eastern_now_naive():
+    """Return the linkshell's current Eastern time for naive event timestamps."""
+    return datetime.now(EASTERN_TIME).replace(tzinfo=None, second=0, microsecond=0)
+
+
 def request_occurs_on(help_request, day):
     """Return whether a request appears on a day without materializing occurrences."""
     if help_request["status"] not in ACTIVE_HELP_STATUSES:
@@ -1852,7 +1857,7 @@ def create_app(test_config=None):
             item = dict(row)
             event_start = parse_local_datetime(item["start_at"])
             item["is_upcoming"] = bool(
-                event_start and event_start >= datetime.now().replace(second=0, microsecond=0)
+                event_start and event_start >= eastern_now_naive()
             )
             signups = db.execute(
                 """SELECT member_id,rsvp_status,selected_job,discord_name
@@ -2486,7 +2491,7 @@ def create_app(test_config=None):
             event_data = dict(row)
             event_start = parse_local_datetime(event_data["start_at"])
             event_data["is_upcoming"] = bool(
-                event_start and event_start >= datetime.now().replace(second=0, microsecond=0)
+                event_start and event_start >= eastern_now_naive()
             )
             event_data["event_kind"] = "Endgame" if is_endgame_guild_event(event_data) else "User"
             event_data["signups"] = [dict(item) for item in get_db().execute(
@@ -3518,7 +3523,7 @@ def create_app(test_config=None):
              f"Event #{event_id}: added {', '.join(added) or 'none'}; removed {', '.join(removed) or 'none'}; {len(member_ids)} attended"),
         )
         event_start = parse_local_datetime(event["start_at"])
-        if event_start and event_start < datetime.now():
+        if event_start and event_start < eastern_now_naive():
             get_db().execute("UPDATE guild_events SET status='Completed' WHERE id=?", (event_id,))
         get_db().commit()
         flash("Event attendance updated.", "success")
@@ -3571,7 +3576,7 @@ def create_app(test_config=None):
              f"removed {', '.join(removed) or 'none'}"),
         )
         event_start = parse_local_datetime(event["start_at"])
-        if event_start and event_start < datetime.now():
+        if event_start and event_start < eastern_now_naive():
             db.execute("UPDATE guild_events SET status='Completed' WHERE id=?", (event_id,))
         db.commit()
         flash(
