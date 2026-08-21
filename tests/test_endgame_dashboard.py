@@ -634,6 +634,27 @@ def test_startup_removes_encoded_kb_duplicate_and_preserves_signup(tmp_path):
     database.close()
 
 
+def test_startup_renames_lone_kb_member_to_killboi(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    kb_id = database.execute(
+        "INSERT INTO members(name,discord_user_id,discord_name) VALUES(?,?,?)",
+        ("KB", "discord-killboi", "KB"),
+    ).lastrowid
+    database.commit()
+    database.close()
+
+    make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute(
+        "SELECT id,discord_user_id FROM members WHERE name='Killboi'"
+    ).fetchone() == (kb_id, "discord-killboi")
+    assert database.execute("SELECT 1 FROM members WHERE name='KB'").fetchone() is None
+    database.close()
+
+
 def test_admin_can_import_discord_created_events_without_duplicates(monkeypatch, tmp_path):
     import sqlite3
     import missions
