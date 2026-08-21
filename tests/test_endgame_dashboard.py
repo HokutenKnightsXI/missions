@@ -1145,6 +1145,14 @@ def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     assert award == ("Novio Earring", 2.0, "P1", auction_id)
     assert status == "Confirmed"
     assert client.get("/api/endgame/auctions").get_json()["my_balance"] == 3
+    member_payload = client.get("/endgame").data.split(
+        b"window.ENDGAME_MEMBER_DETAILS=", 1
+    )[1].split(b";</script>", 1)[0]
+    member_details = json.loads(member_payload)
+    imaven = member_details["1"]
+    novio_win = next(row for row in imaven["loot"] if row["item"] == "Novio Earring")
+    assert novio_win["event_name"] == "Sky Operations"
+    assert novio_win["auction_id"] == auction_id
     archived = client.get("/api/endgame/auctions").get_json()
     assert archived["past_auctions"][0]["id"] == auction_id
     assert archived["past_auctions"][0]["award_count"] == 1

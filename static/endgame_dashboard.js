@@ -540,7 +540,7 @@
           : (row.attended ? "✓ Attended" : "✕ Not Attended");
         return `<tr><td><button class="member-event-link" type="button" data-member-event-link="${row.id}">${safeText(row.start_at.slice(0,10))}<small>${safeText(row.name)}</small></button></td><td><span class="attendance-result ${positive ? "attended" : "missed"}">${status}</span></td></tr>`;
       }).join("");
-      const lootRows = member.loot.map(row => `<tr><td><button class="member-loot-link" type="button" data-member-loot-link="${row.event_id}"><b>${safeText(row.item)}</b><small>${safeText(priorityLabel(row.award))}</small></button></td><td><button class="member-event-link" type="button" data-member-event-link="${row.event_id}">${safeText(row.event_date)}<small>${safeText(row.event_name)}</small></button></td><td>${Number(row.dkp_cost || 0)} DKP</td></tr>`).join("");
+      const lootRows = member.loot.map(row => `<tr><td><button class="member-loot-link" type="button" data-member-loot-link="${row.event_id}"><b>${safeText(row.item)}</b><small>${safeText(priorityLabel(row.award))}</small></button></td><td><button class="member-event-link" type="button" data-member-event-link="${row.event_id}">${safeText(row.event_date)}<small>${safeText(row.event_name)}</small></button>${row.auction_id ? `<button class="member-auction-link" type="button" data-open-auction="${row.auction_id}">Auction #${row.auction_id}</button>` : ""}</td><td>${Number(row.dkp_cost || 0)} DKP</td></tr>`).join("");
       dialogEyebrow.textContent = "Member event and award history";
       dialogTitle.textContent = member.name;
       const completedEvents = member.events.filter(row => !row.is_upcoming);
