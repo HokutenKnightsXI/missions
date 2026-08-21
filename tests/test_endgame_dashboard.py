@@ -812,6 +812,9 @@ def test_sky_auction_includes_complete_seiryu_pool(tmp_path):
         "Seiryu's Kote", "Seiryu's Sword", "Aquarian Abjuration: Legs",
         "Dryadic Abjuration: Head", "Martial Abjuration: Head", "Wyrmal Abjuration: Hands",
     }
+    deleted = client.post(f"/endgame/auctions/{auction['id']}/delete", data={"csrf_token": "token"})
+    assert deleted.status_code == 302
+    assert client.get("/api/endgame/auctions").get_json()["auctions"] == []
 
 
 def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):

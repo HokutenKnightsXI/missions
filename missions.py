@@ -3057,8 +3057,8 @@ def create_app(test_config=None):
             abort(403)
         refresh_auction_statuses()
         auction = get_db().execute("SELECT * FROM endgame_auctions WHERE id=?", (auction_id,)).fetchone()
-        if not auction or auction["status"] != "Closed":
-            abort(400, description="Only a closed, unconfirmed auction can be discarded.")
+        if not auction or auction["status"] not in ("Active", "Closed"):
+            abort(400, description="Only an active, paused, or closed unconfirmed auction can be discarded.")
         actor = require_member_identity()
         get_db().execute("DELETE FROM endgame_auctions WHERE id=?", (auction_id,))
         get_db().execute(
@@ -3066,7 +3066,7 @@ def create_app(test_config=None):
             (actor["id"], "DKP Auction", "Auction discarded", auction["boss"]),
         )
         get_db().commit()
-        flash(f"Discarded the closed {auction['boss']} auction. No DKP was deducted.", "success")
+        flash(f"Stopped and discarded the {auction['boss']} auction. No DKP was deducted.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
 
     def is_endgame_guild_event(event):
