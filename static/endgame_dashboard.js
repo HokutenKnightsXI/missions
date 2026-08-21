@@ -71,12 +71,16 @@
   };
   const renderAuctions = payload => {
     if (!auctionRoot) return;
+    const currentAuctions = payload.current_auctions || payload.auctions.filter(auction => auction.status !== "Confirmed");
+    const pastAuctions = payload.past_auctions || payload.auctions.filter(auction => auction.status === "Confirmed");
+    const displayedAuctions = [...currentAuctions, ...pastAuctions];
     document.querySelector("#auction-my-dkp").textContent = `${payload.my_available} DKP${payload.my_reserved ? ` (${payload.my_reserved} committed)` : ""}`;
     document.querySelector("#auction-bid-cap").textContent = `${payload.dkp.cap} DKP`;
     document.querySelector("#auction-highest-dkp").textContent = `${payload.dkp.highest} DKP`;
     auctionTooltips = Object.fromEntries(payload.auctions.flatMap(auction => auction.items.map(item => [String(item.id), item.tooltip || {}])));
-    auctionRoot.innerHTML = payload.auctions.length ? payload.auctions.map(auction => {
+    auctionRoot.innerHTML = displayedAuctions.length ? displayedAuctions.map((auction, index) => {
       const active = auction.status === "Active";
+      const completed = auction.status === "Confirmed";
       const acceptingBids = active && !auction.paused;
       const items = auction.items.map(item => {
         const bids = item.bids.length ? item.bids.map((bid, index) => `<li class="${index === 0 ? "leading" : ""}"><span><b>${safeText(bid.name)}</b> ${safeText(bid.job)} · P${bid.tier === 4 ? "Free" : bid.tier}</span><strong>${bid.amount} DKP</strong></li>`).join("") : '<li class="no-bids">No bids yet</li>';
@@ -85,8 +89,10 @@
         return `<article class="auction-item-card"><header><div><h4><button class="auction-tooltip-target" type="button" data-auction-tooltip="${item.id}">${safeText(item.item)}</button></h4><small>${item.target_item && item.target_item !== item.item ? `${safeText(item.target_item)} · ` : ""}${safeText(item.family)} · Lv.${item.required_level}</small></div><b>${item.bids.length} bid${item.bids.length === 1 ? "" : "s"}</b></header><ol class="auction-bid-list">${bids}</ol>${acceptingBids ? (jobOptions ? `<form class="auction-bid-form" data-auction-item="${item.id}"><select name="job" required><option value="">Eligible job</option>${jobOptions}</select><input type="number" name="amount" min="1" max="${item.max_bid}" value="${item.my_bid?.amount || ""}" placeholder="DKP" required><button type="submit">${item.my_bid ? "Update Bid" : "Place Bid"}</button><small class="auction-bid-budget">Up to ${item.max_bid} DKP; increasing this may reduce other active bids</small></form>` : '<p class="auction-ineligible">No eligible leveled job for this item.</p>') : (active ? '<p class="auction-paused-note">Bidding is paused by leadership.</p>' : `<label class="auction-winner-select">Confirmed winner<select name="winner_${item.id}" form="confirm-auction-${auction.id}"><option value="">No award</option>${bidderOptions}</select></label>`)}</article>`;
       }).join("");
       const pauseControl = active && payload.is_admin ? `<form class="auction-pause-form" method="post" action="/endgame/auctions/${auction.id}/pause"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button type="submit">${auction.paused ? "Resume Auction" : "Pause Auction"}</button></form>` : "";
+      const completeControl = active && payload.is_admin ? `<form class="auction-complete-form" method="post" action="/endgame/auctions/${auction.id}/complete"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button type="submit">Stop &amp; Complete</button></form>` : "";
       const stopControl = active && payload.is_admin ? `<form class="auction-discard-form" method="post" action="/endgame/auctions/${auction.id}/delete"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button class="danger" type="submit">Stop &amp; Delete Auction</button></form>` : "";
-      return `<section class="auction-card ${active ? "active" : "closed"} ${auction.paused ? "paused" : ""}"><header><div><span>${safeText(auction.area)} · ${safeText(auction.event_name)}</span><h3>${safeText(auction.boss)}</h3>${pauseControl}${stopControl}</div><div class="auction-clock"><small>${auction.paused ? "Countdown frozen" : (active ? "Bidding closes in" : "Bidding closed")}</small><b data-auction-ends="${auction.ends_at}" data-auction-paused="${auction.paused ? "true" : "false"}">${auction.paused ? "PAUSED" : (active ? countdownText(auction.ends_at) : "00:00")}</b></div></header>${!active && payload.is_admin ? `<form id="confirm-auction-${auction.id}" class="auction-confirm-form" method="post" action="/endgame/auctions/${auction.id}/confirm"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><p>Review the suggested winners, then confirm the items that actually dropped.</p></form>` : ""}<div class="auction-item-grid">${items}</div>${!active && payload.is_admin ? `<button class="button primary auction-confirm-button" type="submit" form="confirm-auction-${auction.id}">Confirm Winners &amp; Deduct DKP</button>` : ""}</section>`;
+      const sectionHeading = (currentAuctions.length && index === 0) ? `<h3 class="auction-section-title">Current Auctions</h3>` : (pastAuctions.length && index === currentAuctions.length ? `<h3 class="auction-section-title">Past Auctions</h3>` : "");
+      return `${sectionHeading}<section id="auction-${auction.id}" class="auction-card ${active ? "active" : "closed"} ${completed ? "completed" : ""} ${auction.paused ? "paused" : ""}"><header><div><span>${safeText(auction.area)} · ${safeText(auction.event_name)}</span><h3>${safeText(auction.boss)}</h3>${pauseControl}${completeControl}${stopControl}</div><div class="auction-clock"><small>${completed ? "Winners / DKP Completed" : (auction.paused ? "Countdown frozen" : (active ? "Bidding closes in" : "Bidding closed"))}</small><b data-auction-ends="${auction.ends_at}" data-auction-paused="${auction.paused ? "true" : "false"}">${auction.paused ? "PAUSED" : (active ? countdownText(auction.ends_at) : "00:00")}</b></div></header>${!active && !completed && payload.is_admin ? `<form id="confirm-auction-${auction.id}" class="auction-confirm-form" method="post" action="/endgame/auctions/${auction.id}/confirm"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><p>Review the suggested winners, then confirm the items that actually dropped.</p></form>` : ""}<div class="auction-item-grid">${items}</div>${!active && !completed && payload.is_admin ? `<button class="button primary auction-confirm-button" type="submit" form="confirm-auction-${auction.id}">Confirm Winners &amp; Deduct DKP</button>` : ""}${completed ? `<p class="auction-completed-note">Winners / DKP Completed${auction.award_count ? ` · ${auction.award_count} award${auction.award_count === 1 ? "" : "s"}` : ""}</p>` : ""}</section>`;
     }).join("") : '<p class="event-empty">No active or recently closed auctions. An administrator can start one for an Endgame event above.</p>';
     // Closed auctions are deliberately kept until an administrator confirms them.
     // A separate discard control makes it safe to clear test auctions without touching DKP.
@@ -96,21 +102,39 @@
           if (!confirm("Stop and delete this auction? All bids will be cleared and no DKP will be deducted.")) event.preventDefault();
         });
       });
-      const closedCards = [...auctionRoot.querySelectorAll(".auction-card.closed")];
-      payload.auctions.filter(auction => auction.status === "Closed").forEach((auction, index) => {
-        const card = closedCards[index];
+      payload.auctions.filter(auction => auction.status === "Closed" || auction.status === "Confirmed").forEach(auction => {
+        const card = document.getElementById(`auction-${auction.id}`);
         if (!card) return;
         const actions = document.createElement("form");
         actions.className = "auction-discard-form";
         actions.method = "post";
         actions.action = `/endgame/auctions/${auction.id}/delete`;
-        actions.innerHTML = `<input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button type="submit">Discard Auction</button>`;
+        actions.innerHTML = `<input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button type="submit">${auction.status === "Confirmed" ? "Discard &amp; Reverse DKP" : "Discard Auction"}</button>`;
         actions.addEventListener("submit", event => {
-          if (!confirm("Discard this closed auction? No DKP will be deducted.")) event.preventDefault();
+          const warning = auction.status === "Confirmed" ? "Discard this confirmed auction and reverse its linked DKP awards?" : "Discard this closed auction? No DKP will be deducted.";
+          if (!confirm(warning)) event.preventDefault();
         });
         card.querySelector("header > div")?.append(actions);
       });
+      pastAuctions.forEach(auction => {
+        const card = document.getElementById(`auction-${auction.id}`);
+        card?.querySelectorAll(".auction-winner-select").forEach(control => {
+          const note = document.createElement("p");
+          note.className = "auction-completed-note";
+          note.textContent = "Winners / DKP Completed";
+          control.replaceWith(note);
+        });
+      });
     }
+    pastAuctions.forEach(auction => {
+      const card = document.getElementById(`auction-${auction.id}`);
+      card?.querySelectorAll(".auction-winner-select").forEach(control => {
+        const note = document.createElement("p");
+        note.className = "auction-completed-note";
+        note.textContent = "Winners / DKP Completed";
+        control.replaceWith(note);
+      });
+    });
     auctionRoot.querySelectorAll(".auction-bid-list li span, .auction-winner-select option").forEach(entry => {
       entry.innerHTML = entry.innerHTML.replace("PFree", "Freelot");
     });
@@ -429,6 +453,7 @@
   dialog.addEventListener("close", () => dialog.classList.remove("event-detail-dialog", "member-history-dialog"));
   document.querySelector(".dialog-close").addEventListener("click", () => { dialog.close(); dialog.classList.remove("event-detail-dialog", "member-history-dialog"); });
   document.addEventListener("click", event => {
+    const auctionLink = event.target.closest("[data-open-auction]");
     const memberCell = event.target.closest("#endgame-roster-body td:first-child");
     const eventHistoryLink = event.target.closest("[data-member-event-link]");
     const lootHistoryLink = event.target.closest("[data-member-loot-link]");
@@ -437,6 +462,12 @@
     const eventButton = event.target.closest("[data-open-event]");
     const jobBadge = event.target.closest("[data-job-member]");
     const attendance = event.target.closest("[data-attendance]"); const wins = event.target.closest("[data-wins]");
+    if (auctionLink) {
+      location.hash = `auction-${auctionLink.dataset.openAuction}`;
+      openLiveAuction();
+      requestAnimationFrame(() => document.getElementById(`auction-${auctionLink.dataset.openAuction}`)?.scrollIntoView({behavior: "smooth", block: "start"}));
+      return;
+    }
     if (lootHistoryLink) {
       const eventId = lootHistoryLink.dataset.memberLootLink;
       dialog.close();
@@ -475,6 +506,8 @@
       if (!selected) return;
       const attendees = selected.attendees || [];
       const awards = selected.loot || [];
+      const eventAuctions = selected.auctions || [];
+      const auctionArchive = eventAuctions.length ? `<section class="event-auction-archive"><header><h3>Event Auctions</h3><span>${eventAuctions.length} auction${eventAuctions.length === 1 ? "" : "s"}</span></header>${eventAuctions.map(auction => `<button class="event-auction-link ${auction.status === "Confirmed" ? "completed" : ""}" type="button" data-open-auction="${auction.id}"><b>${safeText(auction.boss)}</b><span>${safeText(auction.area)} · ${safeText(auction.status === "Confirmed" ? "Winners / DKP Completed" : auction.status)}${auction.award_count ? ` · ${auction.award_count} awards` : ""}</span></button>`).join("")}</section>` : "";
       const allMembers = window.ENDGAME_MEMBERS || [];
       const lootCatalog = window.ENDGAME_LOOT_CATALOG || [];
       const lootOptions = `<option value="">Select Sky or Sea item</option>${lootCatalog.map(item => `<option value="${safeText(item.name)}" data-family="${safeText(item.family)}">${safeText(item.area)} · ${safeText(item.source)} · ${safeText(item.name)}</option>`).join("")}`;
@@ -486,6 +519,7 @@
       dialogEyebrow.textContent = `${selected.start_at.slice(0, 10)} / Endgame event`;
       dialogTitle.textContent = `${selected.name} / Loot`;
       dialogContent.innerHTML = `<section class="event-detail-column event-loot-only"><header><h3>Event Loot</h3><span>${awards.length} awards</span></header><div class="event-detail-scroll">${lootPanel}</div>${manualLootForm}</section>`;
+      dialogContent.insertAdjacentHTML("beforeend", auctionArchive);
       dialog.classList.add("event-detail-dialog");
       dialog.showModal();
       return;
