@@ -1187,8 +1187,22 @@ def create_app(test_config=None):
             )
             access_token = token["access_token"]
             discord_user = discord_get(access_token, "/users/@me")
-        except (HTTPError, URLError, KeyError, ValueError, json.JSONDecodeError):
-            flash("Discord could not verify your account. Please try signing in again.", "error")
+        except HTTPError as error:
+            app.logger.warning("Discord account verification failed with HTTP %s", error.code)
+            flash(
+                f"Discord could not verify your account (HTTP {error.code}). "
+                "Check the Discord Client Secret and callback URL, then try again.",
+                "error",
+            )
+            return redirect(url_for("discord_connect"))
+        except (URLError, KeyError, ValueError, json.JSONDecodeError) as error:
+            error_kind = type(error).__name__
+            app.logger.warning("Discord account verification failed: %s", error_kind)
+            flash(
+                f"Discord could not verify your account ({error_kind}). "
+                "Please try signing in again.",
+                "error",
+            )
             return redirect(url_for("discord_connect"))
 
         try:
@@ -1633,6 +1647,12 @@ def create_app(test_config=None):
                        VALUES(?,?,?,?,?,?,?,?)""",
                     (event_id, member_id["id"], item, job, family, distribution, classification, creator_id),
                 )
+        get_db().execute(
+            """UPDATE endgame_loot_awards SET distribution=''
+               WHERE event_id IN (
+                   SELECT id FROM guild_events WHERE start_at < '2026-08-20T00:00'
+               )"""
+        )
         past_test_events = get_db().execute(
             """SELECT id,name FROM guild_events
                WHERE datetime(start_at) < datetime('now')
