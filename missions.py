@@ -2,6 +2,7 @@ import os
 import sqlite3
 import json
 import hmac
+import html
 import re
 import secrets
 import calendar
@@ -123,6 +124,33 @@ ENDGAME_BASELINE_ATTENDANCE = {
     "bodom": 2, "werx": 0, "hikari": 2, "gravekeeper": 1, "boshu": 2,
     "chonk": 1, "desier": 1, "wizzaro": 1, "anshul": 1, "escii": 1,
     "imaven": 2, "tarantula": 2,
+}
+
+MEMBER_NAME_ALIASES = {
+    "kb": "Killboi",
+    "kb&#x20;": "Killboi",
+    "soya": "Soyabean",
+}
+
+# The generated catalog retains a few original DAT names rather than their
+# player-facing names used by the Sky auction rules.
+AUCTION_TOOLTIP_ITEM_ALIASES = {
+    "Crimson Finger Gauntlets": "Crimson Fng. Gnt.",
+}
+
+# Some valid Horizon-era items are missing from the generated DAT catalog.
+# Keep auction tooltips complete without mistaking an abjuration for its gear.
+AUCTION_TOOLTIP_OVERRIDES = {
+    "Hecatomb Leggings": {
+        "item_id": 14180,
+        "name": "Hecatomb Leggings",
+        "level": 73,
+        "slots": ["Feet"],
+        "jobs": ["WAR", "THF", "PLD", "DRK", "BST", "BRD", "DRG"],
+        "description": 'DEF:22 HP+7 STR+6 DEX+3\n"Slow" +4%',
+        "rare": True,
+        "ex": True,
+    },
 }
 
 # Keeps early-event auctions meaningful while the regular highest-minus-average
@@ -1159,13 +1187,28 @@ def create_app(test_config=None):
             )
             access_token = token["access_token"]
             discord_user = discord_get(access_token, "/users/@me")
+        except (HTTPError, URLError, KeyError, ValueError, json.JSONDecodeError):
+            flash("Discord could not verify your account. Please try signing in again.", "error")
+            return redirect(url_for("discord_connect"))
+
+        try:
             guild_member = discord_get(
                 access_token,
                 f"/users/@me/guilds/{app.config['DISCORD_GUILD_ID']}/member",
             )
         except (HTTPError, URLError, KeyError, ValueError, json.JSONDecodeError):
-            flash("Discord could not verify your Hokuten membership. Make sure you joined the server and try again.", "error")
-            return redirect(url_for("discord_connect"))
+            bot_token = app.config.get("DISCORD_BOT_TOKEN", "")
+            if not bot_token:
+                flash("Discord could not verify your Hokuten membership. Make sure you joined the server and try again.", "error")
+                return redirect(url_for("discord_connect"))
+            try:
+                guild_member = discord_bot_request(
+                    bot_token, "GET",
+                    f"/guilds/{app.config['DISCORD_GUILD_ID']}/members/{discord_user['id']}",
+                )
+            except (HTTPError, URLError, KeyError, ValueError, json.JSONDecodeError):
+                flash("Discord could not verify your Hokuten membership. Make sure you joined the server and try again.", "error")
+                return redirect(url_for("discord_connect"))
 
         discord_user_id = str(discord_user.get("id", ""))
         nickname = (
@@ -1462,6 +1505,49 @@ def create_app(test_config=None):
             "INSERT OR IGNORE INTO members(name) VALUES (?)",
             [(name,) for name in LOGIN_CHARACTERS],
         )
+        # Fold retired character labels into their current in-game names. These
+        # aliases also remain active during Discord signup matching below.
+        for former_name, canonical_name in MEMBER_NAME_ALIASES.items():
+            former = get_db().execute(
+                "SELECT * FROM members WHERE name=? COLLATE NOCASE", (former_name,)
+            ).fetchone()
+            canonical = get_db().execute(
+                "SELECT * FROM members WHERE name=? COLLATE NOCASE", (canonical_name,)
+            ).fetchone()
+            if not former or not canonical or former["id"] == canonical["id"]:
+                continue
+            former_id, canonical_id = former["id"], canonical["id"]
+            for table, columns in (
+                ("guild_event_signups", "event_id,source,rsvp_status,selected_job,discord_name,updated_at"),
+                ("guild_event_attendance", "event_id,attended,updated_by,updated_at"),
+                ("endgame_event_job_snapshots", "event_id,main_job,secondary_job,created_at"),
+            ):
+                get_db().execute(
+                    f"INSERT OR IGNORE INTO {table}(member_id,{columns}) "
+                    f"SELECT ?,{columns} FROM {table} WHERE member_id=?",
+                    (canonical_id, former_id),
+                )
+            get_db().execute(
+                "UPDATE endgame_loot_awards SET recipient_member_id=? WHERE recipient_member_id=?",
+                (canonical_id, former_id),
+            )
+            get_db().execute(
+                "UPDATE guild_events SET creator_member_id=? WHERE creator_member_id=?",
+                (canonical_id, former_id),
+            )
+            get_db().execute(
+                "UPDATE endgame_auctions SET created_by=? WHERE created_by=?",
+                (canonical_id, former_id),
+            )
+            if not canonical["discord_user_id"] and former["discord_user_id"]:
+                get_db().execute(
+                    "UPDATE members SET discord_user_id=?,discord_name=? WHERE id=?",
+                    (former["discord_user_id"], former["discord_name"], canonical_id),
+                )
+                get_db().execute(
+                    "UPDATE members SET discord_user_id='' WHERE id=?", (former_id,)
+                )
+            get_db().execute("DELETE FROM members WHERE id=?", (former_id,))
         archive_events = (
             ("Sky Operations", "Imported historical event", "2026-08-06T20:00", "2026-08-06T23:00", "Ru'Aun Gardens"),
             ("Sky Operations", "Imported historical event", "2026-08-13T20:00", "2026-08-13T23:00", "Ru'Aun Gardens"),
@@ -2512,6 +2598,17 @@ def create_app(test_config=None):
                    WHERE l.event_id=? ORDER BY l.id""", (row["id"],)
             ).fetchall()]
             guild_events.append(event_data)
+        guild_events = (
+            sorted(
+                (event for event in guild_events if event["is_upcoming"]),
+                key=lambda event: (event["start_at"], event["id"]),
+            )
+            + sorted(
+                (event for event in guild_events if not event["is_upcoming"]),
+                key=lambda event: (event["start_at"], event["id"]),
+                reverse=True,
+            )
+        )
         # The Google roster is the authoritative two-event baseline through 2026-08-13.
         # Only explicitly completed events after that snapshot extend the calculation.
         completed_events = [
@@ -2774,7 +2871,12 @@ def create_app(test_config=None):
                 "SELECT * FROM endgame_auction_items WHERE auction_id=? ORDER BY id", (row["id"],)
             ).fetchall():
                 item = dict(item_row)
-                tooltip_item = catalog.get((item.get("target_item") or item["item"]).casefold(), {})
+                tooltip_source_name = item.get("target_item") or item["item"]
+                tooltip_name = AUCTION_TOOLTIP_ITEM_ALIASES.get(tooltip_source_name, tooltip_source_name)
+                tooltip_item = AUCTION_TOOLTIP_OVERRIDES.get(
+                    tooltip_source_name,
+                    catalog.get(tooltip_name.casefold(), {}),
+                )
                 item["tooltip"] = {
                     "item_id": tooltip_item.get("item_id"), "name": tooltip_item.get("name") or item.get("target_item") or item["item"],
                     "level": tooltip_item.get("level") or item["required_level"], "slots": tooltip_item.get("slots", []),
@@ -3125,10 +3227,11 @@ def create_app(test_config=None):
         }
         matched = []
         for item in users:
-            display_name = str(
+            display_name = html.unescape(str(
                 item.get("display_name") or item.get("name") or item.get("discord_name") or ""
-            ).strip()
-            member = members_by_name.get(display_name.casefold())
+            )).strip()
+            canonical_name = MEMBER_NAME_ALIASES.get(display_name.casefold(), display_name)
+            member = members_by_name.get(canonical_name.casefold())
             status = str(item.get("status") or "").strip().casefold()
             status = {"yes": "going", "no": "cant", "can't": "cant", "cannot": "cant"}.get(status, status)
             job = str(item.get("job") or item.get("selected_job") or "").strip().upper()

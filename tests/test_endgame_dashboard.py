@@ -109,6 +109,19 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert response.data.count(b"data-loot-sort=") == 6
 
 
+def test_past_endgame_events_show_most_recent_first(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, admin=True)
+
+    page = client.get("/endgame").data
+    past_endgame = page.split(b"Past Endgame Events", 1)[1].split(b"Past User Events", 1)[0]
+    assert past_endgame.index(b"2026-08-13 at 20:00") < past_endgame.index(b"2026-08-06 at 20:00")
+
+    event_log = page.split(b">Past Events</h3>", 1)[1]
+    assert event_log.index(b"2026-08-13") < event_log.index(b"2026-08-06")
+
+
 def test_endgame_admin_controls_render_without_job_change_inbox(tmp_path):
     app = make_app(tmp_path)
     client = app.test_client()
@@ -318,6 +331,8 @@ def test_endgame_javascript_calculates_priority_and_pop_readiness(tmp_path):
     assert b"Only P1 candidates may bid" in script.data
     assert b"member.job_levels" in script.data
     assert b">= Number(item.required_level" in script.data
+    assert b"endgame:open-live-auction" in script.data
+    assert b"scrollIntoView" in script.data
     assert b"rankKey" in script.data
     assert b"displayedRank" in script.data
     assert b'"/api/endgame/pops"' in script.data
@@ -508,6 +523,107 @@ def test_event_bot_rsvps_include_status_and_job_in_alliance_builder(monkeypatch,
     script = client.get("/static/alliance_builder.js?v=5")
     assert b"discord-selected-job" in script.data
     assert b"Signed up as" in script.data
+
+
+def test_event_bot_resolves_retired_and_html_encoded_character_names(monkeypatch, tmp_path):
+    import sqlite3
+    import missions
+
+    app = make_app(tmp_path)
+    app.config.update(
+        HOKUTEN_EVENT_BOT_API_URL="https://events.example.test",
+        HOKUTEN_EVENT_BOT_API_TOKEN="shared-secret",
+    )
+    database = sqlite3.connect(app.config["DATABASE"])
+    creator_id = database.execute("SELECT id FROM members WHERE name='Imaven'").fetchone()[0]
+    killboi_id = database.execute("INSERT INTO members(name) VALUES('Killboi')").lastrowid
+    event_id = database.execute(
+        """INSERT INTO guild_events
+           (creator_member_id,name,start_at,end_at,discord_message_id)
+           VALUES(?,?,?,?,?)""",
+        (creator_id, "Alias Night", "2099-08-20T20:00", "2099-08-20T23:00", "alias-message"),
+    ).lastrowid
+    database.commit()
+    database.close()
+
+    monkeypatch.setattr(missions, "hokuten_event_bot_request", lambda *_args, **_kwargs: {
+        "event": {"players": {
+            "KB&#x20;": {"status": "going", "job": "DRG"},
+            "Soya": {"status": "maybe", "job": "BST"},
+        }}
+    })
+    client = app.test_client()
+    sign_in(client, admin=True)
+    assert client.post(f"/endgame/events/{event_id}/sync", data={"csrf_token": "token"}).status_code == 302
+
+    database = sqlite3.connect(app.config["DATABASE"])
+    rows = database.execute(
+        """SELECT m.name,s.rsvp_status,s.selected_job FROM guild_event_signups s
+           JOIN members m ON m.id=s.member_id WHERE s.event_id=? ORDER BY m.name""", (event_id,),
+    ).fetchall()
+    database.close()
+    assert rows == [("Killboi", "going", "DRG"), ("Soyabean", "maybe", "BST")]
+    assert killboi_id
+
+
+def test_startup_removes_soya_duplicate_and_preserves_signup(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    creator_id = database.execute("SELECT id FROM members WHERE name='Imaven'").fetchone()[0]
+    soya_id = database.execute("INSERT INTO members(name) VALUES('Soya')").lastrowid
+    event_id = database.execute(
+        """INSERT INTO guild_events(creator_member_id,name,start_at,end_at)
+           VALUES(?,?,?,?)""",
+        (creator_id, "Old Name Night", "2099-09-01T20:00", "2099-09-01T23:00"),
+    ).lastrowid
+    database.execute(
+        """INSERT INTO guild_event_signups
+           (event_id,member_id,rsvp_status,selected_job,discord_name)
+           VALUES(?,?,?,?,?)""",
+        (event_id, soya_id, "going", "BST", "Soya"),
+    )
+    database.commit()
+    database.close()
+
+    make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT 1 FROM members WHERE name='Soya'").fetchone() is None
+    signup = database.execute(
+        """SELECT m.name,s.rsvp_status,s.selected_job FROM guild_event_signups s
+           JOIN members m ON m.id=s.member_id WHERE s.event_id=?""", (event_id,),
+    ).fetchone()
+    database.close()
+    assert signup == ("Soyabean", "going", "BST")
+
+
+def test_startup_removes_encoded_kb_duplicate_and_preserves_signup(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    creator_id = database.execute("SELECT id FROM members WHERE name='Imaven'").fetchone()[0]
+    killboi_id = database.execute("INSERT INTO members(name) VALUES('Killboi')").lastrowid
+    kb_id = database.execute("INSERT INTO members(name) VALUES('KB&#x20;')").lastrowid
+    event_id = database.execute(
+        "INSERT INTO guild_events(creator_member_id,name,start_at,end_at) VALUES(?,?,?,?)",
+        (creator_id, "Encoded Name Night", "2099-09-02T20:00", "2099-09-02T23:00"),
+    ).lastrowid
+    database.execute(
+        "INSERT INTO guild_event_signups(event_id,member_id,discord_name) VALUES(?,?,?)",
+        (event_id, kb_id, "KB&#x20;"),
+    )
+    database.commit()
+    database.close()
+
+    make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT 1 FROM members WHERE name='KB&#x20;'").fetchone() is None
+    assert database.execute(
+        "SELECT member_id FROM guild_event_signups WHERE event_id=?", (event_id,),
+    ).fetchone() == (killboi_id,)
+    database.close()
 
 
 def test_admin_can_import_discord_created_events_without_duplicates(monkeypatch, tmp_path):
@@ -871,6 +987,17 @@ def test_sky_auction_includes_complete_seiryu_pool(tmp_path):
     deleted = client.post(f"/endgame/auctions/{auction['id']}/delete", data={"csrf_token": "token"})
     assert deleted.status_code == 302
     assert client.get("/api/endgame/auctions").get_json()["auctions"] == []
+
+    assert client.post("/endgame/auctions", data={
+        "csrf_token": "token", "event_id": str(event_id), "boss": "Suzaku", "duration_minutes": "3",
+    }).status_code == 302
+    auction = client.get("/api/endgame/auctions").get_json()["auctions"][0]
+    leggings = next(item for item in auction["items"] if item["item"] == "Neptunal Abjuration: Feet")
+    assert leggings["target_item"] == "Hecatomb Leggings"
+    assert leggings["tooltip"]["item_id"] == 14180
+    assert leggings["tooltip"]["name"] == "Hecatomb Leggings"
+    assert leggings["tooltip"]["slots"] == ["Feet"]
+    assert "STR+6" in leggings["tooltip"]["description"]
 
 
 def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
