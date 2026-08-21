@@ -1,6 +1,6 @@
 import json
 
-from missions import create_app
+from missions import ENDGAME_PRIORITY_ITEMS, create_app
 
 
 def make_app(tmp_path):
@@ -18,6 +18,15 @@ def sign_in(client, member_id=1, admin=False):
         session["is_admin"] = admin
         session["member_id"] = member_id
         session["csrf_token"] = "token"
+
+
+def test_dragoon_has_tier_one_priority_on_all_hecatomb_gear():
+    hecatomb_items = [item for item in ENDGAME_PRIORITY_ITEMS if item["name"].startswith("Hecatomb ")]
+
+    assert {item["name"] for item in hecatomb_items} == {
+        "Hecatomb Mittens", "Hecatomb Leggings", "Hecatomb Harness",
+    }
+    assert all("DRG" in item["p1"] for item in hecatomb_items)
 
 
 def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
