@@ -61,6 +61,7 @@
   window.addEventListener("endgame:open-live-auction", openLiveAuction);
   let auctionEditingUntil = 0;
   let auctionRecords = new Map();
+  let pastAuctionsOpen = false;
   const auctionEditing = () => Date.now() < auctionEditingUntil || Boolean(
     document.activeElement?.closest?.(".auction-bid-form, .auction-winner-select")
   );
@@ -69,6 +70,10 @@
   const countdownText = endsAt => {
     const seconds = Math.max(0, Math.ceil((Date.parse(`${endsAt}Z`) - Date.now()) / 1000));
     return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  };
+  const activityTimestamp = value => {
+    const parsed = Date.parse(String(value || "").includes("T") ? value : `${value}Z`);
+    return Number.isNaN(parsed) ? "" : new Date(parsed).toLocaleString([], {month: "short", day: "numeric", hour: "numeric", minute: "2-digit"});
   };
   const renderAuctions = payload => {
     if (!auctionRoot) return;
@@ -106,6 +111,8 @@
       const archive = document.createElement("details");
       archive.className = "past-auctions-archive";
       archive.innerHTML = `<summary>Past Auctions <span>${pastAuctions.length}</span></summary><div class="past-auctions-list"></div>`;
+      archive.open = pastAuctionsOpen;
+      archive.addEventListener("toggle", () => { pastAuctionsOpen = archive.open; });
       firstPastCard?.previousElementSibling?.classList.contains("auction-section-title") && firstPastCard.previousElementSibling.remove();
       firstPastCard?.before(archive);
       const list = archive.querySelector(".past-auctions-list");
@@ -165,7 +172,7 @@
       entry.innerHTML = entry.innerHTML.replace("PFree", "Freelot");
     });
     const recent = document.querySelector("#recent-auction-bids");
-    recent.innerHTML = payload.recent_bids.length ? payload.recent_bids.map(bid => `<article><span><b>${safeText(bid.name)}</b> bid on ${safeText(bid.item)}<small>${safeText(bid.boss)} · ${safeText(bid.job)}</small></span><strong>${bid.amount} DKP</strong></article>`).join("") : '<p class="event-empty">No bids have been placed.</p>';
+    recent.innerHTML = payload.recent_bids.length ? payload.recent_bids.map(bid => `<article><span><b>${safeText(bid.name)}</b> bid on ${safeText(bid.item)}<small>${safeText(bid.boss)} · ${safeText(bid.job)} · ${safeText(activityTimestamp(bid.updated_at))}</small></span><strong>${bid.amount} DKP</strong></article>`).join("") : '<p class="event-empty">No bids have been placed.</p>';
   };
   const loadAuctions = async () => {
     if (!auctionRoot) return;
