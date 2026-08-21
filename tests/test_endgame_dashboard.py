@@ -45,7 +45,7 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert b">Event Calendar</button>" not in response.data
     assert b">Endgame Operations</button>" not in response.data
     for label in (
-        b"Item Eligibility", b"Member Detail", b"Event Log",
+        b"Item Seratim", b"Member Detail", b"Event Log",
         b"Linkshell Loot", b"Linkshell Pops",
     ):
         assert label in response.data
@@ -131,6 +131,8 @@ def test_endgame_admin_controls_render_without_job_change_inbox(tmp_path):
     assert b"job-change requests need review" not in response.data
     assert b"Record Event" not in response.data
     assert b"Record Loot" in response.data
+    assert b"Adjust award" not in response.data
+    assert b"ENDGAME_LOOT_CATALOG" in response.data
     assert b"Review requests" not in response.data
     assert b'id="record-loot-dialog"' in response.data
     assert b'id="open-priority-matrix"' in response.data
@@ -150,7 +152,7 @@ def test_endgame_admin_controls_render_without_job_change_inbox(tmp_path):
     assert response.data.count(b"data-audit-sort=") == 5
     assert response.data.count(b"data-audit-filter=") == 5
     assert b"clear-audit-filters" in response.data
-    assert response.data.index(b">Member Detail</button>") < response.data.index(b">Item Eligibility</button>")
+    assert response.data.index(b">Member Detail</button>") < response.data.index(b">Item Seratim</button>")
     assert b'class="active" type="button" data-endgame-tab="bidding-live"' in response.data
     assert b"Active Bidding" in response.data
     assert b"Auction timer" in response.data
@@ -1130,10 +1132,10 @@ def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     assert confirmed.status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
     award = database.execute(
-        "SELECT item,dkp_cost,distribution FROM endgame_loot_awards WHERE item='Novio Earring' ORDER BY id DESC LIMIT 1"
+        "SELECT item,dkp_cost,distribution,auction_id FROM endgame_loot_awards WHERE item='Novio Earring' ORDER BY id DESC LIMIT 1"
     ).fetchone()
     status = database.execute("SELECT status FROM endgame_auctions WHERE id=?", (auction_id,)).fetchone()[0]
     database.close()
-    assert award == ("Novio Earring", 2.0, "P1")
+    assert award == ("Novio Earring", 2.0, "P1", auction_id)
     assert status == "Confirmed"
     assert client.get("/api/endgame/auctions").get_json()["my_balance"] == 3
