@@ -74,17 +74,18 @@ ENDGAME_PRIORITY_ITEMS = (
     {"area": "Sky", "source": "Byakko", "name": "Hecatomb Mittens", "p1": ("THF", "WAR"), "p2": ("DRK",), "p3": ("BRD",)},
     {"area": "Sky", "source": "Byakko", "name": "Shura Haidate", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
     {"area": "Sky", "source": "Byakko", "name": "Adaman Sollerets", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
-    {"area": "Sky", "source": "Seiryu", "name": "Zenith Crown", "p1": ("BLM",), "p2": ("RDM", "WHM", "SMN"), "p3": ("BRD",)},
+    {"area": "Sky", "source": "Byakko", "name": "Zenith Crown", "p1": ("BLM",), "p2": ("RDM", "WHM", "SMN"), "p3": ("BRD",)},
     {"area": "Sky", "source": "Seiryu", "name": "Seiryu's Kote", "p1": ("RNG",), "p2": ("SAM", "NIN"), "p3": ()},
     {"area": "Sky", "source": "Seiryu", "name": "Seiryu's Sword", "p1": (), "p2": (), "p3": (), "freelot": True},
     {"area": "Sky", "source": "Seiryu", "name": "Crimson Finger Gauntlets", "p1": ("COR", "RNG"), "p2": ("RDM",), "p3": ("DRK",)},
-    {"area": "Sky", "source": "Suzaku", "name": "Zenith Slacks", "p1": ("BLM",), "p2": ("RDM", "SMN"), "p3": ("BRD",)},
-    {"area": "Sky", "source": "Suzaku", "name": "Shura Zunari Kabuto", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
-    {"area": "Sky", "source": "Suzaku", "name": "Koenig Schaller", "p1": ("PLD",), "p2": ("WAR",), "p3": ()},
+    {"area": "Sky", "source": "Seiryu", "name": "Zenith Slacks", "p1": ("BLM",), "p2": ("RDM", "SMN"), "p3": ("BRD",)},
+    {"area": "Sky", "source": "Seiryu", "name": "Shura Zunari Kabuto", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
+    {"area": "Sky", "source": "Seiryu", "name": "Koenig Schaller", "p1": ("PLD",), "p2": ("WAR",), "p3": ()},
     {"area": "Sky", "source": "Suzaku", "name": "Suzaku's Sune-Ate", "p1": ("BRD",), "p2": ("RNG", "SAM", "NIN"), "p3": ()},
-    {"area": "Sky", "source": "Genbu", "name": "Hecatomb Leggings", "p1": ("THF", "DRK", "WAR"), "p2": ("BRD",), "p3": ()},
-    {"area": "Sky", "source": "Genbu", "name": "Shura Kote", "p1": ("MNK", "SAM", "NIN"), "p2": (), "p3": ()},
-    {"area": "Sky", "source": "Genbu", "name": "Adaman Celata", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
+    {"area": "Sky", "source": "Suzaku", "name": "Zenith Slacks", "p1": ("BLM",), "p2": ("RDM", "SMN"), "p3": ("BRD",)},
+    {"area": "Sky", "source": "Suzaku", "name": "Hecatomb Leggings", "p1": ("THF", "DRK", "WAR"), "p2": ("BRD",), "p3": ()},
+    {"area": "Sky", "source": "Suzaku", "name": "Shura Kote", "p1": ("MNK", "SAM", "NIN"), "p2": (), "p3": ()},
+    {"area": "Sky", "source": "Suzaku", "name": "Adaman Celata", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
     {"area": "Sky", "source": "Genbu", "name": "Genbu's Shield", "p1": ("RDM",), "p2": ("WHM", "BLU"), "p3": ()},
     {"area": "Sky", "source": "Genbu", "name": "Genbu's Kabuto", "p1": ("WAR", "MNK"), "p2": ("BRD",), "p3": ()},
     {"area": "Sky", "source": "Genbu", "name": "Zenith Mitts", "p1": ("BLM",), "p2": ("RDM",), "p3": ("SMN",)},
@@ -104,6 +105,13 @@ ENDGAME_PRIORITY_ITEMS = (
     {"area": "Sea", "source": "Jailer of Love", "name": "Love Torque", "p1": ("DRG", "THF"), "p2": ("COR",), "p3": ("BRD",)},
     {"area": "Sea", "source": "Jailer of Love", "name": "Novio Earring", "p1": ("BLM",), "p2": ("RDM", "BLU", "NIN", "COR"), "p3": ()},
     {"area": "Sea", "source": "Jailer of Love", "name": "Novia Earring", "p1": ("WHM",), "p2": ("PLD", "THF", "NIN"), "p3": ("RDM", "SMN")},
+)
+
+# Non-priority Sky equipment still belongs in the auction pool so it can be
+# confirmed as Freelot when it drops.
+ENDGAME_AUCTION_EXTRA_DROPS = (
+    {"area": "Sky", "source": "Suzaku", "name": "Suzaku's Scythe", "p1": (), "p2": (), "p3": ()},
+    {"area": "Sky", "source": "Genbu", "name": "Dryadic Abjuration: Feet", "p1": (), "p2": (), "p3": ()},
 )
 
 ENDGAME_BASELINE_ATTENDANCE = {
@@ -2423,43 +2431,6 @@ def create_app(test_config=None):
             {"area": "Sea", "name": "Jailer of Prudence", "requires": ("third-virtue", "deed-sensibility", "hq-hpemde")},
             {"area": "Sea", "name": "Jailer of Love", "requires": ("fourth-virtue", "fifth-virtue", "sixth-virtue")},
         )
-        priority_items = (
-            {"area": "Sky", "source": "Byakko", "name": "Byakko's Haidate", "p1": ("NIN", "WAR", "SAM", "MNK"), "p2": ("BST", "BRD"), "p3": ()},
-            {"area": "Sky", "source": "Byakko", "name": "Byakko's Axe", "p1": ("WAR",), "p2": (), "p3": ()},
-            {"area": "Sky", "source": "Byakko", "name": "Hecatomb Mittens", "p1": ("THF", "WAR"), "p2": ("DRK",), "p3": ("BRD",)},
-            {"area": "Sky", "source": "Byakko", "name": "Shura Haidate", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
-            {"area": "Sky", "source": "Byakko", "name": "Adaman Sollerets", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
-            {"area": "Sky", "source": "Seiryu", "name": "Zenith Crown", "p1": ("BLM",), "p2": ("RDM", "WHM", "SMN"), "p3": ("BRD",)},
-            {"area": "Sky", "source": "Seiryu", "name": "Seiryu's Kote", "p1": ("RNG",), "p2": ("SAM", "NIN"), "p3": ()},
-            {"area": "Sky", "source": "Seiryu", "name": "Seiryu's Sword", "p1": (), "p2": (), "p3": (), "freelot": True},
-            {"area": "Sky", "source": "Seiryu", "name": "Crimson Finger Gauntlets", "p1": ("COR", "RNG"), "p2": ("RDM",), "p3": ("DRK",)},
-            {"area": "Sky", "source": "Suzaku", "name": "Zenith Slacks", "p1": ("BLM",), "p2": ("RDM", "SMN"), "p3": ("BRD",)},
-            {"area": "Sky", "source": "Suzaku", "name": "Shura Zunari Kabuto", "p1": ("SAM",), "p2": ("MNK", "NIN"), "p3": ()},
-            {"area": "Sky", "source": "Suzaku", "name": "Koenig Schaller", "p1": ("PLD",), "p2": ("WAR",), "p3": ()},
-            {"area": "Sky", "source": "Suzaku", "name": "Suzaku's Sune-Ate", "p1": ("BRD",), "p2": ("RNG", "SAM", "NIN"), "p3": ()},
-            {"area": "Sky", "source": "Genbu", "name": "Hecatomb Leggings", "p1": ("THF", "DRK", "WAR"), "p2": ("BRD",), "p3": ()},
-            {"area": "Sky", "source": "Genbu", "name": "Shura Kote", "p1": ("MNK", "SAM", "NIN"), "p2": (), "p3": ()},
-            {"area": "Sky", "source": "Genbu", "name": "Adaman Celata", "p1": ("WAR",), "p2": ("DRK", "BST"), "p3": ()},
-            {"area": "Sky", "source": "Genbu", "name": "Genbu's Shield", "p1": ("RDM",), "p2": ("WHM", "BLU"), "p3": ()},
-            {"area": "Sky", "source": "Genbu", "name": "Genbu's Kabuto", "p1": ("WAR", "MNK"), "p2": ("BRD",), "p3": ()},
-            {"area": "Sky", "source": "Genbu", "name": "Zenith Mitts", "p1": ("BLM",), "p2": ("RDM",), "p3": ("SMN",)},
-            {"area": "Sky", "source": "Genbu", "name": "Koenig Handschuhs", "p1": ("PLD",), "p2": ("WAR",), "p3": ()},
-            {"area": "Sky", "source": "Genbu", "name": "Crimson Greaves", "p1": ("PLD",), "p2": ("RDM", "RNG"), "p3": ()},
-            {"area": "Sky", "source": "Kirin", "name": "Kirin's Osode", "p1": ("RNG", "SAM"), "p2": ("WAR",), "p3": ("BRD", "NIN")},
-            {"area": "Sky", "source": "Kirin", "name": "Kirin's Pole", "p1": ("BLM",), "p2": ("RDM",), "p3": ("MNK",)},
-            {"area": "Sky", "source": "Kirin", "name": "Shura Togi", "p1": ("MNK",), "p2": ("SAM",), "p3": ()},
-            {"area": "Sky", "source": "Kirin", "name": "Hecatomb Harness", "p1": ("THF", "DRK"), "p2": ("WAR",), "p3": ()},
-            {"area": "Sky", "source": "Kirin", "name": "Crimson Cuisses", "p1": ("PLD",), "p2": ("RDM",), "p3": ("RNG", "COR")},
-            {"area": "Sea", "source": "Jailer of Faith", "name": "Faith Torque", "p1": ("MNK",), "p2": ("RNG", "COR"), "p3": ("THF", "WHM")},
-            {"area": "Sea", "source": "Jailer of Justice", "name": "Justice Torque", "p1": ("DRK", "SAM"), "p2": (), "p3": ()},
-            {"area": "Sea", "source": "Jailer of Hope", "name": "Hope Torque", "p1": ("NIN", "RNG"), "p2": ("THF",), "p3": ("SAM",)},
-            {"area": "Sea", "source": "Jailer of Prudence", "name": "Prudence Torque", "p1": ("DRK", "BLM"), "p2": ("RDM",), "p3": ("BLU",)},
-            {"area": "Sea", "source": "Jailer of Fortitude", "name": "Fortitude Torque", "p1": ("WAR",), "p2": ("DRK", "BLU"), "p3": ("RDM",)},
-            {"area": "Sea", "source": "Jailer of Temperance", "name": "Temperance Torque", "p1": ("BST",), "p2": ("WAR",), "p3": ()},
-            {"area": "Sea", "source": "Jailer of Love", "name": "Love Torque", "p1": ("DRG", "THF"), "p2": ("COR",), "p3": ("BRD",)},
-            {"area": "Sea", "source": "Jailer of Love", "name": "Novio Earring", "p1": ("BLM",), "p2": ("RDM", "BLU", "NIN", "COR"), "p3": ()},
-            {"area": "Sea", "source": "Jailer of Love", "name": "Novia Earring", "p1": ("WHM",), "p2": ("PLD", "THF", "NIN"), "p3": ("RDM", "SMN")},
-        )
         priority_items = [dict(item) for item in ENDGAME_PRIORITY_ITEMS]
         item_families = {
             "Byakko's Haidate": "Legs", "Byakko's Axe": "Weapons", "Hecatomb Mittens": "Hands", "Shura Haidate": "Legs",
@@ -2734,11 +2705,11 @@ def create_app(test_config=None):
     def auction_drop_name(item_name):
         abjurations = {
             "Hecatomb Mittens": "Neptunal Abjuration: Hands", "Shura Haidate": "Dryadic Abjuration: Legs",
-            "Adaman Sollerets": "Martial Abjuration: Feet", "Zenith Crown": "Aquarian Abjuration: Head",
+            "Adaman Sollerets": "Earthen Abjuration: Feet", "Zenith Crown": "Aquarian Abjuration: Head",
             "Crimson Finger Gauntlets": "Wyrmal Abjuration: Hands", "Zenith Slacks": "Aquarian Abjuration: Legs",
             "Shura Zunari Kabuto": "Dryadic Abjuration: Head", "Koenig Schaller": "Martial Abjuration: Head",
             "Hecatomb Leggings": "Neptunal Abjuration: Feet", "Shura Kote": "Dryadic Abjuration: Hands",
-            "Adaman Celata": "Martial Abjuration: Head", "Zenith Mitts": "Aquarian Abjuration: Hands",
+            "Adaman Celata": "Earthen Abjuration: Head", "Zenith Mitts": "Aquarian Abjuration: Hands",
             "Koenig Handschuhs": "Martial Abjuration: Hands", "Crimson Greaves": "Wyrmal Abjuration: Feet",
             "Shura Togi": "Dryadic Abjuration: Body", "Hecatomb Harness": "Neptunal Abjuration: Body",
             "Crimson Cuisses": "Wyrmal Abjuration: Legs",
@@ -2908,7 +2879,8 @@ def create_app(test_config=None):
         duration_minutes = request.form.get("duration_minutes", type=int)
         if duration_minutes not in range(3, 11):
             abort(400, description="Choose an auction duration between 3 and 10 minutes.")
-        boss_items = [dict(item) for item in ENDGAME_PRIORITY_ITEMS if item["source"] == boss]
+        boss_items = [dict(item) for item in (*ENDGAME_PRIORITY_ITEMS, *ENDGAME_AUCTION_EXTRA_DROPS)
+                      if item["source"] == boss]
         event = get_db().execute("SELECT * FROM guild_events WHERE id=?", (event_id,)).fetchone()
         if not event or not is_endgame_guild_event(event) or not boss_items:
             abort(400, description="Choose an Endgame event and a valid Sky or Sea boss.")

@@ -156,7 +156,7 @@ def test_only_designated_admins_can_create_guild_events(tmp_path):
     assert b"Record Loot" not in page
     response = client.post("/endgame/events/new", data={
         "csrf_token": "token", "name": "Unauthorized Event",
-        "start_at": "2026-08-20T20:00", "location": "Ru'Aun Gardens",
+        "start_at": "2099-08-20T20:00", "location": "Ru'Aun Gardens",
     })
     assert response.status_code == 403
 
@@ -188,7 +188,7 @@ def test_past_test_events_are_removed_and_only_archived_sky_is_endgame(tmp_path)
             (creator_id, "Past Dynamis", "2026-07-02T20:00", "2026-07-02T23:00", "Completed", "endgame-events-only"),
             (creator_id, "Chains of Promathia 4-3", "2026-08-20T18:00", "2026-08-20T21:00", "Scheduled", "endgame-events-only"),
             (creator_id, "Community ENM", "2026-08-20T19:00", "2026-08-20T22:00", "Scheduled", "events-posting-and-signup-only"),
-            (creator_id, "Sky Gods", "2026-08-20T20:00", "2026-08-20T23:00", "Scheduled", "endgame-events-only"),
+            (creator_id, "Sky Gods", "2099-08-20T20:00", "2099-08-20T23:00", "Scheduled", "endgame-events-only"),
         ],
     )
     database.commit()
@@ -375,7 +375,7 @@ def test_guild_event_creates_discord_event_syncs_signups_and_tracks_attendance(m
     sign_in(client, admin=True)
     response = client.post("/endgame/events/new", data={
         "csrf_token": "token", "name": "Sky Gods", "description": "Four gods and Kirin",
-        "start_at": "2026-08-20T20:00", "end_at": "2026-08-20T23:00", "location": "Ru'Aun Gardens",
+        "start_at": "2099-08-20T20:00", "end_at": "2099-08-20T23:00", "location": "Ru'Aun Gardens",
     })
     assert response.status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
@@ -431,7 +431,7 @@ def test_event_bot_rsvps_include_status_and_job_in_alliance_builder(monkeypatch,
         """INSERT INTO guild_events
            (creator_member_id,name,start_at,end_at,discord_message_id)
            VALUES(?,?,?,?,?)""",
-        (creator_id, "Sea Night", "2026-08-20T20:00", "2026-08-20T23:00", "message-1"),
+        (creator_id, "Sea Night", "2099-08-20T20:00", "2099-08-20T23:00", "message-1"),
     ).lastrowid
     database.commit()
     database.close()
@@ -754,14 +754,14 @@ def test_event_creation_prefers_private_event_bot_api(monkeypatch, tmp_path):
     sign_in(client, admin=True)
     response = client.post("/endgame/events/new", data={
         "csrf_token": "token", "name": "API Sky", "description": "Test",
-        "start_at": "2026-08-20T20:00", "location": "Ru'Aun Gardens",
+        "start_at": "2099-08-20T20:00", "location": "Ru'Aun Gardens",
     })
     assert response.status_code == 302
     assert calls[0][0:4] == (
         "https://events.example.test", "shared-secret", "POST", "/api/events",
     )
     assert calls[0][4]["duration"] == "3"
-    assert calls[0][4]["date"] == "Thursday August 20 2026"
+    assert calls[0][4]["date"] == "Thursday August 20 2099"
     assert calls[0][4]["time"] == "8:00 PM"
     assert calls[0][4]["channel"] == "endgame-events-only"
     database = sqlite3.connect(app.config["DATABASE"])
@@ -791,6 +791,29 @@ def test_event_creation_rejects_past_time_before_calling_discord(monkeypatch, tm
     })
     assert response.status_code == 400
     assert b"Choose an event date and time in the future" in response.data
+def test_sky_auction_includes_complete_seiryu_pool(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+
+    import sqlite3
+    database = sqlite3.connect(app.config["DATABASE"])
+    event_id = database.execute(
+        "SELECT id FROM guild_events WHERE name='Sky Operations' ORDER BY id LIMIT 1"
+    ).fetchone()[0]
+    database.close()
+
+    started = client.post("/endgame/auctions", data={
+        "csrf_token": "token", "event_id": str(event_id), "boss": "Seiryu", "duration_minutes": "3",
+    })
+    assert started.status_code == 302
+    auction = client.get("/api/endgame/auctions").get_json()["auctions"][0]
+    assert {item["item"] for item in auction["items"]} == {
+        "Seiryu's Kote", "Seiryu's Sword", "Aquarian Abjuration: Legs",
+        "Dryadic Abjuration: Head", "Martial Abjuration: Head", "Wyrmal Abjuration: Hands",
+    }
+
+
 def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     import sqlite3
 
