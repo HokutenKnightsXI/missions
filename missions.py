@@ -1547,7 +1547,18 @@ def create_app(test_config=None):
             canonical = get_db().execute(
                 "SELECT * FROM members WHERE name=? COLLATE NOCASE", (canonical_name,)
             ).fetchone()
-            if not former or not canonical or former["id"] == canonical["id"]:
+            if not former:
+                continue
+            # Killboi was not part of the seeded roster, so a site which only
+            # contains the old KB entry must rename that member in place. That
+            # preserves every foreign-keyed signup, attendance, award, and DKP
+            # record without requiring a second member row to exist first.
+            if not canonical:
+                get_db().execute(
+                    "UPDATE members SET name=? WHERE id=?", (canonical_name, former["id"])
+                )
+                continue
+            if former["id"] == canonical["id"]:
                 continue
             former_id, canonical_id = former["id"], canonical["id"]
             for table, columns in (
@@ -1573,6 +1584,8 @@ def create_app(test_config=None):
                 (canonical_id, former_id),
             )
             if not canonical["discord_user_id"] and former["discord_user_id"]:
+                # The Discord ID is unique. Release it from the retired row
+                # before assigning it to the canonical member.
                 get_db().execute(
                     "UPDATE members SET discord_user_id='' WHERE id=?", (former_id,)
                 )
