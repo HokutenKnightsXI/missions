@@ -22,7 +22,7 @@
   };
   tabs.forEach(tab => tab.addEventListener("click", () => activate(tab.dataset.endgameTab)));
   const requested = location.hash.slice(1);
-  if (["bidding-live", "jobs", "priority", "loot"].includes(requested)) { activateView("dkp-loot"); activate(requested); }
+  if (["bidding-live", "jobs", "priority", "loot"].includes(requested) || requested.startsWith("auction-")) { activateView("dkp-loot"); activate(requested.startsWith("auction-") ? "bidding-live" : requested); }
   else if (["events", "pops", "admin-audit"].includes(requested)) { activateView("operations"); activate(requested); }
   else activateView("calendar");
   const guildDateInput = document.querySelector('.event-create-form .native-date-input');
@@ -126,6 +126,10 @@
       const payload = await response.json();
       if (auctionEditing()) return;
       renderAuctions(payload);
+      const auctionAnchor = location.hash.slice(1);
+      if (auctionAnchor.startsWith("auction-")) {
+        requestAnimationFrame(() => document.getElementById(auctionAnchor)?.scrollIntoView({behavior: "smooth", block: "start"}));
+      }
       const state = document.querySelector("#auction-refresh-state");
       if (state) state.textContent = `Updated ${new Date().toLocaleTimeString([], {hour: "2-digit", minute: "2-digit", second: "2-digit"})}`;
     } catch (error) { auctionRoot.innerHTML = auctionError(error.message); }
@@ -481,11 +485,13 @@
       const attendees = selected.attendees || [];
       const awards = selected.loot || [];
       const allMembers = window.ENDGAME_MEMBERS || [];
+      const lootCatalog = window.ENDGAME_LOOT_CATALOG || [];
+      const lootOptions = `<option value="">Select Sky or Sea item</option>${lootCatalog.map(item => `<option value="${safeText(item.name)}" data-family="${safeText(item.family)}">${safeText(item.area)} · ${safeText(item.source)} · ${safeText(item.name)}</option>`).join("")}`;
       const csrf = safeText(document.querySelector('input[name="csrf_token"]')?.value || window.ENDGAME_CSRF || "");
       const lootPanel = window.ENDGAME_IS_ADMIN
         ? awards.map(row => `<form method="post" action="/endgame/loot/${row.id}/update" class="event-loot-persistent-editor"><input type="hidden" name="csrf_token" value="${csrf}"><input type="hidden" name="family" value="${safeText(row.family || "Other")}"><input type="hidden" name="classification" value="Major Loot"><input name="item" value="${safeText(row.item)}" aria-label="Item"><select name="member_id" aria-label="Recipient">${allMembers.map(member => `<option value="${member.id}" ${member.name === row.player ? "selected" : ""}>${safeText(member.name)}</option>`).join("")}</select><select name="job" aria-label="Receiving job">${jobs.map(job => `<option ${job === row.job ? "selected" : ""}>${job}</option>`).join("")}</select><select name="distribution" aria-label="Priority">${["P1","P2","P3","Freelot"].map(value => `<option ${priorityLabel(row.award) === value ? "selected" : ""}>${value}</option>`).join("")}</select><input type="number" name="dkp_cost" min="0" max="999" step="1" value="${Number(row.dkp_cost || 0)}" aria-label="DKP spent"><div><button type="submit">Save</button><button class="danger" type="submit" formaction="/endgame/loot/${row.id}/delete">Remove &amp; Restore DKP</button></div></form>`).join("") || '<p class="event-empty">No loot was recorded for this event.</p>'
         : awards.length ? `<table class="event-detail-table"><thead><tr><th>Item</th><th>Recipient</th><th>Job</th><th>Priority</th><th>DKP</th></tr></thead><tbody>${awards.map(row => `<tr><td class="event-loot-item"><b>${safeText(row.item)}</b></td><td>${safeText(row.player)}</td><td><span class="job-badge main">${safeText(row.job)}</span></td><td>${safeText(priorityLabel(row.award))}</td><td>${Number(row.dkp_cost || 0)}</td></tr>`).join("")}</tbody></table>` : '<p class="event-empty">No loot was recorded for this event.</p>';
-      const manualLootForm = window.ENDGAME_IS_ADMIN ? `<form method="post" action="/endgame/loot" class="event-add-loot persistent-event-add"><input type="hidden" name="csrf_token" value="${csrf}"><input type="hidden" name="event_id" value="${selected.id}"><input type="hidden" name="family" value="Other"><input type="hidden" name="classification" value="Major Loot"><h4>Add Loot Drop</h4><input name="item" placeholder="Item name" required><select name="member_id" required><option value="">Recipient</option>${allMembers.map(member => `<option value="${member.id}">${safeText(member.name)}</option>`).join("")}</select><select name="job" required><option value="">Job</option>${jobs.map(job => `<option>${job}</option>`).join("")}</select><select name="distribution"><option>P1</option><option>P2</option><option>P3</option><option selected>Freelot</option></select><input type="number" name="dkp_cost" min="0" max="999" step="1" value="0" aria-label="DKP spent"><button class="button primary" type="submit">Add Loot Drop</button></form>` : "";
+      const manualLootForm = window.ENDGAME_IS_ADMIN ? `<form method="post" action="/endgame/loot" class="event-add-loot persistent-event-add"><input type="hidden" name="csrf_token" value="${csrf}"><input type="hidden" name="event_id" value="${selected.id}"><input type="hidden" name="classification" value="Major Loot"><h4>Add Loot Drop</h4><select name="item" required>${lootOptions}</select><select name="member_id" required><option value="">Recipient</option>${allMembers.map(member => `<option value="${member.id}">${safeText(member.name)}</option>`).join("")}</select><select name="job" required><option value="">Job</option>${jobs.map(job => `<option>${job}</option>`).join("")}</select><select name="distribution"><option>P1</option><option>P2</option><option>P3</option><option selected>Freelot</option></select><input type="number" name="dkp_cost" min="0" max="999" step="1" value="0" aria-label="DKP spent"><button class="button primary" type="submit">Add Loot Drop</button></form>` : "";
       dialogEyebrow.textContent = `${selected.start_at.slice(0, 10)} / Endgame event`;
       dialogTitle.textContent = `${selected.name} / Loot`;
       dialogContent.innerHTML = `<section class="event-detail-column event-loot-only"><header><h3>Event Loot</h3><span>${awards.length} awards</span></header><div class="event-detail-scroll">${lootPanel}</div>${manualLootForm}</section>`;

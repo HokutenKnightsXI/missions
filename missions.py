@@ -1391,6 +1391,25 @@ def create_app(test_config=None):
             get_db().execute(
                 "ALTER TABLE endgame_loot_awards ADD COLUMN dkp_cost REAL NOT NULL DEFAULT 0"
             )
+        if "auction_id" not in loot_award_columns:
+            get_db().execute("ALTER TABLE endgame_loot_awards ADD COLUMN auction_id INTEGER")
+        get_db().execute(
+            """UPDATE endgame_loot_awards AS award SET auction_id=(
+                   SELECT auction.id FROM endgame_auction_items item
+                   JOIN endgame_auctions auction ON auction.id=item.auction_id
+                   WHERE auction.event_id=award.event_id AND item.item=award.item
+                   ORDER BY auction.id DESC LIMIT 1
+               ) WHERE auction_id IS NULL"""
+        )
+        get_db().execute(
+            """UPDATE endgame_loot_awards SET item=CASE lower(item)
+                   WHEN 'w hands' THEN 'Crimson Finger Gauntlets'
+                   WHEN 'n hands' THEN 'Hecatomb Mittens'
+                   WHEN 'd legs' THEN 'Shura Haidate'
+               END
+               WHERE event_id IN (SELECT id FROM guild_events WHERE substr(start_at,1,10)='2026-08-20')
+               AND lower(item) IN ('w hands','n hands','d legs')"""
+        )
         auction_item_columns = {
             row["name"] for row in get_db().execute("PRAGMA table_info(endgame_auction_items)")
         }
@@ -2537,6 +2556,12 @@ def create_app(test_config=None):
         )
         for priority_item in priority_items:
             priority_item["required_level"] = required_levels.get(priority_item["name"], 1)
+        loot_catalog = sorted(
+            [dict(item) for item in (*ENDGAME_PRIORITY_ITEMS, *ENDGAME_AUCTION_EXTRA_DROPS)],
+            key=lambda item: (item["area"], item["source"], item["name"]),
+        )
+        for item in loot_catalog:
+            item["family"] = item_families.get(item["name"], auction_item_family(item["name"]))
         guild_events = []
         for row in get_db().execute(
             """SELECT e.*, m.name creator_name,
@@ -2592,7 +2617,7 @@ def create_app(test_config=None):
                    WHERE a.event_id=? AND a.attended=1 ORDER BY m.name COLLATE NOCASE""", (row["id"],)
             ).fetchall()]
             event_data["loot"] = [dict(item) for item in get_db().execute(
-                """SELECT l.id,l.item,m.name player,l.job,l.family,l.distribution award,l.dkp_cost,
+                """SELECT l.id,l.item,m.name player,l.job,l.family,l.distribution award,l.dkp_cost,l.auction_id,
                           l.classification='Major Loot' major
                    FROM endgame_loot_awards l JOIN members m ON m.id=l.recipient_member_id
                    WHERE l.event_id=? ORDER BY l.id""", (row["id"],)
@@ -2664,7 +2689,7 @@ def create_app(test_config=None):
         persistent_loot = [dict(row) for row in get_db().execute(
             """SELECT substr(e.start_at,6,2)||'/'||substr(e.start_at,9,2)||'/'||substr(e.start_at,1,4) date,
                       m.name player,l.item,l.family,l.classification='Major Loot' major,
-                       l.job,l.distribution award,l.dkp_cost,e.name event_name,e.id event_id,
+                      l.job,l.distribution award,l.dkp_cost,l.auction_id,e.name event_name,e.id event_id,
                        l.recipient_member_id,l.id
                FROM endgame_loot_awards l JOIN guild_events e ON e.id=l.event_id
                JOIN members m ON m.id=l.recipient_member_id ORDER BY e.start_at DESC,l.id DESC"""
@@ -2746,6 +2771,7 @@ def create_app(test_config=None):
             "endgame_dashboard.html", roster=prototype_roster,
             loot=persistent_loot, pop_items=pop_items, pop_targets=pop_targets,
             priority_items=priority_items, jobs=JOBS, guild_events=guild_events,
+            loot_catalog=loot_catalog,
             calendar_members=calendar_members,
             pending_job_requests=pending_job_requests,
             own_job_request=dict(own_job_request) if own_job_request else None,
@@ -2815,6 +2841,13 @@ def create_app(test_config=None):
                 return family
         return "Other"
 
+    def manual_loot_family(item_name):
+        catalog_names = {
+            item["name"]: auction_item_family(item["name"])
+            for item in (*ENDGAME_PRIORITY_ITEMS, *ENDGAME_AUCTION_EXTRA_DROPS)
+        }
+        return catalog_names.get(item_name)
+
     def auction_drop_name(item_name):
         abjurations = {
             "Hecatomb Mittens": "Neptunal Abjuration: Hands", "Shura Haidate": "Dryadic Abjuration: Legs",
@@ -2861,7 +2894,7 @@ def create_app(test_config=None):
         rows = get_db().execute(
             """SELECT a.*,e.name event_name FROM endgame_auctions a
                JOIN guild_events e ON e.id=a.event_id
-               WHERE a.status IN ('Active','Closed') ORDER BY a.id DESC LIMIT 8"""
+               WHERE a.status IN ('Active','Closed','Confirmed') ORDER BY a.id DESC LIMIT 8"""
         ).fetchall()
         for row in rows:
             auction = dict(row)
@@ -3150,10 +3183,10 @@ def create_app(test_config=None):
             tier = auction_priority_tier(item, bid["job"])
             get_db().execute(
                 """INSERT INTO endgame_loot_awards
-                   (event_id,recipient_member_id,item,job,family,distribution,classification,dkp_cost,recorded_by)
-                   VALUES(?,?,?,?,?,?, 'Major Loot',?,?)""",
+                   (event_id,recipient_member_id,item,job,family,distribution,classification,dkp_cost,auction_id,recorded_by)
+                   VALUES(?,?,?,?,?,?, 'Major Loot',?,?,?)""",
                 (auction["event_id"], winner_id, item["item"], bid["job"], item["family"],
-                 f"{'Freelot' if tier == 4 else f'P{tier}'}", bid["amount"], actor["id"]),
+                 f"{'Freelot' if tier == 4 else f'P{tier}'}", bid["amount"], auction_id, actor["id"]),
             )
             balances[winner_id]["balance"] -= bid["amount"]
             awards += 1
@@ -3822,7 +3855,7 @@ def create_app(test_config=None):
         member_id = request.form.get("member_id", "")
         item = request.form.get("item", "").strip()[:120]
         job = request.form.get("job", "").strip().upper()
-        family = request.form.get("family", "").strip()
+        family = manual_loot_family(item)
         distribution = request.form.get("distribution", "").strip()
         classification = request.form.get("classification", "").strip()
         try:
