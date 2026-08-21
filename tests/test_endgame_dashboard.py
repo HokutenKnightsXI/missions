@@ -637,6 +637,19 @@ def test_designated_admin_can_edit_archived_attendance_and_loot(tmp_path):
     assert b'data-dkp="1"' in alecy_row
     assert b'data-spent="2"' in alecy_row
 
+    sexualpotato_row = client.get("/endgame").data.split(
+        b'data-name="sexualpotato"', 1
+    )[1].split(b"</tr>", 1)[0]
+    assert b'data-dkp="3"' in sexualpotato_row
+
+    member_payload = client.get("/endgame").data.split(
+        b"window.ENDGAME_MEMBER_DETAILS=", 1
+    )[1].split(b";</script>", 1)[0]
+    member_details = json.loads(member_payload)
+    sexualpotato = next(member for member in member_details.values() if member["name"] == "Sexualpotato")
+    assert sexualpotato["lifetime_earned"] == 3
+    assert sexualpotato["dkp"] == 3
+
     assert client.post(f"/endgame/loot/{award_id}/delete", data={"csrf_token": "token"}).status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
     assert database.execute("SELECT 1 FROM endgame_loot_awards WHERE id=?", (award_id,)).fetchone() is None
@@ -647,6 +660,39 @@ def test_designated_admin_can_edit_archived_attendance_and_loot(tmp_path):
     assert "added none" in attendance_audit
     assert "removed Sexualpotato" in attendance_audit
     database.close()
+
+
+def test_archived_attendance_edits_add_and_subtract_member_dkp(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, admin=True)
+    database = sqlite3.connect(app.config["DATABASE"])
+    event_id = database.execute("SELECT id FROM guild_events ORDER BY start_at LIMIT 1").fetchone()[0]
+    bodom_id = database.execute("SELECT id FROM members WHERE name='Bodom'").fetchone()[0]
+    database.close()
+
+    assert client.post(f"/endgame/events/{event_id}/attendance", data={
+        "csrf_token": "token", "member_ids": [str(bodom_id)],
+    }).status_code == 302
+    bodom_row = client.get("/endgame").data.split(b'data-name="bodom"', 1)[1].split(b"</tr>", 1)[0]
+    assert b'data-earned="9"' in bodom_row
+    assert b'data-dkp="9"' in bodom_row
+
+    assert client.post(f"/endgame/events/{event_id}/attendance", data={
+        "csrf_token": "token", "member_ids": [],
+    }).status_code == 302
+    page = client.get("/endgame").data
+    bodom_row = page.split(b'data-name="bodom"', 1)[1].split(b"</tr>", 1)[0]
+    assert b'data-earned="6"' in bodom_row
+    assert b'data-dkp="6"' in bodom_row
+    member_details = json.loads(
+        page.split(b"window.ENDGAME_MEMBER_DETAILS=", 1)[1].split(b";</script>", 1)[0]
+    )
+    bodom = next(member for member in member_details.values() if member["name"] == "Bodom")
+    assert bodom["lifetime_earned"] == 6
+    assert bodom["dkp"] == 6
 
 
 def test_ordinary_member_cannot_edit_archived_loot(tmp_path):

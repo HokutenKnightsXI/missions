@@ -200,6 +200,16 @@ CREATE TABLE IF NOT EXISTS guild_event_attendance (
 
 CREATE INDEX IF NOT EXISTS idx_guild_events_start ON guild_events(start_at, status);
 
+CREATE TABLE IF NOT EXISTS endgame_attendance_dkp_adjustments (
+    event_id INTEGER NOT NULL,
+    member_id INTEGER NOT NULL,
+    dkp_delta REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (event_id, member_id),
+    FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS admin_change_log (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     actor_member_id INTEGER,

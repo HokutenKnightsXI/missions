@@ -1469,6 +1469,7 @@ def create_app(test_config=None):
         creator_id = get_db().execute(
             "SELECT id FROM members WHERE name='Imaven' COLLATE NOCASE"
         ).fetchone()["id"]
+        created_archive_events = set()
         for event_name, event_description, start_at, end_at, location in archive_events:
             if not get_db().execute(
                 "SELECT 1 FROM guild_events WHERE name=? AND start_at=?", (event_name, start_at)
@@ -1479,11 +1480,14 @@ def create_app(test_config=None):
                        VALUES(?,?,?,?,?,?,'Completed')""",
                     (creator_id, event_name, event_description, start_at, end_at, location),
                 )
+                created_archive_events.add(start_at)
         archive_attendance = {
             "2026-08-06T20:00": ("Sexualpotato", "Vlathgar", "Chickenbanana", "Alecy", "Rhode", "Shiru", "Venenua", "Teeje", "Mygas", "Ivalin", "Cartuja", "Shurgajoe", "Firewater", "Anonym", "Ramenwarrior", "Hikari"),
             "2026-08-13T20:00": ("Sexualpotato", "Vlathgar", "Chickenbanana", "Alecy", "Rhode", "Shiru", "Venenua", "Teeje", "Mygas", "Ivalin", "Cartuja", "Shurgajoe", "Kaeru", "Firewater", "Anonym", "Ramenwarrior", "Eunos", "Hikari", "Gravekeeper"),
         }
         for start_at, names in archive_attendance.items():
+            if start_at not in created_archive_events:
+                continue
             event_id = get_db().execute(
                 "SELECT id FROM guild_events WHERE name='Sky Operations' AND start_at=?", (start_at,)
             ).fetchone()["id"]
@@ -2522,13 +2526,20 @@ def create_app(test_config=None):
                    FROM endgame_loot_awards GROUP BY recipient_member_id"""
             ).fetchall()
         }
+        attendance_adjustments = {
+            row["member_id"]: float(row["delta"] or 0)
+            for row in get_db().execute(
+                """SELECT member_id,SUM(dkp_delta) delta
+                   FROM endgame_attendance_dkp_adjustments GROUP BY member_id"""
+            ).fetchall()
+        }
         for member in prototype_roster:
             baseline_attended = member["attended"]
             eligible = member["eligible"] + len(completed_events)
             attended = member["attended"] + sum(
                 member["id"] in event["attendance"] for event in completed_events
             )
-            lifetime_earned = baseline_attended * 3 + sum(
+            lifetime_earned = baseline_attended * 3 + attendance_adjustments.get(member["id"], 0) + sum(
                 float(event["dkp_value"])
                 for event in completed_events if member["id"] in event["attendance"]
             )
@@ -2663,6 +2674,11 @@ def create_app(test_config=None):
             row["id"]: ENDGAME_BASELINE_ATTENDANCE.get(row["name"].casefold(), 0) * 3
             for row in members
         }
+        for adjustment in get_db().execute(
+            """SELECT member_id,SUM(dkp_delta) delta
+               FROM endgame_attendance_dkp_adjustments GROUP BY member_id"""
+        ).fetchall():
+            earned[adjustment["member_id"]] = earned.get(adjustment["member_id"], 0) + int(round(adjustment["delta"] or 0))
         for event in get_db().execute("SELECT * FROM guild_events").fetchall():
             if (not is_endgame_guild_event(event) or event["status"] != "Completed"
                     or event["start_at"] <= "2026-08-13T23:59"):
@@ -3518,7 +3534,7 @@ def create_app(test_config=None):
         if not can_create_guild_events():
             abort(403, description="Only designated event administrators can update attendance.")
         event = get_db().execute(
-            "SELECT id,start_at FROM guild_events WHERE id=?", (event_id,)
+            "SELECT * FROM guild_events WHERE id=?", (event_id,)
         ).fetchone()
         if not event:
             abort(404)
@@ -3543,6 +3559,15 @@ def create_app(test_config=None):
             "INSERT INTO guild_event_attendance(event_id,member_id,attended,updated_by) VALUES(?,?,1,?)",
             [(event_id, member_id, updater["id"]) for member_id in sorted(member_ids)],
         )
+        if is_endgame_guild_event(event) and event["start_at"] <= "2026-08-13T23:59":
+            dkp_value = float(event["dkp_value"])
+            get_db().executemany(
+                """INSERT INTO endgame_attendance_dkp_adjustments(event_id,member_id,dkp_delta)
+                   VALUES(?,?,?) ON CONFLICT(event_id,member_id) DO UPDATE SET
+                   dkp_delta=dkp_delta+excluded.dkp_delta,updated_at=CURRENT_TIMESTAMP""",
+                [(event_id, member_id, dkp_value) for member_id in member_ids - previous_ids]
+                + [(event_id, member_id, -dkp_value) for member_id in previous_ids - member_ids],
+            )
         get_db().execute(
             "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
             (updater["id"], "Event Attendance", "Attendance updated",
@@ -3562,7 +3587,7 @@ def create_app(test_config=None):
             abort(403, description="Only designated event administrators can update attendance.")
         db = get_db()
         event = db.execute(
-            "SELECT id,name,start_at FROM guild_events WHERE id=?", (event_id,)
+            "SELECT * FROM guild_events WHERE id=?", (event_id,)
         ).fetchone()
         if not event:
             abort(404)
@@ -3589,6 +3614,15 @@ def create_app(test_config=None):
                 """INSERT INTO guild_event_attendance(event_id,member_id,attended,updated_by)
                    VALUES(?,?,1,?)""",
                 [(event_id, member_id, updater["id"]) for member_id in sorted(attended_ids)],
+            )
+        if is_endgame_guild_event(event) and event["start_at"] <= "2026-08-13T23:59":
+            dkp_value = float(event["dkp_value"])
+            db.executemany(
+                """INSERT INTO endgame_attendance_dkp_adjustments(event_id,member_id,dkp_delta)
+                   VALUES(?,?,?) ON CONFLICT(event_id,member_id) DO UPDATE SET
+                   dkp_delta=dkp_delta+excluded.dkp_delta,updated_at=CURRENT_TIMESTAMP""",
+                [(event_id, member_id, dkp_value) for member_id in attended_ids - previous_ids]
+                + [(event_id, member_id, -dkp_value) for member_id in previous_ids - attended_ids],
             )
         names = {row["id"]: row["name"] for row in db.execute("SELECT id,name FROM members")}
         added = [names[item] for item in sorted(attended_ids - previous_ids) if item in names]
