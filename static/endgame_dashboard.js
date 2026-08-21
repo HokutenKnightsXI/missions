@@ -101,6 +101,16 @@
       const heading = card?.querySelector("header h3");
       if (heading) heading.textContent = `Auction #${auction.id} / ${auction.boss}`;
     });
+    if (pastAuctions.length) {
+      const firstPastCard = document.getElementById(`auction-${pastAuctions[0].id}`);
+      const archive = document.createElement("details");
+      archive.className = "past-auctions-archive";
+      archive.innerHTML = `<summary>Past Auctions <span>${pastAuctions.length}</span></summary><div class="past-auctions-list"></div>`;
+      firstPastCard?.previousElementSibling?.classList.contains("auction-section-title") && firstPastCard.previousElementSibling.remove();
+      firstPastCard?.before(archive);
+      const list = archive.querySelector(".past-auctions-list");
+      pastAuctions.forEach(auction => list?.append(document.getElementById(`auction-${auction.id}`)));
+    }
     // Closed auctions are deliberately kept until an administrator confirms them.
     // A separate discard control makes it safe to clear test auctions without touching DKP.
     if (payload.is_admin) {
@@ -122,6 +132,15 @@
           if (!confirm(warning)) event.preventDefault();
         });
         card.querySelector("header > div")?.append(actions);
+        const reopen = document.createElement("form");
+        reopen.className = "auction-reopen-form";
+        reopen.method = "post";
+        reopen.action = `/endgame/auctions/${auction.id}/reopen`;
+        reopen.innerHTML = `<input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><button type="submit">Reopen for Editing</button>`;
+        reopen.addEventListener("submit", event => {
+          if (!confirm("Reopen this auction for five minutes? Linked DKP awards will be restored so winners can be corrected.")) event.preventDefault();
+        });
+        card.querySelector("header > div")?.append(reopen);
       });
       pastAuctions.forEach(auction => {
         const card = document.getElementById(`auction-${auction.id}`);

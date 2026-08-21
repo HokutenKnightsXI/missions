@@ -3215,6 +3215,39 @@ def create_app(test_config=None):
         flash(f"Stopped bidding for {auction['boss']}. Review winners before deducting DKP.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
 
+    @app.post("/endgame/auctions/<int:auction_id>/reopen")
+    @admin_required
+    def reopen_endgame_auction(auction_id):
+        """Restore a completed auction to active bidding so its results can be corrected."""
+        if not can_create_guild_events():
+            abort(403)
+        auction = get_db().execute(
+            "SELECT * FROM endgame_auctions WHERE id=?", (auction_id,)
+        ).fetchone()
+        if not auction or auction["status"] not in ("Closed", "Confirmed"):
+            abort(400, description="Only a closed or completed auction can be reopened.")
+        if get_db().execute("SELECT 1 FROM endgame_auctions WHERE status='Active'").fetchone():
+            abort(400, description="Finish the current auction before reopening another one.")
+        actor = require_member_identity()
+        restored_awards = get_db().execute(
+            "SELECT COUNT(*) count FROM endgame_loot_awards WHERE auction_id=?", (auction_id,)
+        ).fetchone()["count"]
+        get_db().execute("DELETE FROM endgame_loot_awards WHERE auction_id=?", (auction_id,))
+        get_db().execute(
+            """UPDATE endgame_auctions
+               SET status='Active',starts_at=?,ends_at=?,paused_at=NULL,confirmed_at=NULL WHERE id=?""",
+            (datetime.utcnow().isoformat(timespec="seconds"),
+             (datetime.utcnow() + timedelta(minutes=5)).isoformat(timespec="seconds"), auction_id),
+        )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "DKP Auction", "Auction reopened for editing",
+             f"{auction['boss']} / restored {restored_awards} awards"),
+        )
+        get_db().commit()
+        flash(f"Reopened {auction['boss']} for five minutes. {restored_awards} DKP awards were restored.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
+
     @app.post("/endgame/auctions/<int:auction_id>/confirm")
     @admin_required
     def confirm_endgame_auction(auction_id):

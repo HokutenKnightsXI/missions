@@ -1148,6 +1148,18 @@ def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     archived = client.get("/api/endgame/auctions").get_json()
     assert archived["past_auctions"][0]["id"] == auction_id
     assert archived["past_auctions"][0]["award_count"] == 1
+    reopened = client.post(f"/endgame/auctions/{auction_id}/reopen", data={"csrf_token": "token"})
+    assert reopened.status_code == 302
+    reopened_payload = client.get("/api/endgame/auctions").get_json()
+    assert reopened_payload["current_auctions"][0]["status"] == "Active"
+    assert reopened_payload["my_balance"] == 5
+    reclosed = client.post(f"/endgame/auctions/{auction_id}/complete", data={"csrf_token": "token"})
+    assert reclosed.status_code == 302
+    reconfirmed = client.post(f"/endgame/auctions/{auction_id}/confirm", data={
+        "csrf_token": "token", f"winner_{novio['id']}": "1",
+    })
+    assert reconfirmed.status_code == 302
+    assert client.get("/api/endgame/auctions").get_json()["my_balance"] == 3
     discarded = client.post(f"/endgame/auctions/{auction_id}/delete", data={"csrf_token": "token"})
     assert discarded.status_code == 302
     assert client.get("/api/endgame/auctions").get_json()["my_balance"] == 5
