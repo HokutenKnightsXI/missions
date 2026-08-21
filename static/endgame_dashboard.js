@@ -60,6 +60,7 @@
   };
   window.addEventListener("endgame:open-live-auction", openLiveAuction);
   let auctionEditingUntil = 0;
+  let auctionRecords = new Map();
   const auctionEditing = () => Date.now() < auctionEditingUntil || Boolean(
     document.activeElement?.closest?.(".auction-bid-form, .auction-winner-select")
   );
@@ -78,6 +79,7 @@
     document.querySelector("#auction-bid-cap").textContent = `${payload.dkp.cap} DKP`;
     document.querySelector("#auction-highest-dkp").textContent = `${payload.dkp.highest} DKP`;
     auctionTooltips = Object.fromEntries(payload.auctions.flatMap(auction => auction.items.map(item => [String(item.id), item.tooltip || {}])));
+    auctionRecords = new Map(payload.auctions.map(auction => [String(auction.id), auction]));
     auctionRoot.innerHTML = displayedAuctions.length ? displayedAuctions.map((auction, index) => {
       const active = auction.status === "Active";
       const completed = auction.status === "Confirmed";
@@ -94,6 +96,11 @@
       const sectionHeading = (currentAuctions.length && index === 0) ? `<h3 class="auction-section-title">Current Auctions</h3>` : (pastAuctions.length && index === currentAuctions.length ? `<h3 class="auction-section-title">Past Auctions</h3>` : "");
       return `${sectionHeading}<section id="auction-${auction.id}" class="auction-card ${active ? "active" : "closed"} ${completed ? "completed" : ""} ${auction.paused ? "paused" : ""}"><header><div><span>${safeText(auction.area)} · ${safeText(auction.event_name)}</span><h3>${safeText(auction.boss)}</h3>${pauseControl}${completeControl}${stopControl}</div><div class="auction-clock"><small>${completed ? "Winners / DKP Completed" : (auction.paused ? "Countdown frozen" : (active ? "Bidding closes in" : "Bidding closed"))}</small><b data-auction-ends="${auction.ends_at}" data-auction-paused="${auction.paused ? "true" : "false"}">${auction.paused ? "PAUSED" : (active ? countdownText(auction.ends_at) : "00:00")}</b></div></header>${!active && !completed && payload.is_admin ? `<form id="confirm-auction-${auction.id}" class="auction-confirm-form" method="post" action="/endgame/auctions/${auction.id}/confirm"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><p>Review the suggested winners, then confirm the items that actually dropped.</p></form>` : ""}<div class="auction-item-grid">${items}</div>${!active && !completed && payload.is_admin ? `<button class="button primary auction-confirm-button" type="submit" form="confirm-auction-${auction.id}">Confirm Winners &amp; Deduct DKP</button>` : ""}${completed ? `<p class="auction-completed-note">Winners / DKP Completed${auction.award_count ? ` · ${auction.award_count} award${auction.award_count === 1 ? "" : "s"}` : ""}</p>` : ""}</section>`;
     }).join("") : '<p class="event-empty">No active or recently closed auctions. An administrator can start one for an Endgame event above.</p>';
+    displayedAuctions.forEach(auction => {
+      const card = document.getElementById(`auction-${auction.id}`);
+      const heading = card?.querySelector("header h3");
+      if (heading) heading.textContent = `Auction #${auction.id} / ${auction.boss}`;
+    });
     // Closed auctions are deliberately kept until an administrator confirms them.
     // A separate discard control makes it safe to clear test auctions without touching DKP.
     if (payload.is_admin) {
@@ -392,6 +399,29 @@
   }));
 
   const dialog = document.querySelector("#endgame-dialog"), dialogTitle = document.querySelector("#dialog-title"), dialogContent = document.querySelector("#dialog-content"), dialogEyebrow = document.querySelector("#dialog-eyebrow");
+  const auctionDetailDialog = document.querySelector("#auction-detail-dialog");
+  const auctionDetailTitle = document.querySelector("#auction-detail-title");
+  const auctionDetailContent = document.querySelector("#auction-detail-content");
+  const openAuctionDetail = async auctionId => {
+    let auction = auctionRecords.get(String(auctionId));
+    if (!auction) {
+      const response = await fetch("/api/endgame/auctions", {headers: {"Accept": "application/json"}});
+      if (!response.ok) return;
+      const payload = await response.json();
+      auctionRecords = new Map(payload.auctions.map(entry => [String(entry.id), entry]));
+      auction = auctionRecords.get(String(auctionId));
+    }
+    if (!auction || !auctionDetailDialog) return;
+    const status = auction.status === "Confirmed" ? "Winners / DKP Completed" : auction.status;
+    const items = auction.items.map(item => {
+      const bids = item.bids.length ? `<ul>${item.bids.map(bid => `<li><b>${safeText(bid.name)}</b> / ${safeText(bid.job)} / ${bid.amount} DKP / ${bid.tier === 4 ? "Freelot" : `P${bid.tier}`}</li>`).join("")}</ul>` : "<p>No bids were placed.</p>";
+      return `<article class="auction-detail-item"><h3>${safeText(item.item)}</h3>${item.target_item && item.target_item !== item.item ? `<small>${safeText(item.target_item)}</small>` : ""}${bids}</article>`;
+    }).join("");
+    auctionDetailTitle.textContent = `Auction #${auction.id} / ${auction.boss}`;
+    auctionDetailContent.innerHTML = `<p class="auction-detail-meta"><b>Event:</b> ${safeText(auction.event_name)} / ${safeText(auction.area)} / ${safeText(status)}</p><div class="auction-detail-items">${items}</div>`;
+    if (!auctionDetailDialog.open) auctionDetailDialog.showModal();
+  };
+  document.querySelector(".auction-detail-close")?.addEventListener("click", () => auctionDetailDialog?.close());
   const eventStoreKey = "hokuten-event-overrides";
   const eventOverrides = JSON.parse(localStorage.getItem(eventStoreKey) || "{}");
   const eventState = button => {
@@ -463,9 +493,8 @@
     const jobBadge = event.target.closest("[data-job-member]");
     const attendance = event.target.closest("[data-attendance]"); const wins = event.target.closest("[data-wins]");
     if (auctionLink) {
-      location.hash = `auction-${auctionLink.dataset.openAuction}`;
-      openLiveAuction();
-      requestAnimationFrame(() => document.getElementById(`auction-${auctionLink.dataset.openAuction}`)?.scrollIntoView({behavior: "smooth", block: "start"}));
+      event.preventDefault();
+      openAuctionDetail(auctionLink.dataset.openAuction);
       return;
     }
     if (lootHistoryLink) {
@@ -507,7 +536,7 @@
       const attendees = selected.attendees || [];
       const awards = selected.loot || [];
       const eventAuctions = selected.auctions || [];
-      const auctionArchive = eventAuctions.length ? `<section class="event-auction-archive"><header><h3>Event Auctions</h3><span>${eventAuctions.length} auction${eventAuctions.length === 1 ? "" : "s"}</span></header>${eventAuctions.map(auction => `<button class="event-auction-link ${auction.status === "Confirmed" ? "completed" : ""}" type="button" data-open-auction="${auction.id}"><b>${safeText(auction.boss)}</b><span>${safeText(auction.area)} · ${safeText(auction.status === "Confirmed" ? "Winners / DKP Completed" : auction.status)}${auction.award_count ? ` · ${auction.award_count} awards` : ""}</span></button>`).join("")}</section>` : "";
+      const auctionArchive = eventAuctions.length ? `<section class="event-auction-archive"><header><h3>Event Auctions</h3><span>${eventAuctions.length} auction${eventAuctions.length === 1 ? "" : "s"}</span></header>${eventAuctions.map(auction => `<button class="event-auction-link ${auction.status === "Confirmed" ? "completed" : ""}" type="button" data-open-auction="${auction.id}"><b>Auction #${auction.id} / ${safeText(auction.boss)}</b><span>${safeText(auction.area)} · ${safeText(auction.status === "Confirmed" ? "Winners / DKP Completed" : auction.status)}${auction.award_count ? ` · ${auction.award_count} awards` : ""}</span></button>`).join("")}</section>` : "";
       const allMembers = window.ENDGAME_MEMBERS || [];
       const lootCatalog = window.ENDGAME_LOOT_CATALOG || [];
       const lootOptions = `<option value="">Select Sky or Sea item</option>${lootCatalog.map(item => `<option value="${safeText(item.name)}" data-family="${safeText(item.family)}">${safeText(item.area)} · ${safeText(item.source)} · ${safeText(item.name)}</option>`).join("")}`;
