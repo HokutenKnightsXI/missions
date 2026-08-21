@@ -572,7 +572,10 @@ def test_startup_removes_soya_duplicate_and_preserves_signup(tmp_path):
     app = make_app(tmp_path)
     database = sqlite3.connect(app.config["DATABASE"])
     creator_id = database.execute("SELECT id FROM members WHERE name='Imaven'").fetchone()[0]
-    soya_id = database.execute("INSERT INTO members(name) VALUES('Soya')").lastrowid
+    soya_id = database.execute(
+        "INSERT INTO members(name,discord_name,discord_user_id) VALUES(?,?,?)",
+        ("Soya", "SoyaDiscord", "discord-soya"),
+    ).lastrowid
     event_id = database.execute(
         """INSERT INTO guild_events(creator_member_id,name,start_at,end_at)
            VALUES(?,?,?,?)""",
@@ -590,6 +593,9 @@ def test_startup_removes_soya_duplicate_and_preserves_signup(tmp_path):
     make_app(tmp_path)
     database = sqlite3.connect(app.config["DATABASE"])
     assert database.execute("SELECT 1 FROM members WHERE name='Soya'").fetchone() is None
+    assert database.execute(
+        "SELECT discord_user_id,discord_name FROM members WHERE name='Soyabean'"
+    ).fetchone() == ("discord-soya", "SoyaDiscord")
     signup = database.execute(
         """SELECT m.name,s.rsvp_status,s.selected_job FROM guild_event_signups s
            JOIN members m ON m.id=s.member_id WHERE s.event_id=?""", (event_id,),

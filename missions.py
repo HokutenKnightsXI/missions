@@ -1541,11 +1541,11 @@ def create_app(test_config=None):
             )
             if not canonical["discord_user_id"] and former["discord_user_id"]:
                 get_db().execute(
-                    "UPDATE members SET discord_user_id=?,discord_name=? WHERE id=?",
-                    (former["discord_user_id"], former["discord_name"], canonical_id),
+                    "UPDATE members SET discord_user_id='' WHERE id=?", (former_id,)
                 )
                 get_db().execute(
-                    "UPDATE members SET discord_user_id='' WHERE id=?", (former_id,)
+                    "UPDATE members SET discord_user_id=?,discord_name=? WHERE id=?",
+                    (former["discord_user_id"], former["discord_name"], canonical_id),
                 )
             get_db().execute("DELETE FROM members WHERE id=?", (former_id,))
         archive_events = (
