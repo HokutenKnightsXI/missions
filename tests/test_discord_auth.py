@@ -138,6 +138,32 @@ def test_display_name_is_used_when_server_nickname_is_missing(monkeypatch, tmp_p
         assert session["is_admin"] is False
 
 
+def test_bot_membership_lookup_falls_back_when_oauth_member_lookup_fails(monkeypatch, tmp_path):
+    app = discord_app(tmp_path)
+    app.config["DISCORD_BOT_TOKEN"] = "bot-token"
+    client = app.test_client()
+    state = begin_discord_login(client)
+    monkeypatch.setattr(missions, "discord_exchange_code", lambda *_args: {"access_token": "token"})
+    monkeypatch.setattr(
+        missions, "discord_get",
+        lambda _token, path: {"id": "discord-fallback", "username": "user", "global_name": "Sexualpotato"}
+        if path == "/users/@me" else (_ for _ in ()).throw(ValueError("member lookup unavailable")),
+    )
+    bot_calls = []
+    monkeypatch.setattr(
+        missions, "discord_bot_request",
+        lambda token, method, path: bot_calls.append((token, method, path)) or {"nick": "Sexualpotato"},
+    )
+
+    response = client.get(f"/discord/callback?code=valid&state={state}")
+    assert response.status_code == 302
+    assert bot_calls == [
+        ("bot-token", "GET", "/guilds/hokuten-guild/members/discord-fallback")
+    ]
+    with client.session_transaction() as session:
+        assert session["is_editor"] is True
+
+
 def test_non_admin_discord_account_cannot_claim_imaven(monkeypatch, tmp_path):
     app = discord_app(tmp_path)
     client = app.test_client()

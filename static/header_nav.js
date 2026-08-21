@@ -25,6 +25,12 @@
 (() => {
   const banner = document.querySelector("#live-auction-banner");
   if (!banner) return;
+  banner.addEventListener("click", event => {
+    const destination = new URL(banner.href, window.location.origin);
+    if (destination.pathname !== window.location.pathname) return;
+    event.preventDefault();
+    window.dispatchEvent(new Event("endgame:open-live-auction"));
+  });
   const boss = banner.querySelector("[data-live-auction-boss]");
   const timer = banner.querySelector("[data-live-auction-time]");
   let activeAuction = null;

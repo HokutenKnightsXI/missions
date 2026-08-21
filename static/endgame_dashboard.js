@@ -53,6 +53,12 @@
   const safeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
   const priorityLabel = value => ({"Main priority":"P1","Secondary priority":"P2","P1 Auction":"P1","P2 Auction":"P2","P3 Auction":"P3"}[value] || value || "Freelot");
   const auctionRoot = document.querySelector("#active-auctions");
+  const openLiveAuction = () => {
+    activateView("dkp-loot");
+    activate("bidding-live");
+    requestAnimationFrame(() => auctionRoot?.scrollIntoView({behavior: "smooth", block: "start"}));
+  };
+  window.addEventListener("endgame:open-live-auction", openLiveAuction);
   let auctionEditingUntil = 0;
   const auctionEditing = () => Date.now() < auctionEditingUntil || Boolean(
     document.activeElement?.closest?.(".auction-bid-form, .auction-winner-select")
