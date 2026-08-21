@@ -992,6 +992,12 @@ def test_sky_auction_includes_complete_seiryu_pool(tmp_path):
         "Seiryu's Kote", "Seiryu's Sword", "Aquarian Abjuration: Legs",
         "Dryadic Abjuration: Head", "Martial Abjuration: Head", "Wyrmal Abjuration: Hands",
     }
+    completed = client.post(
+        f"/endgame/auctions/{auction['id']}/complete", data={"csrf_token": "token"}
+    )
+    assert completed.status_code == 302
+    payload = client.get("/api/endgame/auctions").get_json()
+    assert payload["current_auctions"][0]["status"] == "Closed"
     deleted = client.post(f"/endgame/auctions/{auction['id']}/delete", data={"csrf_token": "token"})
     assert deleted.status_code == 302
     assert client.get("/api/endgame/auctions").get_json()["auctions"] == []
@@ -1145,3 +1151,9 @@ def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     assert award == ("Novio Earring", 2.0, "P1", auction_id)
     assert status == "Confirmed"
     assert client.get("/api/endgame/auctions").get_json()["my_balance"] == 3
+    archived = client.get("/api/endgame/auctions").get_json()
+    assert archived["past_auctions"][0]["id"] == auction_id
+    assert archived["past_auctions"][0]["award_count"] == 1
+    discarded = client.post(f"/endgame/auctions/{auction_id}/delete", data={"csrf_token": "token"})
+    assert discarded.status_code == 302
+    assert client.get("/api/endgame/auctions").get_json()["my_balance"] == 5

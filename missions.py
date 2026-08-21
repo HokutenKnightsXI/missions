@@ -2640,7 +2640,15 @@ def create_app(test_config=None):
                 """SELECT l.id,l.item,m.name player,l.job,l.family,l.distribution award,l.dkp_cost,l.auction_id,
                           l.classification='Major Loot' major
                    FROM endgame_loot_awards l JOIN members m ON m.id=l.recipient_member_id
-                   WHERE l.event_id=? ORDER BY l.id""", (row["id"],)
+                WHERE l.event_id=? ORDER BY l.id""", (row["id"],)
+            ).fetchall()]
+            event_data["auctions"] = [dict(item) for item in get_db().execute(
+                """SELECT a.id,a.area,a.boss,a.status,a.ends_at,a.confirmed_at,
+                          COUNT(l.id) award_count
+                   FROM endgame_auctions a
+                   LEFT JOIN endgame_loot_awards l ON l.auction_id=a.id
+                   WHERE a.event_id=? GROUP BY a.id ORDER BY a.id DESC""",
+                (row["id"],),
             ).fetchall()]
             guild_events.append(event_data)
         guild_events = (
@@ -2912,9 +2920,11 @@ def create_app(test_config=None):
             my_reserved = int(reserved["reserved"] or 0)
         auctions = []
         rows = get_db().execute(
-            """SELECT a.*,e.name event_name FROM endgame_auctions a
-               JOIN guild_events e ON e.id=a.event_id
-               WHERE a.status IN ('Active','Closed','Confirmed') ORDER BY a.id DESC LIMIT 8"""
+            """SELECT a.*,e.name event_name,COUNT(l.id) award_count
+               FROM endgame_auctions a JOIN guild_events e ON e.id=a.event_id
+               LEFT JOIN endgame_loot_awards l ON l.auction_id=a.id
+               WHERE a.status IN ('Active','Closed','Confirmed')
+               GROUP BY a.id ORDER BY a.id DESC LIMIT 32"""
         ).fetchall()
         for row in rows:
             auction = dict(row)
@@ -2976,7 +2986,10 @@ def create_app(test_config=None):
                ORDER BY b.updated_at DESC,b.id DESC LIMIT 20"""
         ).fetchall()]
         my_balance = balances.get(actor_id, {}).get("balance", 0)
-        return {"auctions": auctions, "recent_bids": recent, "dkp": cap,
+        current_auctions = [auction for auction in auctions if auction["status"] in ("Active", "Closed")]
+        past_auctions = [auction for auction in auctions if auction["status"] == "Confirmed"]
+        return {"auctions": auctions, "current_auctions": current_auctions,
+                "past_auctions": past_auctions, "recent_bids": recent, "dkp": cap,
                 "my_balance": my_balance, "my_reserved": my_reserved,
                 "my_available": max(0, my_balance - my_reserved),
                 "is_admin": can_create_guild_events(), "server_time": datetime.utcnow().isoformat(timespec="seconds") + "Z"}
@@ -3178,6 +3191,30 @@ def create_app(test_config=None):
         get_db().commit()
         return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
 
+    @app.post("/endgame/auctions/<int:auction_id>/complete")
+    @admin_required
+    def complete_endgame_auction(auction_id):
+        """End bidding immediately; winners are still reviewed before DKP changes."""
+        if not can_create_guild_events():
+            abort(403)
+        auction = get_db().execute(
+            "SELECT * FROM endgame_auctions WHERE id=?", (auction_id,)
+        ).fetchone()
+        if not auction or auction["status"] != "Active":
+            abort(400, description="Only an active auction can be completed early.")
+        actor = require_member_identity()
+        get_db().execute(
+            "UPDATE endgame_auctions SET status='Closed',ends_at=?,paused_at=NULL WHERE id=?",
+            (datetime.utcnow().isoformat(timespec="seconds"), auction_id),
+        )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "DKP Auction", "Auction completed early", auction["boss"]),
+        )
+        get_db().commit()
+        flash(f"Stopped bidding for {auction['boss']}. Review winners before deducting DKP.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
+
     @app.post("/endgame/auctions/<int:auction_id>/confirm")
     @admin_required
     def confirm_endgame_auction(auction_id):
@@ -3228,16 +3265,22 @@ def create_app(test_config=None):
             abort(403)
         refresh_auction_statuses()
         auction = get_db().execute("SELECT * FROM endgame_auctions WHERE id=?", (auction_id,)).fetchone()
-        if not auction or auction["status"] not in ("Active", "Closed"):
-            abort(400, description="Only an active, paused, or closed unconfirmed auction can be discarded.")
+        if not auction or auction["status"] not in ("Active", "Closed", "Confirmed"):
+            abort(400, description="Only an auction record can be discarded.")
         actor = require_member_identity()
+        confirmed_awards = get_db().execute(
+            "SELECT COUNT(*) count FROM endgame_loot_awards WHERE auction_id=?", (auction_id,)
+        ).fetchone()["count"]
+        # DKP balances are derived from awards, so deleting a confirmed auction
+        # and its linked awards restores the deducted DKP automatically.
+        get_db().execute("DELETE FROM endgame_loot_awards WHERE auction_id=?", (auction_id,))
         get_db().execute("DELETE FROM endgame_auctions WHERE id=?", (auction_id,))
         get_db().execute(
             "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
-            (actor["id"], "DKP Auction", "Auction discarded", auction["boss"]),
+            (actor["id"], "DKP Auction", "Auction discarded", f"{auction['boss']} / reversed {confirmed_awards} awards"),
         )
         get_db().commit()
-        flash(f"Stopped and discarded the {auction['boss']} auction. No DKP was deducted.", "success")
+        flash(f"Discarded the {auction['boss']} auction and reversed {confirmed_awards} linked DKP awards.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="bidding-live"))
 
     def is_endgame_guild_event(event):
