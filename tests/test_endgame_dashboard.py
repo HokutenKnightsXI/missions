@@ -313,6 +313,7 @@ def test_endgame_javascript_calculates_priority_and_pop_readiness(tmp_path):
     assert b"jobStatus" in script.data
     assert b"rankMatrixPriority" in script.data
     assert b"priorityTier" in script.data
+    assert b"jobRequestDialog" not in script.data
     assert b"b.dkp - a.dkp" in script.data
     assert b"Only P1 candidates may bid" in script.data
     assert b"member.job_levels" in script.data

@@ -543,11 +543,6 @@
     if (wins) { const rows = loot.filter(row => row.player === wins.dataset.wins); dialogEyebrow.textContent = "Loot history"; dialogTitle.textContent = wins.dataset.wins; dialogContent.innerHTML = rows.length ? `<div class="dialog-list">${rows.map(row => `<article><div><b>${row.item}</b><small>${row.date} · ${row.job} · ${row.award}</small></div><span>${row.major ? "Major" : "Standard"}</span></article>`).join("")}</div>` : "<p>No awards are recorded for this member.</p>"; dialog.showModal(); }
   });
 
-  jobRequestDialog?.querySelector(".job-request-close")?.addEventListener("click", () => jobRequestDialog.close());
-  jobRequestDialog?.addEventListener("click", event => {
-    if (event.target === jobRequestDialog) jobRequestDialog.close();
-  });
-
   const priorityMatrixDialog = document.querySelector("#priority-matrix-dialog");
   document.querySelector("#open-priority-matrix")?.addEventListener("click", () => priorityMatrixDialog.showModal());
   priorityMatrixDialog?.querySelector(".priority-dialog-close")?.addEventListener("click", () => priorityMatrixDialog.close());
