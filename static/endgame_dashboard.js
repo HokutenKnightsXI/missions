@@ -381,18 +381,9 @@
     }
     return eventOverrides[date];
   };
-  const syncEventChanges = () => {
-    const overriddenDates = new Set(Object.keys(eventOverrides));
-    const currentLoot = [...loot.filter(row => !overriddenDates.has(row.date)), ...Object.values(eventOverrides).flatMap(state => state.loot)];
-    const body = document.querySelector("#loot-log-body");
-    body.innerHTML = currentLoot.map(row => `<tr data-search="${safeText(`${row.item} ${row.player} ${row.job} ${row.family} ${row.award}`.toLowerCase())}" data-date="${safeText(row.date.toLowerCase())}" data-item="${safeText(row.item.toLowerCase())}" data-recipient="${safeText(row.player.toLowerCase())}" data-job="${safeText(row.job.toLowerCase())}" data-family="${safeText((row.family || "Other").toLowerCase())}" data-award="${safeText(row.award.toLowerCase())}" data-major="${row.major ? "major" : "normal"}"><td>${safeText(row.date)}</td><td><b>${safeText(row.item)}</b></td><td>${safeText(row.player)}</td><td><span class="job-badge main">${safeText(row.job)}</span></td><td>${safeText(row.family || "Other")}</td><td>${safeText(row.award)}</td><td><span class="loot-class ${row.major ? "major" : "normal"}">${row.major ? "Major Loot" : "Standard"}</span></td></tr>`).join("");
-    document.querySelectorAll("[data-open-event]").forEach(button => {
-      const state = eventOverrides[button.dataset.openEvent]; if (!state) return;
-      const meta = button.closest(".event-card").querySelector(".event-meta");
-      meta.querySelector("b").textContent = `${state.loot.length} loot awards`;
-      meta.querySelector("span").textContent = `${state.attendees.length} attended`;
-    });
-  };
+  // Event and loot edits are persisted by the server.  Do not overwrite the
+  // server-rendered Linkshell Loot table with the retired browser-only format.
+  const syncEventChanges = () => {};
   const saveEventState = () => { localStorage.setItem(eventStoreKey, JSON.stringify(eventOverrides)); syncEventChanges(); };
   const memberOptions = selected => roster.map(member => `<option value="${safeText(member.name)}" ${member.name === selected ? "selected" : ""}>${safeText(member.name)}</option>`).join("");
   const jobOptions = selected => jobs.map(job => `<option value="${job}" ${job === selected ? "selected" : ""}>${job}</option>`).join("");
