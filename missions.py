@@ -976,6 +976,7 @@ def create_app(test_config=None):
         ROSTER_REFRESH_TOKEN=os.environ.get("ROSTER_REFRESH_TOKEN", ""),
         PSXI_API_TOKEN=os.environ.get("PSXI_API_TOKEN", ""),
         PSXI_MARKET_CACHE=os.path.join(app.instance_path, "psxi_market_snapshot.json"),
+        LOCAL_ADMIN_BYPASS=os.environ.get("LOCAL_ADMIN_BYPASS", "").lower() in {"1", "true", "yes"},
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "").lower() in {"1", "true", "yes"},
@@ -997,6 +998,27 @@ def create_app(test_config=None):
             if request.query_string:
                 target += f"?{request.query_string.decode('latin-1')}"
             return redirect(target, code=308)
+
+    def local_admin_bypass_enabled():
+        """Allow the opted-in local development server to act as Imaven only."""
+        return bool(
+            app.config.get("LOCAL_ADMIN_BYPASS")
+            and (not app.config.get("TESTING") or app.config.get("ALLOW_LOCAL_ADMIN_BYPASS_FOR_TESTS"))
+            and request.remote_addr in {"127.0.0.1", "::1"}
+        )
+
+    @app.before_request
+    def sign_in_local_admin():
+        if not local_admin_bypass_enabled():
+            return None
+        imaven = get_db().execute(
+            "SELECT id FROM members WHERE name='Imaven' COLLATE NOCASE"
+        ).fetchone()
+        if imaven:
+            session["member_id"] = imaven["id"]
+            session["is_editor"] = True
+            session["is_admin"] = True
+            csrf_token()
 
     def is_editor():
         return bool(app.config.get("AUTH_DISABLED") or session.get("is_editor") or session.get("is_admin"))
@@ -1087,6 +1109,9 @@ def create_app(test_config=None):
 
     @app.route("/login", methods=("GET", "POST"))
     def login():
+        if local_admin_bypass_enabled():
+            destination = request.values.get("next", "")
+            return redirect(destination if destination.startswith("/") and not destination.startswith("//") else url_for("help_board"))
         if discord_ready():
             return redirect(url_for("discord_connect", next=request.values.get("next", "")))
         if request.method == "POST":
@@ -4384,6 +4409,11 @@ def create_app(test_config=None):
             selected_template_spells=(json.loads(selected_template["spells_json"])
                                       if selected_template else []),
         )
+
+    @app.get("/skillchain-calculator")
+    @editor_required
+    def skillchain_calculator():
+        return render_template("skillchain_calculator.html")
 
     @app.post("/spell-farming/ownership")
     @editor_required

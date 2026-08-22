@@ -29,6 +29,7 @@
       <a class="{{ 'active' if request.endpoint == 'index' }}" href="{{ url_for('index') }}">Missions</a>
       <a class="{{ 'active' if request.endpoint == 'loot_tables' }}" href="{{ url_for('loot_tables') }}">Loot Tables</a>
       <a class="{{ 'active' if request.endpoint in ('spell_farming', 'save_blue_spell_template', 'delete_blue_spell_template') }}" href="{{ url_for('spell_farming') }}">Blue Mage Tools</a>
+      <a class="{{ 'active' if request.endpoint == 'skillchain_calculator' }}" href="{{ url_for('skillchain_calculator') }}">Skillchains</a>
       <a class="{{ 'active' if request.endpoint == 'gear_optimizer' }}" href="{{ url_for('gear_optimizer') }}">Gear Optimizer</a>
       <a class="{{ 'active' if request.endpoint == 'job_roster' }}" href="{{ url_for('job_roster') }}">Job Roster</a>
       <a class="operations-nav-link {{ 'active' if request.endpoint == 'endgame_dashboard' }}" href="{{ url_for('endgame_dashboard') }}">Endgame</a>

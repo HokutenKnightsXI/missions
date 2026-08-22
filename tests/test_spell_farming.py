@@ -4,7 +4,7 @@ from pathlib import Path
 
 from build_blue_spell_farming import (
     HORIZON_SPELL_CARD_SOURCE, blue_magic_cap, build, parse_blue_metadata, parse_combat_metadata,
-    parse_physical_damage_type, parse_spell_description, parse_spell_effects,
+    parse_magic_element, parse_physical_damage_type, parse_spell_description, parse_spell_effects,
 )
 from missions import create_app
 
@@ -87,6 +87,9 @@ return xi.spells.blue.usePhysicalSpell(caster, target, spell, params)
         "Physical", ["STR (fSTR)", "CHR 30%"]
     )
     assert parse_physical_damage_type(physical) == "Blunt"
+    assert parse_magic_element("-- Spell Type: Magical (Fire)") == "Fire"
+    assert parse_magic_element("-- Spell Type: Magical (Lightning)") == "Lightning"
+    assert parse_magic_element("-- Spell Type: Magical (Breath)") is None
 
 
 def test_spell_description_uses_effect_summary_from_script_header():
@@ -181,6 +184,9 @@ def test_spell_farming_page_and_generated_catalog(tmp_path):
     head_butt = next(row for row in payload["rows"] if row["spell"] == "Head Butt")
     assert "Stun" in head_butt["description"]
     assert head_butt["effects"] == ["Stun"]
+    bomb_toss = next(row for row in payload["rows"] if row["spell"] == "Bomb Toss")
+    assert bomb_toss["spell_type"] == "Magical"
+    assert bomb_toss["element"] == "Fire"
     assert not any("Abyssea" in row["zone"] or " (S)" in row["zone"]
                    for row in payload["rows"])
 

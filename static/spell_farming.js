@@ -141,7 +141,7 @@
     const maxLevel = Math.min(75, Math.max(1, number(controls.level.value) || 75));
     const skill = number(controls.skill.value);
     const matches = rows.filter(row =>
-      (!query || `${row.spell} ${row.monster} ${row.trait || ""} ${row.spell_type || ""} ${row.physical_damage_type || ""} ${(row.set_stats || []).join(" ")} ${(row.stat_modifiers || []).join(" ")}`.toLowerCase().includes(query)) &&
+      (!query || `${row.spell} ${row.monster} ${row.trait || ""} ${row.spell_type || ""} ${row.element || ""} ${row.physical_damage_type || ""} ${(row.set_stats || []).join(" ")} ${(row.stat_modifiers || []).join(" ")}`.toLowerCase().includes(query)) &&
       (!zone || row.zone === zone) && row.spell_level <= maxLevel &&
       (!controls.type.value || row.spell_type === controls.type.value) &&
       (!controls.hide.checked || !learned.has(row.spell))
@@ -163,8 +163,11 @@
         ? `${row.trait}<small>Trait weight ${row.trait_weight}</small>`
         : "&mdash;";
       const damageType = row.physical_damage_type ? `<small class="damage-type ${row.physical_damage_type.toLowerCase()}">${escapeHtml(row.physical_damage_type)}</small>` : "";
+      const typeLabel = row.spell_type === "Magical" && row.element
+        ? `Magical (${row.element})`
+        : row.spell_type;
       const scaling = (row.stat_modifiers || []).map(value => `<span>${escapeHtml(value)}</span>`).join("") || "&mdash;";
-      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${escapeHtml(row.spell)}" ${isLearned ? "checked" : ""} aria-label="Mark ${escapeHtml(row.spell)} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${escapeHtml(row.spell)}</span></td><td><span class="spell-type ${row.spell_type.toLowerCase().replace(/[^a-z]+/g, "-")}">${escapeHtml(row.spell_type)}</span>${damageType}</td><td><span class="spell-scaling">${scaling}</span></td><td><span class="spell-set-cost">${row.set_points ?? "-"}</span></td><td><span class="spell-set-stats">${setStats}</span></td><td><span class="spell-trait">${trait}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${escapeHtml(row.monster)}</td><td><button type="button" class="spell-zone-map" data-zone="${escapeHtml(row.zone)}" data-monsters="${escapeHtml(row.monster)}">${escapeHtml(row.zone)}</button></td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
+      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${escapeHtml(row.spell)}" ${isLearned ? "checked" : ""} aria-label="Mark ${escapeHtml(row.spell)} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${escapeHtml(row.spell)}</span></td><td><span class="spell-type ${row.spell_type.toLowerCase().replace(/[^a-z]+/g, "-")}">${escapeHtml(typeLabel)}</span>${damageType}</td><td><span class="spell-scaling">${scaling}</span></td><td><span class="spell-set-cost">${row.set_points ?? "-"}</span></td><td><span class="spell-set-stats">${setStats}</span></td><td><span class="spell-trait">${trait}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${escapeHtml(row.monster)}</td><td><button type="button" class="spell-zone-map" data-zone="${escapeHtml(row.zone)}" data-monsters="${escapeHtml(row.monster)}">${escapeHtml(row.zone)}</button></td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
       tr.querySelector("input").addEventListener("change", event => setLearned(row.spell, event.target.checked));
       tr.querySelector(".spell-zone-map").addEventListener("click", event => window.openSpellTargetMap(event.currentTarget.dataset.zone, event.currentTarget.dataset.monsters));
       return tr;
@@ -179,7 +182,7 @@
 
   syncHiddenValues();
   renderLearnedList();
-  fetch("/static/blue_spell_farming.json")
+  fetch("/static/blue_spell_farming.json?v=2")
     .then(response => {
       if (!response.ok) throw new Error("Spell data unavailable");
       return response.json();
