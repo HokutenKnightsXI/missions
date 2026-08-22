@@ -64,6 +64,23 @@ def test_cop_chapters_six_and_seven_follow_horizon_mission_order():
     ]
 
 
+def test_cop_chapter_four_and_five_follow_the_return_home_progression():
+    cop_missions = [mission for _chapter, entries in MISSION_OPTIONS["COP"] for mission, _ in entries]
+    start = cop_missions.index("CoP 4-4 – Slanderous Utterings")
+    assert cop_missions[start:start + 8] == [
+        "CoP 4-4 – Slanderous Utterings",
+        "The Return Home",
+        "CoP 5-1 – The Enduring Tumult of War",
+        "CoP 5-2 – Desires of Emptiness",
+        "CoP 5-3 – Three Paths",
+        "Louverance's Path",
+        "Tenzen's Path",
+        "Ulmia's Path",
+    ]
+
+    assert missions.split_mission("COP", "Louverance's Path") == ("CoP 5-3", "Louverance's Path")
+
+
 def test_header_uses_single_yellow_account_control(tmp_path):
     app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "account-header.db"),
                       "SECRET_KEY": "test", "AUTH_DISABLED": False})

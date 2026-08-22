@@ -593,16 +593,16 @@ MISSION_OPTIONS = {
             ("CoP 4-1 – Sheltering Doubt", "Chapter 4 – Dawn"),
             ("CoP 4-2 – The Savage", "Chapter 4 – Dawn"),
             ("CoP 4-3 – The Secrets of Worship", "Chapter 4 – Dawn"),
-            ("CoP 4-4 – Flames for the Dead", "Chapter 4 – Dawn"),
-            ("CoP 4-5 – The Warrior's Path", "Chapter 4 – Dawn"),
-            ("CoP 4-6 – Garden of Antiquity (Chapter transition)", "Chapter 4 – Dawn"),
+            ("CoP 4-4 – Slanderous Utterings", "Chapter 4 – Dawn"),
+            ("The Return Home", "Chapter 4 – Dawn"),
         ]),
         ("Chapter 5 – The Return Home to Jeuno", [
-            ("CoP 5-1 – Desires of Emptiness", "Chapter 5 – The Return Home to Jeuno"),
-            ("CoP 5-2 – Three Paths", "Chapter 5 – The Return Home to Jeuno"),
+            ("CoP 5-1 – The Enduring Tumult of War", "Chapter 5 – The Return Home to Jeuno"),
+            ("CoP 5-2 – Desires of Emptiness", "Chapter 5 – The Return Home to Jeuno"),
+            ("CoP 5-3 – Three Paths", "Chapter 5 – The Return Home to Jeuno"),
             ("Louverance's Path", "Chapter 5 – The Return Home to Jeuno"),
-            ("Ulmia's Path", "Chapter 5 – The Return Home to Jeuno"),
             ("Tenzen's Path", "Chapter 5 – The Return Home to Jeuno"),
+            ("Ulmia's Path", "Chapter 5 – The Return Home to Jeuno"),
         ]),
         ("Chapter 6 – Echoes of Time", [
             ("CoP 6-1 – For Whom the Verse Is Sung", "Chapter 6 – Echoes of Time"),
@@ -734,7 +734,7 @@ def split_mission(campaign, mission, chapter=""):
         number, title = mission.split(" – ", 1)
         return number, title
     if campaign == "COP" and mission.endswith("Path"):
-        return "CoP 5-2", mission
+        return "CoP 5-3", mission
     return chapter or campaign, mission
 
 
