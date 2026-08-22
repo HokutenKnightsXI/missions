@@ -51,6 +51,24 @@ def test_discord_connect_is_a_simple_direct_sign_in(tmp_path):
     assert b"Administrator access" not in page.data
 
 
+def test_local_admin_bypass_signs_in_as_imaven_without_discord(tmp_path):
+    app = discord_app(tmp_path)
+    app.config["LOCAL_ADMIN_BYPASS"] = True
+    app.config["ALLOW_LOCAL_ADMIN_BYPASS_FOR_TESTS"] = True
+    client = app.test_client()
+
+    response = client.get("/endgame")
+    assert response.status_code == 200
+    with client.session_transaction() as session:
+        assert session["is_editor"] is True
+        assert session["is_admin"] is True
+        imaven_id = session["member_id"]
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT name FROM members WHERE id=?", (imaven_id,)).fetchone() == ("Imaven",)
+    database.close()
+    assert client.get("/login?next=/endgame").location.endswith("/endgame")
+
+
 def test_www_redirects_to_canonical_host_before_discord_session_starts(tmp_path):
     client = discord_app(tmp_path).test_client()
     response = client.get(

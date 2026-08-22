@@ -52,7 +52,10 @@
   const openPicker = () => { el("quick-spell-search").value = ""; renderQuickPicker(); el("spell-picker-modal").hidden = false; el("quick-spell-search").focus(); };
   const showSpell = spell => {
     el("spell-detail-title").textContent = spell.spell;
-    el("spell-detail-content").innerHTML = `<div class="spell-detail-grid"><div><span>Blue Mage level</span><strong>${spell.spell_level}</strong></div><div><span>Set cost</span><strong>${spell.set_points} points</strong></div><div><span>Type</span><strong>${spell.spell_type || "Support"}</strong></div><div><span>Status</span><strong>${learned.has(spell.spell) ? "Learned" : "Need to learn"}</strong></div><div><span>Trait contribution</span><strong>${spell.trait ? `${spell.trait} +${contribution(spell)}` : "None"}</strong></div><div><span>Set stats</span><strong>${(spell.set_stats || []).join(" · ") || "None"}</strong></div></div>`;
+    const typeLabel = spell.spell_type === "Magical" && spell.element
+      ? `Magical (${spell.element})`
+      : (spell.spell_type || "Support");
+    el("spell-detail-content").innerHTML = `<div class="spell-detail-grid"><div><span>Blue Mage level</span><strong>${spell.spell_level}</strong></div><div><span>Set cost</span><strong>${spell.set_points} points</strong></div><div><span>Type</span><strong>${typeLabel}</strong></div><div><span>Status</span><strong>${learned.has(spell.spell) ? "Learned" : "Need to learn"}</strong></div><div><span>Trait contribution</span><strong>${spell.trait ? `${spell.trait} +${contribution(spell)}` : "None"}</strong></div><div><span>Set stats</span><strong>${(spell.set_stats || []).join(" · ") || "None"}</strong></div></div>`;
     el("spell-detail-modal").hidden = false;
   };
   const render = () => {
@@ -142,7 +145,7 @@
   el("close-spell-picker").addEventListener("click", () => { el("spell-picker-modal").hidden = true; });
   el("close-spell-detail").addEventListener("click", () => { el("spell-detail-modal").hidden = true; });
   [el("spell-picker-modal"), el("spell-detail-modal")].forEach(modal => modal.addEventListener("click", event => { if (event.target === modal) modal.hidden = true; }));
-  fetch("/static/blue_spell_farming.json").then(response => response.json()).then(payload => {
+  fetch("/static/blue_spell_farming.json?v=2").then(response => response.json()).then(payload => {
     const unique = new Map(); payload.rows.forEach(row => { if (!unique.has(row.spell)) unique.set(row.spell, row); }); spells = [...unique.values()];
     const addGoals = (container, values) => { container.innerHTML = values.map(value => `<label><input type="checkbox" value="${value}"><span>${value}</span></label>`).join(""); };
     const effectLabels = { "HP Drain": "HP Drain (Drain)", "MP Drain": "MP Drain (Aspir)", "Defense Down": "Defense Down (Dia)", "Attack Down": "Attack Down (Bio)", "Magic Defense Down": "Magic Defense Down", "Accuracy Down": "Accuracy Down", "Evasion Down": "Evasion Down", "Cure": "Restore HP (Cure)", "Paralyze": "Paralyze", "Blind": "Blind", "Silence": "Silence", "Dispel": "Dispel", "Haste": "Haste", "Stoneskin": "Stoneskin", "Blink": "Blink" };

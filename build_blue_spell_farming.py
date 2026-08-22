@@ -217,6 +217,22 @@ def parse_combat_metadata(script: str) -> tuple[str, list[str]]:
     return spell_type, modifiers
 
 
+def parse_magic_element(script: str) -> str | None:
+    """Return a magical Blue Magic spell's listed elemental alignment.
+
+    LandSandBoat's spell headers use ``Magical (Fire)`` (and the other seven
+    elements), which is the player-facing element needed when choosing a
+    Magic Burst. Keep it separate from ``spell_type`` so existing category
+    filters continue to work.
+    """
+    match = re.search(
+        r"--\s*Spell Type:\s*Magical\s*\((Fire|Ice|Wind|Earth|Lightning|Water|Light|Dark)\)",
+        script,
+        re.I,
+    )
+    return match.group(1).title() if match else None
+
+
 def parse_physical_damage_type(script: str) -> str | None:
     """Return the physical damage family advertised or used by a spell script."""
     comment = re.search(r"--\s*Spell Type:\s*Physical\s*\(([^)]+)\)", script, re.I)
@@ -302,6 +318,7 @@ def fetch_combat_metadata() -> dict[str, dict]:
             spell_type, modifiers = parse_combat_metadata(script)
             metadata[spell.casefold()] = {
                 "spell_type": spell_type,
+                "element": parse_magic_element(script) if spell_type == "Magical" else None,
                 "stat_modifiers": modifiers,
                 "physical_damage_type": parse_physical_damage_type(script),
                 "description": parse_spell_description(script),
@@ -351,6 +368,7 @@ def build(rows: list[dict], metadata: dict[str, dict] | None = None,
             "trait": spell_metadata.get("trait"),
             "trait_weight": spell_metadata.get("trait_weight", 0),
             "spell_type": combat.get("spell_type", "Support"),
+            "element": combat.get("element"),
             "stat_modifiers": combat.get("stat_modifiers", []),
             "physical_damage_type": combat.get("physical_damage_type"),
             "description": combat.get("description", ""),
