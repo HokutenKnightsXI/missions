@@ -55,6 +55,28 @@ def test_horizon_spell_cards_override_retail_blue_magic_metadata():
     assert payload["horizon_spell_card_source"] == HORIZON_SPELL_CARD_SOURCE
 
 
+def test_promyvion_vahzl_horizon_spells_are_kept_with_their_learning_targets():
+    metadata = {
+        "quadratic continuum": {"set_points": 4, "set_stats": ["DEX+3", "CHR-2"],
+                                "trait": "Dual Wield", "trait_weight": 1},
+        "winds of promyvion": {"set_points": 5, "set_stats": ["MND+3", "CHR-2"],
+                                "trait": "Auto Refresh", "trait_weight": 4},
+    }
+    payload = build([
+        {"spell_level": 89, "name": "Quadratic Continuum", "monster_name": "Gorger",
+         "zone": "Promyvion - Vahzl", "min_level": "52", "max_level": "60"},
+        {"spell_level": 89, "name": "Winds of Promyvion", "monster_name": "Thinker",
+         "zone": "Promyvion - Vahzl", "min_level": "52", "max_level": "60"},
+    ], metadata)
+    spells = {row["spell"]: row for row in payload["rows"]}
+    assert spells["Quadratic Continuum"]["spell_level"] == 54
+    assert spells["Quadratic Continuum"]["trait"] == "Defense Bonus"
+    assert spells["Quadratic Continuum"]["monster"] == "Gorger"
+    assert spells["Winds of Promyvion"]["spell_level"] == 56
+    assert spells["Winds of Promyvion"]["monster"] == "Thinker"
+    assert spells["Winds of Promyvion"]["zone"] == "Promyvion - Vahzl"
+
+
 def test_blue_metadata_parser_adds_set_cost_stats_and_trait():
     spell_list = (
         "INSERT INTO `blue_spell_list` VALUES "
@@ -167,7 +189,7 @@ def test_spell_farming_page_and_generated_catalog(tmp_path):
 
     payload = json.loads(Path("static/blue_spell_farming.json").read_text(encoding="utf-8"))
     assert len(payload["rows"]) > 500
-    assert len({row["spell"] for row in payload["rows"]}) == 103
+    assert len({row["spell"] for row in payload["rows"]}) == 105
     assert all(row["spell_level"] <= 75 for row in payload["rows"])
     assert all(row["set_points"] is not None for row in payload["rows"])
     foot_kick = next(row for row in payload["rows"] if row["spell"] == "Foot Kick")
@@ -179,6 +201,9 @@ def test_spell_farming_page_and_generated_catalog(tmp_path):
     assert blood_saber["trait"] == "Auto Refresh"
     assert blood_saber["trait_weight"] == 4
     assert {"Auroral Drape", "Empty Thrash", "Occultation"} <= {
+        row["spell"] for row in payload["rows"]
+    }
+    assert {"Quadratic Continuum", "Winds of Promyvion"} <= {
         row["spell"] for row in payload["rows"]
     }
     head_butt = next(row for row in payload["rows"] if row["spell"] == "Head Butt")
