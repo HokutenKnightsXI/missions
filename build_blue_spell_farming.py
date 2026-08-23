@@ -54,6 +54,22 @@ HORIZON_SPELL_OVERRIDES = {
         "spell_level": 38, "set_points": 3, "set_stats": [],
         "trait": "Evasion Bonus", "trait_weight": 1,
     },
+    "quadratic continuum": {
+        "spell_level": 54, "trait": "Defense Bonus", "trait_weight": 1,
+    },
+    "winds of promyvion": {
+        "spell_level": 56,
+    },
+}
+
+HORIZON_COMBAT_OVERRIDES = {
+    "winds of promyvion": {
+        "spell_type": "Magical",
+        "element": "Light",
+        "stat_modifiers": ["Fixed potency"],
+        "physical_damage_type": None,
+        "description": "Erases one beneficial magic effect from an enemy.",
+    },
 }
 
 DENIED_ZONE_PARTS = (
@@ -352,7 +368,10 @@ def build(rows: list[dict], metadata: dict[str, dict] | None = None,
             **{key: value for key, value in horizon_override.items()
                if key != "spell_level"},
         }
-        combat = combat_metadata.get(spell.casefold(), {})
+        combat = {
+            **combat_metadata.get(spell.casefold(), {}),
+            **HORIZON_COMBAT_OVERRIDES.get(spell.casefold(), {}),
+        }
         catalog.append({
             "spell": spell,
             "spell_level": spell_level,
