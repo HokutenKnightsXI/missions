@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from build_skillchain_catalog import build, parse_blood_pacts, parse_skill_caps
+from build_skillchain_catalog import build, parse_blood_pacts, parse_skill_caps, supplement_blue_magic
 from missions import create_app
 
 
@@ -46,6 +46,25 @@ def test_skillchain_calculator_requires_sign_in_and_renders(tmp_path):
     assert page.status_code == 200
     assert b"Skillchain Calculator" in page.data
     assert b"Chain Affinity" in page.data
-    assert 'input type="number"' in Path("static/skillchain_calculator.js").read_text(encoding="utf-8")
+    assert b"Require weapon skill first" in page.data
+    assert b'id="skillchain-type-filter"' in page.data
+    script = Path("static/skillchain_calculator.js").read_text(encoding="utf-8")
+    assert 'input type="number"' in script
+    assert "requireWeaponSkillFirst.checked" in script
+    assert "Chain Affinity assumed active" in script
+    assert "typeFilter.value" in script
+    assert "bluSlot" in script
+    assert "localeCompare" in script
     catalog = json.loads(Path("static/skillchain_catalog.json").read_text(encoding="utf-8"))
     assert any(action["name"] == "Foot Kick" and action["weapon"] == "Blue Magic" for action in catalog["actions"])
+
+
+def test_blue_magic_catalog_includes_horizon_chain_affinity_properties():
+    spells = {spell["name"]: spell for spell in supplement_blue_magic([], [
+        {"spell": "Screwdriver", "spell_level": 26, "spell_type": "Physical"},
+        {"spell": "Ram Charge", "spell_level": 73, "spell_type": "Physical"},
+        {"spell": "Quadratic Continuum", "spell_level": 54, "spell_type": "Physical"},
+    ])}
+    assert spells["Screwdriver"]["properties"] == ["Transfixion", "Scission"]
+    assert spells["Ram Charge"]["properties"] == ["Fragmentation"]
+    assert "Quadratic Continuum" not in spells

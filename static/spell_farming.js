@@ -39,6 +39,7 @@
     skill: document.querySelector("#spell-current-skill"),
     hide: document.querySelector("#spell-hide-learned"),
   };
+  controls.hide.checked = true;
   let rows = [];
   let sortKey = "spell_level";
   let sortDirection = 1;
@@ -167,7 +168,7 @@
         ? `Magical (${row.element})`
         : row.spell_type;
       const scaling = (row.stat_modifiers || []).map(value => `<span>${escapeHtml(value)}</span>`).join("") || "&mdash;";
-      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${escapeHtml(row.spell)}" ${isLearned ? "checked" : ""} aria-label="Mark ${escapeHtml(row.spell)} learned"></td><td>${row.spell_level}</td><td><span class="spell-name">${escapeHtml(row.spell)}</span></td><td><span class="spell-type ${row.spell_type.toLowerCase().replace(/[^a-z]+/g, "-")}">${escapeHtml(typeLabel)}</span>${damageType}</td><td><span class="spell-scaling">${scaling}</span></td><td><span class="spell-set-cost">${row.set_points ?? "-"}</span></td><td><span class="spell-set-stats">${setStats}</span></td><td><span class="spell-trait">${trait}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${escapeHtml(row.monster)}</td><td><button type="button" class="spell-zone-map" data-zone="${escapeHtml(row.zone)}" data-monsters="${escapeHtml(row.monster)}">${escapeHtml(row.zone)}</button></td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
+      tr.innerHTML = `<td><input class="spell-learned-check" type="checkbox" value="${escapeHtml(row.spell)}" ${isLearned ? "checked" : ""} aria-label="Mark ${escapeHtml(row.spell)} learned"></td><td>${row.spell_level}</td><td><span class="spell-name" title="${escapeHtml(`${row.description || "No description available."}\nType: ${typeLabel}${row.physical_damage_type ? ` (${row.physical_damage_type})` : ""}\nSet cost: ${row.set_points ?? "-"}`)}">${escapeHtml(row.spell)}</span></td><td><span class="spell-type ${row.spell_type.toLowerCase().replace(/[^a-z]+/g, "-")}">${escapeHtml(typeLabel)}</span>${damageType}</td><td><span class="spell-scaling">${scaling}</span></td><td><span class="spell-set-cost">${row.set_points ?? "-"}</span></td><td><span class="spell-set-stats">${setStats}</span></td><td><span class="spell-trait">${trait}</span></td><td><span class="skill-value">${row.minimum_skill}<small>/ ${row.skill_cap} cap</small></span></td><td>${escapeHtml(row.monster)}</td><td><button type="button" class="spell-zone-map" data-zone="${escapeHtml(row.zone)}" data-monsters="${escapeHtml(row.monster)}">${escapeHtml(row.zone)}</button></td><td><span class="mob-level">${mobLevel(row)}</span></td><td><span class="readiness ${ready === null ? "" : ready ? "ready" : "locked"}">${ready === null ? "Enter skill" : ready ? "Learnable" : "Skill low"}</span></td>`;
       tr.querySelector("input").addEventListener("change", event => setLearned(row.spell, event.target.checked));
       tr.querySelector(".spell-zone-map").addEventListener("click", event => window.openSpellTargetMap(event.currentTarget.dataset.zone, event.currentTarget.dataset.monsters));
       return tr;

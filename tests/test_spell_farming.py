@@ -183,7 +183,7 @@ def test_spell_farming_page_and_generated_catalog(tmp_path):
     assert page.status_code == 200
     assert b"Spell Farming" in page.data
     assert b'id="spell-current-skill"' in page.data
-    assert b"Spell Farming</a>" in page.data
+    assert b"<b>Spell Farming</b>" in page.data
     assert b"My Learned Spells" in page.data
     assert b"Changes automatically save to Imaven" in page.data
 
@@ -294,6 +294,10 @@ def test_spellbook_saves_a_private_named_template(tmp_path):
     assert b"Share with the linkshell" not in page.data
     assert b"Save This Spell Book" in page.data
     assert b'id="trait-priority"' in page.data
+    assert b'id="book-skillchain-filter"' in page.data
+    assert b'id="book-damage-filter"' in page.data
+    assert b'id="goal-skillchains"' not in page.data
+    assert b'id="goal-damage-types"' not in page.data
     assert b'id="clear-goals"' in page.data
     assert b'class="spellbook-three-column"' in page.data
     assert b'id="spell-picker-modal"' in page.data
@@ -304,7 +308,13 @@ def test_spellbook_saves_a_private_named_template(tmp_path):
     assert b'active-effects' in builder_script
     assert b'effectTooltip(spell)' in builder_script
     assert b'Additional Effect / Spell Equivalent' in builder_script
+    assert b'book-skillchain-element-filter' in builder_script
     assert b'spellbook-right-rail' in builder_script
+    assert b'Chain Affinity Skillchains &amp; Damage' not in builder_script
+    assert b'Self Skillchain &amp; Burst Planner' in builder_script
+    assert b'book-skillchain-filter' in builder_script
+    assert b'goal-damage-types' not in builder_script
+    assert b'skillchain_catalog.json' in builder_script
 
 
 def test_spellbook_rejects_level_invalid_template(tmp_path):
