@@ -22,6 +22,46 @@ SC_VARIABLES = {f"@SC_{name.upper()}": name for value, name in SC_PROPERTIES.ite
 AVATAR_BLOOD_PACTS = ((512, 527, "Carbuncle"), (528, 539, "Fenrir"), (544, 555, "Ifrit"), (560, 571, "Titan"), (576, 587, "Leviathan"), (592, 603, "Garuda"), (608, 619, "Shiva"), (624, 635, "Ramuh"), (656, 667, "Diabolos"))
 ERA_RANK_OVERRIDES = {("dagger", "THF"): 2, ("axe", "BST"): 2, ("katana", "NIN"): 2, ("sword", "BLU"): 2, ("hand2hand", "PUP"): 3, ("dagger", "DNC"): 3}
 
+# LandSandBoat's current Blue Magic action-script directory has only a small
+# subset of the era spells.  HorizonXI's level-75 list supplies the remaining
+# physical spells and their Chain Affinity properties.  Quadratic Continuum is
+# deliberately omitted because Horizon marks its property as unconfirmed.
+HORIZON_BLUE_SKILLCHAIN_PROPERTIES = {
+    "Foot Kick": ("Detonation",),
+    "Power Attack": ("Reverberation",),
+    "Sprout Smack": ("Reverberation",),
+    "Wild Oats": ("Transfixion",),
+    "Queasyshroom": ("Compression",),
+    "Battle Dance": ("Impaction",),
+    "Feather Storm": ("Transfixion",),
+    "Head Butt": ("Impaction",),
+    "Helldive": ("Transfixion",),
+    "Bludgeon": ("Liquefaction",),
+    "Claw Cyclone": ("Scission",),
+    "Screwdriver": ("Transfixion", "Scission"),
+    "Grand Slam": ("Induration",),
+    "Smite of Rage": ("Detonation",),
+    "Pinecone Bomb": ("Liquefaction",),
+    "Jet Stream": ("Impaction",),
+    "Uppercut": ("Liquefaction", "Impaction"),
+    "Terror Touch": ("Compression", "Reverberation"),
+    "Sickle Slash": ("Compression",),
+    "Mandibular Bite": ("Induration",),
+    "Death Scissors": ("Compression", "Reverberation"),
+    "Dimensional Death": ("Transfixion", "Impaction"),
+    "Body Slam": ("Impaction",),
+    "Frenetic Rip": ("Induration",),
+    "Frypan": ("Impaction",),
+    "Hydro Shot": ("Reverberation",),
+    "Spinal Cleave": ("Scission", "Detonation"),
+    "Hysteric Barrage": ("Detonation",),
+    "Tail Slap": ("Reverberation",),
+    "Cannonball": ("Fusion",),
+    "Disseverment": ("Distortion",),
+    "Ram Charge": ("Fragmentation",),
+    "Vertical Cleave": ("Gravitation",),
+}
+
 
 def display_name(value: str) -> str:
     value = value.replace("blade_", "Blade: ").replace("tachi_", "Tachi: ")
@@ -101,9 +141,27 @@ def parse_blood_pacts(pet_skills_sql: str, abilities_sql: str) -> list[dict]:
     return actions
 
 
+def supplement_blue_magic(parsed_spells: list[dict], farm_rows: list[dict]) -> list[dict]:
+    """Apply Horizon's complete era property list to parsed Blue Magic data."""
+    farming_spells = {row["spell"]: row for row in farm_rows}
+    parsed = {spell["name"]: spell for spell in parsed_spells}
+    for name, properties in HORIZON_BLUE_SKILLCHAIN_PROPERTIES.items():
+        farm_spell = farming_spells.get(name)
+        if farm_spell and farm_spell.get("spell_type") == "Physical":
+            parsed[name] = {
+                "id": f"blu:{name.casefold()}", "name": name,
+                "kind": "Blue Magic (Chain Affinity)", "weapon": "Blue Magic",
+                "jobs": ["BLU"], "skill_level": farm_spell["spell_level"],
+                "level_requirement": farm_spell["spell_level"],
+                "properties": list(properties),
+            }
+    return list(parsed.values())
+
+
 def fetch_blue_magic() -> list[dict]:
     with Path("static/blue_spell_farming.json").open(encoding="utf-8") as handle:
-        horizon_spells = {row["spell"].casefold() for row in json.load(handle)["rows"]}
+        farm_rows = json.load(handle)["rows"]
+    horizon_spells = {row["spell"].casefold() for row in farm_rows}
     with urlopen(BLUE_SPELLS_API, timeout=30) as response:
         files = [row for row in json.load(response) if row.get("name", "").endswith(".lua")]
     def load(row):
@@ -111,7 +169,8 @@ def fetch_blue_magic() -> list[dict]:
             return response.read().decode("utf-8")
     with ThreadPoolExecutor(max_workers=12) as executor:
         spells = [parse_blue_spell(script) for script in executor.map(load, files)]
-    return [spell for spell in spells if spell and spell["name"].casefold() in horizon_spells]
+    parsed = [spell for spell in spells if spell and spell["name"].casefold() in horizon_spells]
+    return supplement_blue_magic(parsed, farm_rows)
 
 
 def build(sql: str, blue_spells: list[dict], skill_caps: dict[str, dict[str, int]] | None = None, skill_ranks: dict[str, dict[str, int]] | None = None, blood_pacts: list[dict] | None = None) -> dict:
