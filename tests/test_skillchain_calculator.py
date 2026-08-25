@@ -51,6 +51,7 @@ def test_skillchain_calculator_requires_sign_in_and_renders(tmp_path):
     script = Path("static/skillchain_calculator.js").read_text(encoding="utf-8")
     assert 'input type="number"' in script
     assert "requireWeaponSkillFirst.checked" in script
+    assert "requiresBlueMagicOpener" in script
     assert "Chain Affinity assumed active" in script
     assert "typeFilter.value" in script
     assert "bluSlot" in script

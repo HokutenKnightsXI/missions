@@ -38,7 +38,10 @@
     if (selected.length < length) return [];
     const orders = [], buildOrders = (order, remaining) => { if (order.length === length) { orders.push(order); return; } remaining.forEach((entry,index) => buildOrders([...order,entry], [...remaining.slice(0,index),...remaining.slice(index+1)])); };
     buildOrders([], selected);
-    const permittedOrders = requireWeaponSkillFirst.checked
+    const requiresBlueMagicOpener = requireWeaponSkillFirst.checked && selected.some(
+      ({player}) => player.job === "BLU" && player.weapon === "Blue Magic"
+    );
+    const permittedOrders = requiresBlueMagicOpener
       ? orders.filter(order => order[0].player.weapon !== "Blue Magic" && order.slice(1).some(entry => entry.player.weapon === "Blue Magic"))
       : orders;
     const results=[];
