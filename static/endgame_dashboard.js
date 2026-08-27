@@ -22,9 +22,68 @@
   };
   tabs.forEach(tab => tab.addEventListener("click", () => activate(tab.dataset.endgameTab)));
   const requested = location.hash.slice(1);
-  if (["bidding-live", "jobs", "priority", "loot"].includes(requested) || requested.startsWith("auction-")) { activateView("dkp-loot"); activate(requested.startsWith("auction-") ? "bidding-live" : requested); }
+  if (["bidding-live", "jobs", "priority", "loot", "dynamis"].includes(requested) || requested.startsWith("auction-")) { activateView("dkp-loot"); activate(requested.startsWith("auction-") ? "bidding-live" : requested); }
   else if (["events", "pops", "admin-audit"].includes(requested)) { activateView("operations"); activate(requested); }
   else activateView("calendar");
+  const dynamisJobFilter = document.querySelector("#dynamis-job-filter");
+  const dynamisZoneFilter = document.querySelector("#dynamis-zone-filter");
+  const dynamisCatalogZoneFilter = document.querySelector("#dynamis-catalog-zone-filter");
+  const dynamisCatalogJobFilter = document.querySelector("#dynamis-catalog-job-filter");
+  const dynamisPriorityResults = document.querySelector("#dynamis-priority-results");
+  const refreshDynamisLots = () => {
+    const job = dynamisJobFilter?.value || "";
+    const matches = [...document.querySelectorAll(".dynamis-legacy-layout #dynamis-lot-body tr")]
+      .map(row => ({
+        name: row.cells[0]?.textContent.trim() || "",
+        main: row.cells[1]?.textContent.trim() || "",
+        secondary: row.cells[2]?.textContent.trim() || "",
+        levels: [...(row.cells[3]?.querySelectorAll(".dynamis-eligible-job") || [])].map(entry => entry.textContent.trim()),
+      }))
+      .filter(row => job && (row.main === job || row.secondary === job));
+    if (dynamisPriorityResults) dynamisPriorityResults.innerHTML = job
+      ? (matches.length ? matches.map(row => `<article><b>${row.name}</b><span class="main">Priority · ${job} ${row.levels.find(level => level.startsWith(job))?.replace(job, "") || ""}</span></article>`).join("") : `<p>No registered priority lotters for ${job}.</p>`)
+      : "<p>Choose a drop job to show its lot priority.</p>";
+    const zone = dynamisCatalogZoneFilter ? dynamisCatalogZoneFilter.value : (dynamisZoneFilter?.value || "");
+    const catalogJob = dynamisCatalogJobFilter?.value || "";
+    document.querySelectorAll(".dynamis-lot-panel:not(.dynamis-legacy-layout) #dynamis-drop-list article").forEach(card => {
+      card.hidden = Boolean((zone && card.dataset.dynamisDropArea !== zone) || (catalogJob && card.dataset.dynamisDropJob !== catalogJob));
+    });
+  };
+  dynamisJobFilter?.addEventListener("change", refreshDynamisLots);
+  dynamisZoneFilter?.addEventListener("change", () => {
+    if (dynamisCatalogZoneFilter) dynamisCatalogZoneFilter.value = dynamisZoneFilter.value;
+    refreshDynamisLots();
+  });
+  dynamisCatalogZoneFilter?.addEventListener("change", () => {
+    if (dynamisZoneFilter) dynamisZoneFilter.value = dynamisCatalogZoneFilter.value;
+    refreshDynamisLots();
+  });
+  dynamisCatalogJobFilter?.addEventListener("change", refreshDynamisLots);
+  refreshDynamisLots();
+  document.querySelectorAll(".dynamis-member-directory table").forEach(table => {
+    const header = table.querySelector("th:nth-child(2)");
+    if (header) header.textContent = "Priority";
+    table.querySelectorAll("th:nth-child(3), td:nth-child(3)").forEach(cell => { cell.hidden = true; });
+    table.querySelectorAll("tbody tr").forEach(row => {
+      const priority = row.cells[1];
+      const job = priority?.textContent.trim();
+      const level = [...(row.cells[3]?.querySelectorAll(".dynamis-eligible-job") || [])]
+        .find(entry => entry.textContent.trim().startsWith(job))?.querySelector("small")?.textContent;
+      if (priority && job && job !== "—" && level) priority.insertAdjacentHTML("beforeend", ` <small>${level}</small>`);
+    });
+  });
+  document.querySelectorAll("[data-dynamis-cooldown]").forEach(node => {
+    const endsAt = node.dataset.dynamisCooldown;
+    const refresh = () => {
+      const remaining = Math.max(0, Date.parse(endsAt) - Date.now());
+      if (!remaining) { node.textContent = "Ready to request a job change."; return; }
+      const days = Math.floor(remaining / 86400000);
+      const hours = Math.floor((remaining % 86400000) / 3600000);
+      node.textContent = `30-day lock: ${days}d ${hours}h remaining`;
+    };
+    refresh();
+    setInterval(refresh, 60000);
+  });
   const guildDateInput = document.querySelector('.event-create-form .native-date-input');
   const guildDateDisplay = document.querySelector('#guild-event-date-display');
   const guildDateButton = document.querySelector('#pick-guild-event-date');
@@ -42,6 +101,15 @@
   }
 
   const roster = window.ENDGAME_ROSTER || [];
+  const dynamisSelections = new Map(roster.map(member => [String(member.name || "").toLowerCase(), {
+    main: member.dynamis_main || "",
+    secondary: member.dynamis_secondary || "",
+  }]));
+  document.querySelectorAll("#endgame-roster-body tr").forEach(row => {
+    const selection = dynamisSelections.get(row.dataset.name) || {main: "", secondary: ""};
+    row.dataset.dynamis = `${selection.main} ${selection.secondary}`.toLowerCase();
+    row.children[0]?.insertAdjacentHTML("afterend", `<td><span class="job-badge main">${selection.main || "—"}</span> <span class="job-badge">${selection.secondary || "—"}</span></td>`);
+  });
   const loot = window.ENDGAME_LOOT || [];
   const priorityItems = window.ENDGAME_PRIORITY_ITEMS || [];
   const jobs = window.ENDGAME_JOBS || [];
@@ -51,6 +119,38 @@
   const adminAudit = [...(window.ENDGAME_SERVER_AUDIT || []), ...JSON.parse(localStorage.getItem(adminAuditKey) || "[]")];
   let auditSort = {key: "at", direction: -1};
   const safeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
+  if (dynamisCatalogZoneFilter && ![...dynamisCatalogZoneFilter.options].some(option => option.value === "")) {
+    dynamisCatalogZoneFilter.prepend(new Option("All Dynamis zones", ""));
+  }
+  const dynamisCatalogTooltips = new Map((window.ENDGAME_DYNAMIS_CATALOG || []).map(drop => [drop.item, drop.tooltip || {}]));
+  const dynamisItemTooltip = document.createElement("aside");
+  dynamisItemTooltip.className = "auction-item-tooltip dynamis-item-tooltip";
+  dynamisItemTooltip.hidden = true;
+  dynamisItemTooltip.setAttribute("role", "tooltip");
+  document.body.append(dynamisItemTooltip);
+  const positionDynamisTooltip = (x, y) => {
+    const width = dynamisItemTooltip.offsetWidth || 390;
+    const height = dynamisItemTooltip.offsetHeight || 220;
+    dynamisItemTooltip.style.left = `${Math.max(10, Math.min(innerWidth - width - 10, x + 14))}px`;
+    dynamisItemTooltip.style.top = `${Math.max(10, Math.min(innerHeight - height - 10, y + 14))}px`;
+  };
+  document.querySelectorAll(".dynamis-lot-panel:not(.dynamis-legacy-layout) #dynamis-drop-list article").forEach(card => {
+    const item = dynamisCatalogTooltips.get(card.querySelector("b")?.textContent.trim());
+    if (!item) return;
+    card.classList.add("dynamis-tooltip-target");
+    card.tabIndex = 0;
+    const show = (x, y) => {
+      const rarity = item.rare && item.ex ? "Rare/Ex" : item.rare ? "Rare" : item.ex ? "Ex" : "";
+      dynamisItemTooltip.innerHTML = `${item.item_id ? `<img src="https://static.ffxiah.com/images/icon/${item.item_id}.png" alt="">` : ""}<div><strong>${safeText(item.name)}</strong><span>${rarity ? `${rarity} · ` : ""}Level ${item.level || "—"} · ${safeText((item.slots || []).join(" / "))}</span><p>${safeText(item.description || "No item stats available.")}</p><small>${safeText((item.jobs || []).join(" / "))}</small></div>`;
+      dynamisItemTooltip.hidden = false;
+      positionDynamisTooltip(x, y);
+    };
+    card.addEventListener("mouseenter", event => show(event.clientX, event.clientY));
+    card.addEventListener("mousemove", event => positionDynamisTooltip(event.clientX, event.clientY));
+    card.addEventListener("mouseleave", () => { dynamisItemTooltip.hidden = true; });
+    card.addEventListener("focus", () => { const box = card.getBoundingClientRect(); show(box.right, box.top); });
+    card.addEventListener("blur", () => { dynamisItemTooltip.hidden = true; });
+  });
   const priorityLabel = value => ({"Main priority":"P1","Secondary priority":"P2","P1 Auction":"P1","P2 Auction":"P2","P3 Auction":"P3"}[value] || value || "Freelot");
   const auctionRoot = document.querySelector("#active-auctions");
   const openLiveAuction = () => {
@@ -551,7 +651,7 @@
       dialogEyebrow.textContent = "Member event and award history";
       dialogTitle.textContent = member.name;
       const completedEvents = member.events.filter(row => !row.is_upcoming);
-      dialogContent.innerHTML = `<div class="member-history-summary dkp-member-summary"><span>DKP balance <b>${member.dkp}</b></span><span>Total spent <b>${member.total_spent}</b></span><span>Lifetime earned <b>${member.lifetime_earned}</b></span><span>Last event <b>${safeText(member.last_event)}</b></span></div><section class="member-history-section"><header><h3>Event Attendance</h3><span>${completedEvents.filter(row => row.attended).length}/${completedEvents.length} attended</span></header><div class="endgame-table-wrap"><table class="endgame-table member-history-table"><thead><tr><th>Event</th><th>Status</th></tr></thead><tbody>${eventRows}</tbody></table></div></section><section class="member-history-section"><header><h3>Loot Wins</h3><span>${member.loot.length} awards</span></header><div class="endgame-table-wrap">${lootRows ? `<table class="endgame-table member-history-table"><thead><tr><th>Item</th><th>Event</th><th>DKP spent</th></tr></thead><tbody>${lootRows}</tbody></table>` : '<p class="event-empty">No loot wins recorded.</p>'}</div></section>`;
+      dialogContent.innerHTML = `<div class="member-history-summary dkp-member-summary"><span>DKP balance <b>${member.dkp}</b></span><span>Total spent <b>${member.total_spent}</b></span><span>Lifetime earned <b>${member.lifetime_earned}</b></span><span>Last event <b>${safeText(member.last_event)}</b></span><span>Dynamis lots <b>${safeText(member.dynamis_main || "—")} / ${safeText(member.dynamis_secondary || "—")}</b></span></div><section class="member-history-section"><header><h3>Event Attendance</h3><span>${completedEvents.filter(row => row.attended).length}/${completedEvents.length} attended</span></header><div class="endgame-table-wrap"><table class="endgame-table member-history-table"><thead><tr><th>Event</th><th>Status</th></tr></thead><tbody>${eventRows}</tbody></table></div></section><section class="member-history-section"><header><h3>Loot Wins</h3><span>${member.loot.length} awards</span></header><div class="endgame-table-wrap">${lootRows ? `<table class="endgame-table member-history-table"><thead><tr><th>Item</th><th>Event</th><th>DKP spent</th></tr></thead><tbody>${lootRows}</tbody></table>` : '<p class="event-empty">No loot wins recorded.</p>'}</div></section>`;
       dialog.classList.add("member-history-dialog");
       dialog.showModal();
       return;

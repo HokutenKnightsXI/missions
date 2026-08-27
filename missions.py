@@ -2507,6 +2507,21 @@ def create_app(test_config=None):
                    GROUP BY member_id"""
             ).fetchall()
         }
+        dynamis_registrations = {
+            row["member_id"]: (row["main_job"], row["secondary_job"])
+            for row in get_db().execute(
+                "SELECT member_id,main_job,secondary_job FROM dynamis_lot_registrations"
+            ).fetchall()
+        }
+        dynamis_change_reviews = {
+            row["member_id"]: row["reviewed_at"]
+            for row in get_db().execute(
+                """SELECT member_id,MAX(reviewed_at) reviewed_at
+                   FROM dynamis_lot_change_requests
+                   WHERE status='Approved' AND reviewed_at>=datetime('now','-30 days')
+                   GROUP BY member_id"""
+            ).fetchall()
+        }
         roster_job_levels = {}
         for row in get_db().execute("SELECT member_id,job,level FROM member_jobs").fetchall():
             roster_job_levels.setdefault(row["member_id"], {})[row["job"]] = row["level"]
@@ -2765,6 +2780,64 @@ def create_app(test_config=None):
                JOIN members m ON m.id=r.member_id WHERE r.status='Pending'
                ORDER BY r.requested_at"""
         ).fetchall()]
+        dynamis_defaults = {
+            member["id"]: (member["main_job"], member["secondary_job"])
+            for member in prototype_roster if member["id"]
+        }
+        dynamis_members = []
+        for member in get_db().execute(
+            "SELECT id,name FROM members ORDER BY name COLLATE NOCASE"
+        ).fetchall():
+            default_jobs = dynamis_defaults.get(member["id"], ("", ""))
+            main_job, secondary_job = dynamis_registrations.get(member["id"], default_jobs)
+            profile_jobs = roster_job_levels.get(member["id"], {})
+            eligible_jobs = {
+                job: level for job, level in profile_jobs.items()
+                if job in DYNAMIS_RELIC and level >= 71
+            }
+            reviewed_at = dynamis_change_reviews.get(member["id"])
+            cooldown_until = ""
+            if reviewed_at:
+                expires_at = datetime.fromisoformat(reviewed_at) + timedelta(days=30)
+                if expires_at > datetime.utcnow():
+                    cooldown_until = expires_at.isoformat(timespec="seconds") + "Z"
+            dynamis_members.append({
+                "id": member["id"], "name": member["name"], "main_job": main_job,
+                "secondary_job": secondary_job, "eligible_jobs": eligible_jobs,
+                "cooldown_until": cooldown_until,
+            })
+        dynamis_members.sort(key=lambda member: member["name"].casefold())
+        dynamis_by_member = {member["id"]: member for member in dynamis_members}
+        for member in prototype_roster:
+            selection = dynamis_by_member.get(member["id"], {})
+            member["dynamis_main"] = selection.get("main_job", "")
+            member["dynamis_secondary"] = selection.get("secondary_job", "")
+        dynamis_drops = dynamis_catalog()
+        gear_catalog = gear_catalog_by_name(str(Path(app.root_path) / "static" / "gear_catalog.json"))
+        for drop in dynamis_drops:
+            tooltip_item = gear_catalog.get(drop["item"].casefold())
+            if not tooltip_item and drop["item"].endswith(" -1"):
+                tooltip_item = gear_catalog.get(drop["item"][:-3].casefold())
+            drop["tooltip"] = {
+                "item_id": tooltip_item.get("item_id") if tooltip_item else None,
+                "name": (tooltip_item or {}).get("name", drop["item"]),
+                "level": (tooltip_item or {}).get("level", 71),
+                "slots": (tooltip_item or {}).get("slots", [drop["slot"]]),
+                "jobs": (tooltip_item or {}).get("jobs", [drop["job"]]),
+                "description": (tooltip_item or {}).get("description", "No item stats are available yet."),
+                "rare": bool((tooltip_item or {}).get("rare")),
+                "ex": bool((tooltip_item or {}).get("ex")),
+            }
+        dynamis_areas = tuple(dict.fromkeys(drop["area"] for drop in dynamis_drops))
+        pending_dynamis_requests = [dict(row) for row in get_db().execute(
+            """SELECT r.*,m.name member_name FROM dynamis_lot_change_requests r
+               JOIN members m ON m.id=r.member_id WHERE r.status='Pending'
+               ORDER BY r.requested_at"""
+        ).fetchall()]
+        own_dynamis_request = get_db().execute(
+            "SELECT * FROM dynamis_lot_change_requests WHERE member_id=? ORDER BY id DESC LIMIT 1",
+            (current_member_id(),),
+        ).fetchone()
         own_job_request = get_db().execute(
             """SELECT * FROM endgame_job_change_requests WHERE member_id=?
                ORDER BY id DESC LIMIT 1""", (current_member_id(),)
@@ -2828,6 +2901,8 @@ def create_app(test_config=None):
             member_details[str(member["id"])] = {
                 "id": member["id"], "name": member["name"],
                 "main_job": member["main_job"], "secondary_job": member["secondary_job"],
+                "dynamis_main": member["dynamis_main"],
+                "dynamis_secondary": member["dynamis_secondary"],
                 "dkp": member["dkp"], "total_spent": member["total_spent"],
                 "lifetime_earned": member["lifetime_earned"],
                 "last_event": member["last_event"],
@@ -2841,6 +2916,11 @@ def create_app(test_config=None):
             calendar_members=calendar_members,
             pending_job_requests=pending_job_requests,
             own_job_request=dict(own_job_request) if own_job_request else None,
+            dynamis_members=dynamis_members,
+            dynamis_catalog=dynamis_drops,
+            dynamis_areas=dynamis_areas,
+            pending_dynamis_requests=pending_dynamis_requests,
+            own_dynamis_request=dict(own_dynamis_request) if own_dynamis_request else None,
             discord_events_enabled=bool(
                 app.config.get("HOKUTEN_EVENT_BOT_API_URL") and
                 app.config.get("HOKUTEN_EVENT_BOT_API_TOKEN")
@@ -2855,6 +2935,72 @@ def create_app(test_config=None):
             dkp_highest=dkp_highest, dkp_average=dkp_average,
             dkp_bid_cap=dkp_bid_cap,
         )
+
+    @app.post("/endgame/dynamis-lot-requests")
+    @editor_required
+    def request_dynamis_lot_change():
+        member = require_member_identity()
+        main_job = request.form.get("main_job", "").strip().upper()
+        secondary_job = request.form.get("secondary_job", "").strip().upper()
+        eligible_jobs = {
+            row["job"] for row in get_db().execute(
+                "SELECT job FROM member_jobs WHERE member_id=? AND level>=71", (member["id"],)
+            ).fetchall() if row["job"] in DYNAMIS_RELIC
+        }
+        if (main_job not in eligible_jobs or secondary_job not in eligible_jobs
+                or main_job == secondary_job):
+            abort(400, description="Choose two different Dynamis jobs at level 71 or higher on your roster.")
+        db = get_db()
+        if db.execute("SELECT 1 FROM dynamis_lot_change_requests WHERE member_id=? AND status='Pending'", (member["id"],)).fetchone():
+            abort(400, description="You already have a pending Dynamis lotting request.")
+        if db.execute(
+            """SELECT 1 FROM dynamis_lot_change_requests WHERE member_id=? AND status='Approved'
+               AND reviewed_at>=datetime('now','-30 days')""", (member["id"],)
+        ).fetchone():
+            abort(400, description="Approved Dynamis lotting jobs can only be changed once every 30 days.")
+        db.execute(
+            "INSERT INTO dynamis_lot_change_requests(member_id,requested_main,requested_secondary) VALUES(?,?,?)",
+            (member["id"], main_job, secondary_job),
+        )
+        db.commit()
+        flash("Your Dynamis main/secondary lot request was sent to officers.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="dynamis"))
+
+    @app.post("/endgame/dynamis-lot-requests/<int:request_id>/review")
+    @admin_required
+    def review_dynamis_lot_change(request_id):
+        if not can_create_guild_events():
+            abort(403, description="Only designated administrators can review Dynamis lotting jobs.")
+        decision = request.form.get("decision", "")
+        if decision not in {"Approved", "Denied"}:
+            abort(400, description="Choose approve or deny.")
+        db = get_db()
+        change = db.execute(
+            "SELECT * FROM dynamis_lot_change_requests WHERE id=? AND status='Pending'", (request_id,)
+        ).fetchone()
+        if not change:
+            abort(404)
+        reviewer = require_member_identity()
+        member = db.execute("SELECT name FROM members WHERE id=?", (change["member_id"],)).fetchone()
+        if decision == "Approved":
+            db.execute(
+                """INSERT INTO dynamis_lot_registrations(member_id,main_job,secondary_job,updated_at)
+                   VALUES(?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(member_id) DO UPDATE SET
+                   main_job=excluded.main_job,secondary_job=excluded.secondary_job,updated_at=CURRENT_TIMESTAMP""",
+                (change["member_id"], change["requested_main"], change["requested_secondary"]),
+            )
+        db.execute(
+            "UPDATE dynamis_lot_change_requests SET status=?,reviewed_by=?,reviewed_at=CURRENT_TIMESTAMP WHERE id=?",
+            (decision, reviewer["id"], request_id),
+        )
+        db.execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (reviewer["id"], "Dynamis Lotting", f"Request {decision.lower()}",
+             f"{member['name']}: {change['requested_main']} / {change['requested_secondary']} ({decision})"),
+        )
+        db.commit()
+        flash(f"{member['name']}'s Dynamis lotting request was {decision.lower()}.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="dynamis"))
 
     def current_dkp_balances():
         """Calculate available DKP from endgame attendance minus recorded awards."""

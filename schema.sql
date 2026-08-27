@@ -244,6 +244,30 @@ CREATE TABLE IF NOT EXISTS endgame_job_registrations (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_endgame_job_change_pending
 ON endgame_job_change_requests(member_id) WHERE status='Pending';
 
+CREATE TABLE IF NOT EXISTS dynamis_lot_registrations (
+    member_id INTEGER PRIMARY KEY,
+    main_job TEXT NOT NULL DEFAULT '',
+    secondary_job TEXT NOT NULL DEFAULT '',
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS dynamis_lot_change_requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    member_id INTEGER NOT NULL,
+    requested_main TEXT NOT NULL,
+    requested_secondary TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Pending' CHECK(status IN ('Pending','Approved','Denied')),
+    requested_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    reviewed_by INTEGER,
+    reviewed_at TEXT,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dynamis_lot_change_pending
+ON dynamis_lot_change_requests(member_id) WHERE status='Pending';
+
 CREATE TABLE IF NOT EXISTS endgame_loot_awards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id INTEGER NOT NULL,
