@@ -46,7 +46,7 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert b">Endgame Operations</button>" not in response.data
     for label in (
         b"Item Seratim", b"Member Detail", b"Event Log",
-        b"Linkshell Loot", b"Linkshell Pops",
+        b"Linkshell Loot", b"Linkshell Pops", b"Dynamis lots",
     ):
         assert label in response.data
     assert b"Blood Saber" not in response.data
@@ -73,6 +73,8 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert response.data.count(b"priority-source-heading") >= 10
     assert b'id="priority-source" value=""' in response.data
     assert b'id="priority-family"' not in response.data
+
+
     assert b">Loot class<" not in response.data
     assert b"Create new events from Event Calendar" in response.data
     assert b'data-endgame-view="job-selections"' not in response.data
@@ -109,6 +111,40 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert response.data.count(b"data-loot-sort=") == 6
 
 
+def test_dynamis_lotting_uses_horizon_levels_and_locks_after_officer_approval(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute("INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'','BLM',75)")
+    database.execute("INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'','RDM',71)")
+    database.execute("INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'','DRG',70)")
+    database.commit()
+    database.close()
+
+    page = client.get("/endgame")
+    assert b"Dynamis Lotting" in page.data
+    assert b"Dynamis gear catalog" in page.data
+    assert b"BLM \xc2\xb7 Lv.75" in page.data
+    assert b"DRG \xc2\xb7 Lv.70" not in page.data
+    assert client.post("/endgame/dynamis-lot-requests", data={
+        "csrf_token": "token", "main_job": "BLM", "secondary_job": "RDM",
+    }).status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    request_id = database.execute("SELECT id FROM dynamis_lot_change_requests WHERE member_id=1").fetchone()[0]
+    database.close()
+    assert client.post(f"/endgame/dynamis-lot-requests/{request_id}/review", data={
+        "csrf_token": "token", "decision": "Approved",
+    }).status_code == 302
+    locked = client.post("/endgame/dynamis-lot-requests", data={
+        "csrf_token": "token", "main_job": "RDM", "secondary_job": "BLM",
+    })
+    assert locked.status_code == 400
+    assert b"once every 30 days" in locked.data
+
+
 def test_past_endgame_events_show_most_recent_first(tmp_path):
     app = make_app(tmp_path)
     client = app.test_client()
@@ -139,7 +175,7 @@ def test_endgame_admin_controls_render_without_job_change_inbox(tmp_path):
     assert b"Sky &amp; Sea Priority Matrix" in response.data
     assert b"ENDGAME_IS_ADMIN=true" in response.data
     assert b"roster-column-filters" in response.data
-    assert response.data.count(b"data-roster-sort=") == 5
+    assert response.data.count(b"data-roster-sort=") == 6
     assert b'Event date and time' in response.data
     assert b'Choose date and time' in response.data
     assert b'id="pick-guild-event-date"' in response.data
