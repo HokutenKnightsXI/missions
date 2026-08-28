@@ -141,11 +141,18 @@ def test_dynamis_lotting_uses_horizon_levels_and_locks_after_officer_approval(tm
     page = client.get("/endgame")
     assert b"Dynamis Lotting" in page.data
     assert b"Dynamis gear catalog" in page.data
+    assert b'id="dynamis-priority-selection"' in page.data
+    assert b'aria-label="Show lot priority for' in page.data
     assert b"BLM \xc2\xb7 Lv.75" in page.data
     assert b"DRG \xc2\xb7 Lv.70" not in page.data
     assert client.post("/endgame/dynamis-lot-requests", data={
         "csrf_token": "token", "main_job": "BLM", "secondary_job": "RDM",
     }).status_code == 302
+    review_page = client.get("/endgame#dynamis")
+    assert b"Officer approval queue" in review_page.data
+    assert b'class="officer-request-queue"' in review_page.data
+    assert b"Approve" in review_page.data
+    assert b"BLM / RDM" in review_page.data
     database = sqlite3.connect(app.config["DATABASE"])
     request_id = database.execute("SELECT id FROM dynamis_lot_change_requests WHERE member_id=1").fetchone()[0]
     database.close()

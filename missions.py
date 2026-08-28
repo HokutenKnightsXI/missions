@@ -2969,8 +2969,6 @@ def create_app(test_config=None):
     @app.post("/endgame/dynamis-lot-requests/<int:request_id>/review")
     @admin_required
     def review_dynamis_lot_change(request_id):
-        if not can_create_guild_events():
-            abort(403, description="Only designated administrators can review Dynamis lotting jobs.")
         decision = request.form.get("decision", "")
         if decision not in {"Approved", "Denied"}:
             abort(400, description="Choose approve or deny.")
