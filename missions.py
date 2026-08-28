@@ -267,7 +267,7 @@ LOGIN_CHARACTERS = (
     "Kaeru", "Firewater", "Anonym", "Ramenwarrior", "Kalindra", "Eunos",
     "Brewski", "Bodom", "Werx", "Palumbo", "Hikari", "Gravekeeper",
 )
-DISCORD_ADMIN_CHARACTERS = ("Imaven", "Sexualpotato", "Vlathgar", "Cartuja")
+DISCORD_ADMIN_CHARACTERS = ("Imaven", "Sexualpotato", "Vlathgar", "Cartuja", "Ramenwarrior")
 AVAILABILITY_MODES = {
     "now": "Today/Now — PM Me",
     "after": "Any Time After",
@@ -1417,6 +1417,11 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE members ADD COLUMN discord_user_id TEXT NOT NULL DEFAULT ''")
         if "discord_admin" not in member_columns:
             get_db().execute("ALTER TABLE members ADD COLUMN discord_admin INTEGER NOT NULL DEFAULT 0")
+        member_job_columns = {
+            row["name"] for row in get_db().execute("PRAGMA table_info(member_jobs)")
+        }
+        if "bring" not in member_job_columns:
+            get_db().execute("ALTER TABLE member_jobs ADD COLUMN bring INTEGER NOT NULL DEFAULT 1")
         guild_event_columns = {
             row["name"] for row in get_db().execute("PRAGMA table_info(guild_events)")
         }
@@ -1780,7 +1785,7 @@ def create_app(test_config=None):
             clauses.append("p.status = ?")
             params.append(status)
         if job:
-            clauses.append("EXISTS (SELECT 1 FROM member_jobs j2 WHERE j2.member_id=m.id AND j2.job=?)")
+            clauses.append("EXISTS (SELECT 1 FROM member_jobs j2 WHERE j2.member_id=m.id AND j2.job=? AND j2.bring=1)")
             params.append(job)
         where = "WHERE " + " AND ".join(clauses) if clauses else ""
         rows = db.execute(
@@ -1789,7 +1794,7 @@ def create_app(test_config=None):
                    GROUP_CONCAT(j.job || ' ' || j.level, ', ') AS jobs
             FROM members m
             JOIN progress p ON p.member_id = m.id
-            LEFT JOIN member_jobs j ON j.member_id = m.id
+            LEFT JOIN member_jobs j ON j.member_id = m.id AND j.bring=1
             {where}
             GROUP BY m.id, p.campaign
             ORDER BY CASE p.status WHEN 'Ready for help' THEN 0 WHEN 'In progress' THEN 1
@@ -1863,6 +1868,11 @@ def create_app(test_config=None):
             row["job"]: row["level"]
             for row in db.execute("SELECT * FROM member_jobs WHERE member_id=?", (member_id,)).fetchall()
         } if member_id else {}
+        existing_bring_jobs = {
+            row["job"] for row in db.execute(
+                "SELECT job FROM member_jobs WHERE member_id=? AND bring=1", (member_id,)
+            ).fetchall()
+        } if member_id else set()
         existing_progress = {
             row["campaign"]: row
             for row in db.execute("SELECT * FROM progress WHERE member_id=?", (member_id,)).fetchall()
@@ -1883,6 +1893,11 @@ def create_app(test_config=None):
                         break
                     selected_jobs[job] = level
             else:
+                submitted_bring_jobs = set(request.form.getlist("bring_jobs"))
+                if request.form.get("bring_jobs_present"):
+                    submitted_bring_jobs &= set(selected_jobs)
+                else:
+                    submitted_bring_jobs = set(selected_jobs)
                 if not name:
                     flash("Character name is required.", "error")
                 elif not selected_jobs:
@@ -1942,8 +1957,9 @@ def create_app(test_config=None):
                                 session["member_id"] = target_member_id
                         db.execute("DELETE FROM member_jobs WHERE member_id=?", (target_member_id,))
                         db.executemany(
-                            "INSERT INTO member_jobs (member_id, job, level) VALUES (?, ?, ?)",
-                            [(target_member_id, job, level) for job, level in selected_jobs.items()],
+                            "INSERT INTO member_jobs (member_id, job, level, bring) VALUES (?, ?, ?, ?)",
+                            [(target_member_id, job, level, int(job in submitted_bring_jobs))
+                             for job, level in selected_jobs.items()],
                         )
                         for campaign in CAMPAIGNS:
                             mission_value = request.form.get(f"{campaign}_mission", "").strip()
@@ -1971,6 +1987,7 @@ def create_app(test_config=None):
 
         return render_template(
             "member_form.html", member=member, existing_jobs=existing_jobs,
+            existing_bring_jobs=existing_bring_jobs,
             progress=existing_progress, jobs=JOBS, campaigns=CAMPAIGNS, statuses=STATUSES,
             mission_options=MISSION_OPTIONS, campaign_names=CAMPAIGN_NAMES,
             registered_members=registered_members,
@@ -4282,12 +4299,12 @@ def create_app(test_config=None):
         holder_id = request.form.get("holder_member_id", "").strip()
         status = request.form.get("status", "").strip()
         sale_gil = bank_gil_value(request.form.get("sale_gil"))
-        sale_channel = request.form.get("sale_channel", "").strip()
+        sale_channel = request.form.get("sale_channel", entry["sale_channel"]).strip()
         submitted_notes = request.form.get("notes")
         notes = entry["notes"] if not (submitted_notes or "").strip() else submitted_notes.strip()[:500]
         holder = get_db().execute("SELECT id,name FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
         if (status not in {"Held", "Sold"} or sale_gil < 0 or (holder_id and not holder)
-                or (status == "Sold" and sale_channel not in {"Auction House", "Bazaar"})
+                or (status == "Sold" and sale_channel not in {"", "Auction House", "Bazaar"})
                 or (status == "Held" and sale_channel)):
             abort(400, description="Use a valid holder, sale status, and gil amount.")
         actor = require_member_identity()
@@ -4446,10 +4463,16 @@ def create_app(test_config=None):
 
         try:
             for member_id, _name, jobs in updates:
+                existing_bring_jobs = {
+                    row["job"]: row["bring"] for row in db.execute(
+                        "SELECT job,bring FROM member_jobs WHERE member_id=?", (member_id,)
+                    ).fetchall()
+                }
                 db.execute("DELETE FROM member_jobs WHERE member_id=?", (member_id,))
                 db.executemany(
-                    "INSERT INTO member_jobs(member_id,job,level) VALUES (?,?,?)",
-                    [(member_id, job, level) for job, level in jobs.items()],
+                    "INSERT INTO member_jobs(member_id,job,level,bring) VALUES (?,?,?,?)",
+                    [(member_id, job, level, existing_bring_jobs.get(job, 1))
+                     for job, level in jobs.items()],
                 )
                 db.execute(
                     "UPDATE members SET updated_at=CURRENT_TIMESTAMP WHERE id=?", (member_id,)

@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS member_jobs (
     custom_name TEXT NOT NULL DEFAULT '',
     job TEXT NOT NULL,
     level INTEGER NOT NULL CHECK(level BETWEEN 1 AND 75),
+    bring INTEGER NOT NULL DEFAULT 1 CHECK(bring IN (0,1)),
     PRIMARY KEY (member_id, job),
     FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
 );

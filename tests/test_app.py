@@ -1,6 +1,7 @@
 import pytest
 import json
 import re
+import sqlite3
 
 import missions
 from missions import MISSION_OPTIONS, create_app, mission_wiki_url
@@ -270,7 +271,7 @@ def test_mission_form_uses_grouped_dropdowns(client):
     response = client.get("/members/new")
     assert response.status_code == 200
     assert b"Look up jobs" not in response.data
-    assert b"enter its current level" in response.data
+    assert b"Enter your current job levels" in response.data
     assert b'optgroup label="Chapter 1' in response.data
     assert "CoP 1-3 – The Mothercrystals".encode() in response.data
     assert "ZM1 – The New Frontier".encode() in response.data
@@ -294,7 +295,32 @@ def test_progress_form_selects_registered_member_and_populates_jobs(client):
     edit_form = client.get(f"/members/{member_id}/edit")
     assert b'value="75" placeholder=' in edit_form.data
     assert b'value="60" placeholder=' in edit_form.data
-    assert edit_form.data.count(b'class="job-available" checked') == 2
+    assert edit_form.data.count(b'name="bring_jobs"') == len(missions.JOBS)
+    assert len(re.findall(rb'name="bring_jobs" value="[A-Z]+" checked', edit_form.data)) == 2
+
+
+def test_mission_jobs_to_bring_persist_through_a_roster_refresh(tmp_path):
+    app = create_app({
+        "TESTING": True, "DATABASE": str(tmp_path / "mission-jobs.db"), "SECRET_KEY": "test",
+        "AUTH_DISABLED": True, "ROSTER_REFRESH_TOKEN": "daily-refresh-secret",
+    })
+    client = app.test_client()
+    client.post("/members/new", data={
+        "name": "Prishe", "job_WHM": "75", "job_BRD": "60", "job_BLM": "50",
+        "bring_jobs_present": "1", "bring_jobs": ["WHM", "BRD"],
+    })
+    member_id = sqlite3.connect(client.application.config["DATABASE"]).execute(
+        "SELECT id FROM members WHERE name='Prishe'"
+    ).fetchone()[0]
+    refreshed = client.post("/api/job-roster/refresh", json={
+        "players": {"Prishe": {"WHM": 75, "BRD": 60, "BLM": 50}}
+    }, headers={"Authorization": "Bearer daily-refresh-secret"})
+    assert refreshed.status_code == 200
+    database = sqlite3.connect(client.application.config["DATABASE"])
+    assert database.execute(
+        "SELECT job,bring FROM member_jobs WHERE member_id=? ORDER BY job", (member_id,)
+    ).fetchall() == [("BLM", 0), ("BRD", 1), ("WHM", 1)]
+    database.close()
 
 
 def test_dashboard_groups_members_by_mission(client):
