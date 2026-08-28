@@ -30,6 +30,7 @@
   const dynamisCatalogZoneFilter = document.querySelector("#dynamis-catalog-zone-filter");
   const dynamisCatalogJobFilter = document.querySelector("#dynamis-catalog-job-filter");
   const dynamisPriorityResults = document.querySelector("#dynamis-priority-results");
+  const dynamisPrioritySelection = document.querySelector("#dynamis-priority-selection");
   const refreshDynamisLots = () => {
     const job = dynamisJobFilter?.value || "";
     const matches = [...document.querySelectorAll(".dynamis-legacy-layout #dynamis-lot-body tr")]
@@ -59,6 +60,32 @@
     refreshDynamisLots();
   });
   dynamisCatalogJobFilter?.addEventListener("change", refreshDynamisLots);
+  const selectDynamisCatalogItem = card => {
+    const area = card.dataset.dynamisDropArea || "";
+    const job = card.dataset.dynamisDropJob || "";
+    const item = card.querySelector("b")?.textContent.trim() || "Selected item";
+    if (dynamisCatalogZoneFilter) dynamisCatalogZoneFilter.value = area;
+    if (dynamisCatalogJobFilter) dynamisCatalogJobFilter.value = job;
+    if (dynamisZoneFilter) dynamisZoneFilter.value = area;
+    if (dynamisJobFilter) dynamisJobFilter.value = job;
+    document.querySelectorAll(".dynamis-lot-panel:not(.dynamis-legacy-layout) #dynamis-drop-list article").forEach(entry => {
+      const selected = entry === card;
+      entry.classList.toggle("selected", selected);
+      entry.setAttribute("aria-pressed", String(selected));
+    });
+    if (dynamisPrioritySelection) dynamisPrioritySelection.textContent = `${item} · ${area} · ${job}`;
+    refreshDynamisLots();
+    dynamisPriorityResults?.scrollIntoView({behavior: "smooth", block: "nearest"});
+  };
+  document.querySelectorAll(".dynamis-lot-panel:not(.dynamis-legacy-layout) #dynamis-drop-list article").forEach(card => {
+    card.addEventListener("click", () => selectDynamisCatalogItem(card));
+    card.addEventListener("keydown", event => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectDynamisCatalogItem(card);
+      }
+    });
+  });
   refreshDynamisLots();
   document.querySelectorAll(".dynamis-member-directory table").forEach(table => {
     const header = table.querySelector("th:nth-child(2)");
