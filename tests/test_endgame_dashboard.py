@@ -207,6 +207,8 @@ def test_ls_bank_tracks_event_items_sales_and_officer_custody(tmp_path):
     page = client.get("/endgame#bank")
     assert b"LS Bank" in page.data
     assert b"Damascene Cloth" in page.data
+    assert b'id="ls-bank-item"' in page.data
+    assert b'id="ls-bank-item-catalog"' in page.data
     assert b"Refresh market" in page.data
 
 

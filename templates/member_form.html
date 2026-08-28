@@ -30,12 +30,13 @@
   </fieldset>
   <fieldset>
     <legend>Jobs available</legend>
-    <p class="hint">Check each job you are willing to bring and enter its current level.</p>
+    <p class="hint">Enter your current job levels, then check only the jobs you are willing to bring for mission help.</p>
+    <input type="hidden" name="bring_jobs_present" value="1">
     <div class="jobs-grid">
       {% for job in jobs %}
         {% set level = request.form.get('job_' + job, existing_jobs.get(job, '')) %}
         <div class="job-choice" data-job="{{ job }}">
-          <label class="job-check"><input type="checkbox" class="job-available" {{ 'checked' if level }}> <span>{{ job }}</span></label>
+          <label class="job-check"><input type="checkbox" class="job-available" name="bring_jobs" value="{{ job }}" {{ 'checked' if job in existing_bring_jobs }}> <span>{{ job }}</span></label>
           <input aria-label="{{ job }} level" class="job-level" type="number" min="1" max="75" value="{{ level }}" placeholder="—">
           <input class="job-value" type="hidden" name="job_{{ job }}" value="{{ level }}" {{ 'disabled' if not level }}>
         </div>
@@ -84,7 +85,7 @@
     const level = card.querySelector('.job-level').value;
     const hidden = card.querySelector('.job-value');
     hidden.value = level;
-    hidden.disabled = !checked || !level;
+    hidden.disabled = !level;
     card.classList.toggle('selected', checked);
   }
   document.querySelectorAll('.job-choice').forEach(card => {

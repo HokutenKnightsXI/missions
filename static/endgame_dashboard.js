@@ -91,8 +91,8 @@
   refreshDynamisLots();
   document.querySelectorAll(".dynamis-member-directory table").forEach(table => {
     const header = table.querySelector("th:nth-child(2)");
-    if (header) header.textContent = "Priority";
-    table.querySelectorAll("th:nth-child(3), td:nth-child(3)").forEach(cell => { cell.hidden = true; });
+    if (header) header.textContent = "Main lot";
+    table.querySelectorAll("th:nth-child(3), td:nth-child(3)").forEach(cell => { cell.hidden = false; });
     table.querySelectorAll("tbody tr").forEach(row => {
       const priority = row.cells[1];
       const job = priority?.textContent.trim();
@@ -169,6 +169,47 @@
   });
   const bankMarketKey = value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   const formatBankGil = value => `${Math.max(0, Math.round(Number(value) || 0)).toLocaleString()}g`;
+  const bankItemInput = document.querySelector("#ls-bank-item");
+  const bankItemCatalog = document.querySelector("#ls-bank-item-catalog");
+  let bankCanonicalItemNames = new Map();
+  let bankCatalogNames = [];
+  const showBankItemSuggestions = () => {
+    if (!bankItemInput || !bankItemCatalog) return;
+    const query = bankMarketKey(bankItemInput.value);
+    const matches = query.length >= 2 ? bankCatalogNames.filter(name => bankMarketKey(name).includes(query)).slice(0, 12) : [];
+    bankItemCatalog.replaceChildren(...matches.map(name => {
+      const option = document.createElement("button");
+      option.type = "button";
+      option.setAttribute("role", "option");
+      option.textContent = name;
+      option.addEventListener("mousedown", event => {
+        event.preventDefault();
+        bankItemInput.value = name;
+        bankItemCatalog.hidden = true;
+        bankItemInput.setAttribute("aria-expanded", "false");
+      });
+      return option;
+    }));
+    bankItemCatalog.hidden = matches.length === 0;
+    bankItemInput.setAttribute("aria-expanded", String(matches.length > 0));
+  };
+  const updateBankItemCatalog = prices => {
+    if (!bankItemCatalog) return;
+    bankCatalogNames = [...new Set(Object.values(prices || {}).map(price => String(price?.name || "").trim()).filter(Boolean))]
+      .sort((left, right) => left.localeCompare(right));
+    bankCanonicalItemNames = new Map(bankCatalogNames.map(name => [bankMarketKey(name), name]));
+    showBankItemSuggestions();
+  };
+  bankItemInput?.addEventListener("input", showBankItemSuggestions);
+  bankItemInput?.addEventListener("focus", showBankItemSuggestions);
+  bankItemInput?.addEventListener("blur", () => setTimeout(() => {
+    if (bankItemCatalog) bankItemCatalog.hidden = true;
+    bankItemInput?.setAttribute("aria-expanded", "false");
+  }, 120));
+  bankItemInput?.form?.addEventListener("submit", () => {
+    const canonical = bankCanonicalItemNames.get(bankMarketKey(bankItemInput.value));
+    if (canonical) bankItemInput.value = canonical;
+  });
   const updateBankMarketValues = prices => {
     const byName = Object.fromEntries(Object.values(prices || {}).filter(price => price.name).map(price => [bankMarketKey(price.name), price]));
     let heldValue = 0;
@@ -198,7 +239,7 @@
     buttons.forEach(control => { control.disabled = true; control.textContent = "Refreshing…"; });
     return fetch("/api/market-prices?refresh=1", {headers: {"Accept": "application/json"}})
       .then(response => response.ok ? response.json() : Promise.reject())
-      .then(snapshot => updateBankMarketValues(snapshot.prices))
+      .then(snapshot => { updateBankItemCatalog(snapshot.prices); updateBankMarketValues(snapshot.prices); })
       .catch(() => document.querySelectorAll(".bank-market-value").forEach(cell => { cell.textContent = "Market unavailable"; }))
       .finally(() => buttons.forEach(control => { control.disabled = false; control.textContent = "Refresh market"; }));
   };
@@ -207,7 +248,7 @@
     filterBankRows();
     fetch("/api/market-prices", {headers: {"Accept": "application/json"}})
       .then(response => response.ok ? response.json() : Promise.reject())
-      .then(snapshot => updateBankMarketValues(snapshot.prices))
+      .then(snapshot => { updateBankItemCatalog(snapshot.prices); updateBankMarketValues(snapshot.prices); })
       .catch(() => document.querySelectorAll(".bank-market-value").forEach(cell => { cell.textContent = "Market unavailable"; }));
   }
   let bankSort = {key: "item", direction: 1};
