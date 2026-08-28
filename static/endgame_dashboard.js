@@ -12,6 +12,7 @@
     const name = tab.dataset.endgameView;
     activateView(name);
     if (name === "dkp-loot") activate("bidding-live");
+    else if (name === "bank") history.replaceState(null, "", "#bank");
     else if (name === "operations") activate("events");
     else history.replaceState(null, "", "#calendar");
   }));
@@ -23,6 +24,7 @@
   tabs.forEach(tab => tab.addEventListener("click", () => activate(tab.dataset.endgameTab)));
   const requested = location.hash.slice(1);
   if (["bidding-live", "jobs", "priority", "loot", "dynamis"].includes(requested) || requested.startsWith("auction-")) { activateView("dkp-loot"); activate(requested.startsWith("auction-") ? "bidding-live" : requested); }
+  else if (requested === "bank") activateView("bank");
   else if (["events", "pops", "admin-audit"].includes(requested)) { activateView("operations"); activate(requested); }
   else activateView("calendar");
   const dynamisJobFilter = document.querySelector("#dynamis-job-filter");
@@ -146,6 +148,84 @@
   const adminAudit = [...(window.ENDGAME_SERVER_AUDIT || []), ...JSON.parse(localStorage.getItem(adminAuditKey) || "[]")];
   let auditSort = {key: "at", direction: -1};
   const safeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
+  const bankSearch = document.querySelector("#ls-bank-search");
+  const bankHolderFilter = document.querySelector("#ls-bank-holder-filter");
+  const bankStatusFilter = document.querySelector("#ls-bank-status-filter");
+  const filterBankRows = () => {
+    const query = bankSearch?.value.trim().toLowerCase() || "";
+    const holder = bankHolderFilter?.value || "";
+    const status = bankStatusFilter?.value || "";
+    let visible = 0;
+    document.querySelectorAll("#ls-bank-body tr[data-bank-search]").forEach(row => {
+      const matches = (!query || row.dataset.bankSearch.includes(query)) && (!holder || row.dataset.holder === holder) && (!status || row.dataset.status === status);
+      row.hidden = !matches;
+      if (matches) visible += 1;
+    });
+    const count = document.querySelector("#bank-filter-count");
+    if (count) count.textContent = `${visible} matching / ${document.querySelectorAll("#ls-bank-body tr[data-bank-search]").length} entries`;
+  };
+  [bankSearch, bankHolderFilter, bankStatusFilter].filter(Boolean).forEach(control => {
+    ["input", "change"].forEach(eventName => control.addEventListener(eventName, filterBankRows));
+  });
+  const bankMarketKey = value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const formatBankGil = value => `${Math.max(0, Math.round(Number(value) || 0)).toLocaleString()}g`;
+  const updateBankMarketValues = prices => {
+    const byName = Object.fromEntries(Object.values(prices || {}).filter(price => price.name).map(price => [bankMarketKey(price.name), price]));
+    let heldValue = 0;
+    document.querySelectorAll(".bank-market-value").forEach(cell => {
+      const price = byName[bankMarketKey(cell.dataset.bankItem)];
+      const candidates = [price?.bazaar_lowest, price?.single_recent_average, price?.single_average]
+        .filter(value => value !== null && value !== undefined && value !== "")
+        .map(Number).filter(value => Number.isFinite(value) && value > 0);
+      const unit = candidates.length ? Math.min(...candidates) : null;
+      if (unit == null) { cell.textContent = "—"; cell.title = "No PSXI market value is currently available."; return; }
+      const value = Number(unit) * Number(cell.dataset.bankQuantity || 1);
+      heldValue += value;
+      cell.closest("tr").dataset.market = String(value);
+      cell.textContent = formatBankGil(value);
+      const source = Number(price?.bazaar_lowest) === unit ? "lowest bazaar listing" : "sale average";
+      cell.title = `PSXI ${source}: ${formatBankGil(unit)} each`;
+    });
+    const cash = Number(document.querySelector(".ls-bank-summary")?.dataset.bankCash || 0);
+    const held = document.querySelector("#bank-held-market");
+    const total = document.querySelector("#bank-total-value");
+    if (held) held.textContent = formatBankGil(heldValue);
+    if (total) total.textContent = formatBankGil(cash + heldValue);
+    filterBankRows();
+  };
+  const refreshBankMarket = () => {
+    const buttons = [...document.querySelectorAll(".refresh-bank-market")];
+    buttons.forEach(control => { control.disabled = true; control.textContent = "Refreshing…"; });
+    return fetch("/api/market-prices?refresh=1", {headers: {"Accept": "application/json"}})
+      .then(response => response.ok ? response.json() : Promise.reject())
+      .then(snapshot => updateBankMarketValues(snapshot.prices))
+      .catch(() => document.querySelectorAll(".bank-market-value").forEach(cell => { cell.textContent = "Market unavailable"; }))
+      .finally(() => buttons.forEach(control => { control.disabled = false; control.textContent = "Refresh market"; }));
+  };
+  document.querySelectorAll(".refresh-bank-market").forEach(button => button.addEventListener("click", refreshBankMarket));
+  if (document.querySelector(".ls-bank-panel")) {
+    filterBankRows();
+    fetch("/api/market-prices", {headers: {"Accept": "application/json"}})
+      .then(response => response.ok ? response.json() : Promise.reject())
+      .then(snapshot => updateBankMarketValues(snapshot.prices))
+      .catch(() => document.querySelectorAll(".bank-market-value").forEach(cell => { cell.textContent = "Market unavailable"; }));
+  }
+  let bankSort = {key: "item", direction: 1};
+  document.querySelectorAll("[data-bank-sort]").forEach(button => button.addEventListener("click", () => {
+    const key = button.dataset.bankSort;
+    bankSort = {key, direction: bankSort.key === key ? -bankSort.direction : 1};
+    document.querySelectorAll("[data-bank-sort]").forEach(control => {
+      control.classList.toggle("active", control === button);
+      control.querySelector("span").textContent = control === button ? (bankSort.direction > 0 ? "ASC" : "DESC") : "Sort";
+    });
+    const type = button.dataset.sortType;
+    const body = document.querySelector("#ls-bank-body");
+    if (!body) return;
+    [...body.rows].sort((left, right) => {
+      const a = left.dataset[key] || "", b = right.dataset[key] || "";
+      return (type === "number" ? Number(a) - Number(b) : a.localeCompare(b, undefined, {numeric: true})) * bankSort.direction;
+    }).forEach(row => body.appendChild(row));
+  }));
   if (dynamisCatalogZoneFilter && ![...dynamisCatalogZoneFilter.options].some(option => option.value === "")) {
     dynamisCatalogZoneFilter.prepend(new Option("All Dynamis zones", ""));
   }

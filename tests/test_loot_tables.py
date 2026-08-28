@@ -95,12 +95,13 @@ def test_market_snapshot_is_compacted_for_price_cells():
         "data": [{
             "itemId": 15515, "itemName": "Peacock Amulet", "asOf": "2026-08-11T17:55:00Z",
             "ah": {"currentStock": 2, "currentStackStock": 0,
-                   "single": {"lastSale": 900000, "median": 875000, "volume": 4},
+                   "single": {"lastSale": 900000, "avg": 875000, "median": 875000, "volume": 4},
                    "stack": {"lastSale": None, "median": None, "volume": 0}},
         }],
     })
     assert snapshot["generated_at"] == "2026-08-11T18:00:00Z"
     assert snapshot["prices"]["15515"]["single_last"] == 900000
+    assert snapshot["prices"]["15515"]["single_average"] == 875000
     assert snapshot["prices"]["15515"]["stock"] == 2
 
 
