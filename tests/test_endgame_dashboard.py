@@ -54,8 +54,8 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     sign_in(client, admin=True)
     response = client.get("/endgame")
     assert response.status_code == 200
-    assert response.data.count(b"data-endgame-view=") == 3
-    for view in (b">Calendar</button>", b">DKP/Loot</button>", b">Operations</button>"):
+    assert response.data.count(b"data-endgame-view=") == 4
+    for view in (b">Calendar</button>", b">DKP/Loot</button>", b">LS Bank</button>", b">Operations</button>"):
         assert view in response.data
     assert b">Event Calendar</button>" not in response.data
     assert b">Endgame Operations</button>" not in response.data
@@ -164,6 +164,50 @@ def test_dynamis_lotting_uses_horizon_levels_and_locks_after_officer_approval(tm
     })
     assert locked.status_code == 400
     assert b"once every 30 days" in locked.data
+
+
+def test_ls_bank_tracks_event_items_sales_and_officer_custody(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    database = sqlite3.connect(app.config["DATABASE"])
+    event_id = database.execute("SELECT id FROM guild_events ORDER BY id LIMIT 1").fetchone()[0]
+    holder_id = database.execute("SELECT id FROM members ORDER BY id LIMIT 1").fetchone()[0]
+    database.close()
+
+    created = client.post("/endgame/bank", data={
+        "csrf_token": "token", "item": "Damascene Cloth", "event_id": str(event_id),
+        "holder_member_id": str(holder_id), "acquisition_kind": "Event Drop", "quantity": "2",
+        "purchase_gil": "0", "notes": "Sky run",
+    })
+    assert created.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    bank_item_id = database.execute("SELECT id FROM ls_bank_items").fetchone()[0]
+    assert database.execute(
+        "SELECT event_id,item,quantity,acquisition_kind,status,purchase_gil,holder_member_id FROM ls_bank_items WHERE id=?",
+        (bank_item_id,),
+    ).fetchone() == (event_id, "Damascene Cloth", 2, "Event Drop", "Held", 0, holder_id)
+    database.close()
+    updated = client.post(f"/endgame/bank/{bank_item_id}/update", data={
+        "csrf_token": "token", "holder_member_id": str(holder_id), "status": "Sold", "sale_channel": "Bazaar", "sale_gil": "450000", "notes": "Sold in Jeuno",
+    })
+    assert updated.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT status,sale_gil,sale_channel,notes FROM ls_bank_items WHERE id=?", (bank_item_id,)).fetchone() == ("Sold", 450000, "Bazaar", "Sold in Jeuno")
+    database.close()
+    returned = client.post(f"/endgame/bank/{bank_item_id}/update", data={
+        "csrf_token": "token", "holder_member_id": str(holder_id), "status": "Held", "sale_channel": "", "sale_gil": "450000",
+    })
+    assert returned.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT status,sale_gil,sale_channel,notes,sold_at FROM ls_bank_items WHERE id=?", (bank_item_id,)).fetchone() == ("Held", 0, "", "Sold in Jeuno", None)
+    database.close()
+    page = client.get("/endgame#bank")
+    assert b"LS Bank" in page.data
+    assert b"Damascene Cloth" in page.data
+    assert b"Refresh market" in page.data
 
 
 def test_past_endgame_events_show_most_recent_first(tmp_path):

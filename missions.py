@@ -358,6 +358,10 @@ def compact_market_snapshot(payload):
         auction = item.get("ah") or {}
         single = auction.get("single") or {}
         stack = auction.get("stack") or {}
+        bazaar = item.get("bazaar") or item.get("bazaars") or {}
+        bazaar_lowest = next((bazaar.get(key) for key in (
+            "lowest", "lowestPrice", "lowestBazaar", "minPrice", "min"
+        ) if isinstance(bazaar, dict) and bazaar.get(key) is not None), None)
         prices[str(item_id)] = {
             "name": item.get("itemName") or "",
             "as_of": item.get("asOf"),
@@ -369,11 +373,16 @@ def compact_market_snapshot(payload):
             "stack_last": stack.get("lastSale"),
             "stack_median": stack.get("median"),
             "stack_volume": stack.get("volume"),
+            "bazaar_lowest": bazaar_lowest,
+            "single_recent_average": next((single.get(key) for key in (
+                "lastThreeAverage", "last_three_average", "recentAverage"
+            ) if single.get(key) is not None), None),
+            "single_average": single.get("avg"),
         }
     return {"generated_at": (payload.get("meta") or {}).get("generatedAt"), "prices": prices}
 
 
-def market_snapshot(cache_path, token="", now=None):
+def market_snapshot(cache_path, token="", now=None, force_refresh=False):
     """Return an hourly file-backed PSXI market snapshot without exposing credentials."""
     cache_path = Path(cache_path)
     current_time = datetime.now().timestamp() if now is None else float(now)
@@ -381,7 +390,7 @@ def market_snapshot(cache_path, token="", now=None):
         cached = None
         if cache_path.exists():
             cached = json.loads(cache_path.read_text(encoding="utf-8"))
-            if current_time - cache_path.stat().st_mtime < PSXI_MARKET_TTL:
+            if not force_refresh and current_time - cache_path.stat().st_mtime < PSXI_MARKET_TTL:
                 return cached
         headers = {"Accept": "application/json", "User-Agent": "HokutenMarketCache/1.0"}
         if token:
@@ -1434,6 +1443,9 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE endgame_loot_awards ADD COLUMN auction_id INTEGER")
         if "auction_item_id" not in loot_award_columns:
             get_db().execute("ALTER TABLE endgame_loot_awards ADD COLUMN auction_item_id INTEGER")
+        bank_columns = {row["name"] for row in get_db().execute("PRAGMA table_info(ls_bank_items)")}
+        if bank_columns and "sale_channel" not in bank_columns:
+            get_db().execute("ALTER TABLE ls_bank_items ADD COLUMN sale_channel TEXT NOT NULL DEFAULT ''")
         get_db().execute(
             """UPDATE endgame_loot_awards AS award SET auction_id=(
                    SELECT auction.id FROM endgame_auction_items item
@@ -2918,6 +2930,27 @@ def create_app(test_config=None):
                 "last_event": member["last_event"],
                 "events": event_history, "loot": loot_history,
             }
+        bank_items = [dict(row) for row in get_db().execute(
+            """SELECT b.*,e.name event_name,e.start_at event_start,h.name holder_name
+               FROM ls_bank_items b
+               LEFT JOIN guild_events e ON e.id=b.event_id
+               LEFT JOIN members h ON h.id=b.holder_member_id
+               ORDER BY CASE b.status WHEN 'Held' THEN 0 ELSE 1 END,b.acquired_at DESC,b.id DESC"""
+        ).fetchall()]
+        officer_names = {name.casefold() for name in DISCORD_ADMIN_CHARACTERS}
+        if is_admin() and current_member_name():
+            officer_names.add(current_member_name().casefold())
+        bank_officers = [dict(row) for row in get_db().execute(
+            "SELECT id,name FROM members WHERE discord_admin=1 OR name COLLATE NOCASE IN ({}) ORDER BY name COLLATE NOCASE".format(
+                ",".join("?" for _ in officer_names) or "''"
+            ), tuple(officer_names)
+        ).fetchall()]
+        bank_summary = get_db().execute(
+            """SELECT COALESCE(SUM(purchase_gil),0) purchases,COALESCE(SUM(sale_gil),0) sales,
+                      SUM(CASE WHEN status='Held' THEN 1 ELSE 0 END) held_count,
+                      SUM(CASE WHEN status='Sold' THEN 1 ELSE 0 END) sold_count
+               FROM ls_bank_items"""
+        ).fetchone()
         return render_template(
             "endgame_dashboard.html", roster=prototype_roster,
             loot=persistent_loot, pop_items=pop_items, pop_targets=pop_targets,
@@ -2942,6 +2975,9 @@ def create_app(test_config=None):
             discord_announcements_enabled=bool(app.config.get("DISCORD_EVENT_CHANNEL_ID")),
             persistent_audit=persistent_audit,
             member_details=member_details,
+            bank_items=bank_items,
+            bank_officers=bank_officers,
+            bank_summary=dict(bank_summary),
             dkp_highest=dkp_highest, dkp_average=dkp_average,
             dkp_bid_cap=dkp_bid_cap,
         )
@@ -4196,6 +4232,96 @@ def create_app(test_config=None):
         flash(f"Recorded {item} for {recipient['name']}.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="loot"))
 
+    def bank_gil_value(raw):
+        try:
+            value = int(str(raw or "0").strip())
+        except (TypeError, ValueError):
+            return -1
+        return value if 0 <= value <= 2_000_000_000 else -1
+
+    @app.post("/endgame/bank")
+    @admin_required
+    def record_ls_bank_item():
+        item = request.form.get("item", "").strip()[:120]
+        event_id = request.form.get("event_id", "").strip()
+        holder_id = request.form.get("holder_member_id", "").strip()
+        acquisition_kind = request.form.get("acquisition_kind", "").strip()
+        notes = request.form.get("notes", "").strip()[:500]
+        try:
+            quantity = int(request.form.get("quantity", "1"))
+        except (TypeError, ValueError):
+            quantity = 0
+        purchase_gil = bank_gil_value(request.form.get("purchase_gil"))
+        event = get_db().execute("SELECT id FROM guild_events WHERE id=?", (event_id,)).fetchone() if event_id.isdigit() else None
+        holder = get_db().execute("SELECT id,name FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
+        if (not item or not 1 <= quantity <= 9999 or purchase_gil < 0
+                or acquisition_kind not in {"Event Drop", "Purchase", "Manual"}
+                or (event_id and not event) or (holder_id and not holder)):
+            abort(400, description="Complete the LS Bank item using valid values.")
+        actor = require_member_identity()
+        get_db().execute(
+            """INSERT INTO ls_bank_items(event_id,item,quantity,acquisition_kind,purchase_gil,holder_member_id,notes,recorded_by)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (event["id"] if event else None, item, quantity, acquisition_kind, purchase_gil,
+             holder["id"] if holder else None, notes, actor["id"]),
+        )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "LS Bank", "Item recorded", f"{quantity}x {item} / {acquisition_kind}"),
+        )
+        get_db().commit()
+        flash(f"Added {quantity}x {item} to the LS Bank.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+
+    @app.post("/endgame/bank/<int:bank_item_id>/update")
+    @admin_required
+    def update_ls_bank_item(bank_item_id):
+        entry = get_db().execute("SELECT * FROM ls_bank_items WHERE id=?", (bank_item_id,)).fetchone()
+        if not entry:
+            abort(404)
+        holder_id = request.form.get("holder_member_id", "").strip()
+        status = request.form.get("status", "").strip()
+        sale_gil = bank_gil_value(request.form.get("sale_gil"))
+        sale_channel = request.form.get("sale_channel", "").strip()
+        submitted_notes = request.form.get("notes")
+        notes = entry["notes"] if not (submitted_notes or "").strip() else submitted_notes.strip()[:500]
+        holder = get_db().execute("SELECT id,name FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
+        if (status not in {"Held", "Sold"} or sale_gil < 0 or (holder_id and not holder)
+                or (status == "Sold" and sale_channel not in {"Auction House", "Bazaar"})
+                or (status == "Held" and sale_channel)):
+            abort(400, description="Use a valid holder, sale status, and gil amount.")
+        actor = require_member_identity()
+        sale_gil = sale_gil if status == "Sold" else 0
+        get_db().execute(
+            """UPDATE ls_bank_items SET holder_member_id=?,status=?,sale_gil=?,sale_channel=?,notes=?,
+                       sold_at=CASE WHEN ?='Sold' THEN COALESCE(sold_at,CURRENT_TIMESTAMP) ELSE NULL END,
+                       updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+            (holder["id"] if holder else None, status, sale_gil, sale_channel, notes, status, bank_item_id),
+        )
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "LS Bank", "Item updated", f"{entry['quantity']}x {entry['item']} / {status}"),
+        )
+        get_db().commit()
+        flash("LS Bank item updated.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+
+    @app.post("/endgame/bank/<int:bank_item_id>/delete")
+    @admin_required
+    def delete_ls_bank_item(bank_item_id):
+        entry = get_db().execute("SELECT * FROM ls_bank_items WHERE id=?", (bank_item_id,)).fetchone()
+        if not entry:
+            abort(404)
+        actor = require_member_identity()
+        get_db().execute("DELETE FROM ls_bank_items WHERE id=?", (bank_item_id,))
+        get_db().execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "LS Bank", "Item removed", f"{entry['quantity']}x {entry['item']}"),
+        )
+        get_db().commit()
+        flash("Removed the LS Bank entry.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+
     @app.post("/endgame/loot/<int:award_id>/update")
     @admin_required
     def update_endgame_loot(award_id):
@@ -4418,8 +4544,14 @@ def create_app(test_config=None):
     @app.get("/api/market-prices")
     def market_prices_api():
         """Return a compact hourly cached HorizonXI AH snapshot."""
+        force_refresh = request.args.get("refresh") == "1"
+        if force_refresh and not is_admin():
+            abort(403, description="Only officers can refresh market values.")
         try:
             snapshot = market_snapshot(
+                app.config["PSXI_MARKET_CACHE"], app.config.get("PSXI_API_TOKEN", ""),
+                force_refresh=True,
+            ) if force_refresh else market_snapshot(
                 app.config["PSXI_MARKET_CACHE"], app.config.get("PSXI_API_TOKEN", "")
             )
         except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):

@@ -346,6 +346,29 @@ CREATE TABLE IF NOT EXISTS endgame_auction_bids (
 CREATE INDEX IF NOT EXISTS idx_endgame_auction_status ON endgame_auctions(status, ends_at);
 CREATE INDEX IF NOT EXISTS idx_endgame_auction_bids_item ON endgame_auction_bids(auction_item_id, amount DESC);
 
+CREATE TABLE IF NOT EXISTS ls_bank_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER,
+    item TEXT NOT NULL,
+    quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
+    acquisition_kind TEXT NOT NULL CHECK(acquisition_kind IN ('Event Drop','Purchase','Manual')),
+    status TEXT NOT NULL DEFAULT 'Held' CHECK(status IN ('Held','Sold')),
+    purchase_gil INTEGER NOT NULL DEFAULT 0 CHECK(purchase_gil >= 0),
+    sale_gil INTEGER NOT NULL DEFAULT 0 CHECK(sale_gil >= 0),
+    sale_channel TEXT NOT NULL DEFAULT '' CHECK(sale_channel IN ('','Auction House','Bazaar')),
+    holder_member_id INTEGER,
+    acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    sold_at TEXT,
+    notes TEXT NOT NULL DEFAULT '',
+    recorded_by INTEGER,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE SET NULL,
+    FOREIGN KEY (holder_member_id) REFERENCES members(id) ON DELETE SET NULL,
+    FOREIGN KEY (recorded_by) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_ls_bank_status ON ls_bank_items(status, acquired_at DESC);
+
 CREATE TABLE IF NOT EXISTS endgame_pop_inventory (
     member_id INTEGER NOT NULL,
     item_key TEXT NOT NULL,
