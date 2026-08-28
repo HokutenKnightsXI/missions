@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Endgame Operations · Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=20) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=21) }}">{% endblock %}
 {% block content %}
 <section class="endgame-shell">
   <header class="endgame-hero">
@@ -31,13 +31,6 @@
 
   <div data-endgame-view-panel="dkp-loot" hidden>
 
-  <div class="endgame-kpis">
-    <article><span>Active roster</span><b>{{ roster|length }}</b><small>3 DKP earned per attended event</small></article>
-    <article><span>Highest DKP</span><b>{{ dkp_highest }} DKP</b><small>Highest available member balance</small></article>
-    <article><span>Average balance</span><b>{{ dkp_average }} DKP</b><small>Across the active roster</small></article>
-    <article><span>Bid Cap</span><b>{{ dkp_bid_cap }} DKP</b><small>Highest DKP minus average DKP · 20 DKP minimum</small></article>
-  </div>
-
   <nav class="endgame-tabs dkp-loot-tabs" aria-label="DKP and loot sections">
     <button class="active" type="button" data-endgame-tab="bidding-live"><span>01</span>Active Bidding</button>
     <button type="button" data-endgame-tab="jobs"><span>02</span>Member Detail</button>
@@ -49,7 +42,7 @@
   <section class="endgame-panel active" data-endgame-panel="bidding-live">
     <header class="panel-heading"><div><p class="eyebrow">Pre-fight DKP auctions</p><h2>Active Bidding</h2><p>Bid on eligible boss drops, follow the live countdown, and review the latest bids.</p></div><span class="rule-chip">Two-minute auction · Whole DKP</span></header>
     {% if can_create_guild_events() %}<form class="auction-create-form" method="post" action="{{ url_for('create_endgame_auction') }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label>Endgame event<select name="event_id" required><option value="">Select an event</option>{% for event in guild_events if event.event_kind == 'Endgame' %}<option value="{{ event.id }}">{{ event.start_at[:10] }} · {{ event.name }}</option>{% endfor %}</select></label><label>Sky god or Sea jailer<select name="boss" required><option value="">Select a boss</option>{% for area in ('Sky','Sea') %}<optgroup label="{{ area }}">{% for group in priority_items|selectattr('area','equalto',area)|groupby('source') %}<option value="{{ group.grouper }}">{{ group.grouper }}</option>{% endfor %}</optgroup>{% endfor %}</select></label><label>Auction timer<select name="duration_minutes" required>{% for minute in range(3, 11) %}<option value="{{ minute }}" {{ 'selected' if minute == 5 }}>{{ minute }} minutes</option>{% endfor %}</select></label><button class="button primary" type="submit">Start Auction</button></form>{% endif %}
-    <div class="auction-status-strip"><span>Available DKP <b id="auction-my-dkp">—</b></span><span>Current Bid Cap <b id="auction-bid-cap">—</b></span><span>Highest DKP <b id="auction-highest-dkp">—</b></span></div>
+    <div class="auction-status-strip"><span>Available DKP <b data-auction-metric="my-dkp">—</b></span><span>Current Bid Cap <b data-auction-metric="bid-cap">—</b></span><span>Highest DKP <b data-auction-metric="highest-dkp">—</b></span></div>
     <div class="active-auctions" id="active-auctions"><p class="event-empty">Loading active bidding…</p></div>
     <details class="recent-bids-panel past-activity-panel"><summary><div><p class="eyebrow">Past activity</p><h3>Past Activity</h3></div><span id="auction-refresh-state">Refreshing automatically</span></summary><div id="recent-auction-bids" class="recent-auction-bids"></div></details>
     <aside class="auction-item-tooltip" id="auction-item-tooltip" hidden role="tooltip"></aside>
@@ -75,13 +68,13 @@
       <input id="priority-major" type="hidden" value="major">
     </div>
     <div class="priority-tiers" id="priority-tiers"></div>
-    <div class="dkp-cap-visual"><div><span>Bid Cap</span><b>{{ dkp_bid_cap }} DKP</b></div><div class="dkp-cap-track"><i style="width:{{ (dkp_average / dkp_highest * 100) if dkp_highest else 0 }}%"></i></div><p>Highest <strong>{{ dkp_highest }} DKP</strong> − Average <strong>{{ dkp_average }} DKP</strong> · minimum <strong>20 DKP</strong></p></div>
     <div class="priority-summary"><div><span>Calculated order</span><b id="priority-title">Black Cloak · BLM</b></div><p id="priority-note">Eligible registered BLMs ranked under the current rules.</p></div>
     <div class="endgame-table-wrap"><table class="endgame-table priority-table"><thead><tr><th>Rank</th><th>Member</th><th>Priority tier / job</th><th>DKP</th><th>Bid status</th><th>Why here</th></tr></thead><tbody id="priority-body"></tbody></table></div>
   </section>
 
   <section class="endgame-panel" data-endgame-panel="jobs" hidden>
     <header class="panel-heading"><div><p class="eyebrow">Member DKP ledger</p><h2>Member Detail</h2><p>Review each member's available balance, spending, lifetime earnings, and most recent attended event.</p></div></header>
+    <div class="auction-status-strip member-dkp-status-strip" aria-label="Your DKP bidding summary"><span>Available DKP <b data-auction-metric="my-dkp">—</b></span><span>Current Bid Cap <b data-auction-metric="bid-cap">—</b></span><span>Highest DKP <b data-auction-metric="highest-dkp">—</b></span></div>
     <div class="roster-toolbar member-search-toolbar"><label>Find a member<input id="endgame-roster-search" placeholder="Search character"></label></div>
     <div class="endgame-table-wrap"><table class="endgame-table roster-standing-table"><thead><tr>{% for label,key,type in [('Member','name','text'),('Dynamis lots','dynamis','text'),('DKP balance','dkp','number'),('Total spent','spent','number'),('Lifetime earned','earned','number'),('Last event','last','date')] %}<th><button class="roster-sort" type="button" data-roster-sort="{{ key }}" data-sort-type="{{ type }}">{{ label }} <span>Sort</span></button></th>{% endfor %}<th></th></tr><tr class="roster-column-filters"><th><input data-roster-filter="name" placeholder="Filter member"></th><th><input data-roster-filter="dynamis" placeholder="Main or secondary"></th><th><input type="number" min="0" data-roster-filter="dkp" data-filter-mode="min" placeholder="Min balance"></th><th><input type="number" min="0" data-roster-filter="spent" data-filter-mode="min" placeholder="Min spent"></th><th><input type="number" min="0" data-roster-filter="earned" data-filter-mode="min" placeholder="Min earned"></th><th><input data-roster-filter="last" placeholder="YYYY-MM-DD"></th><th><button class="clear-roster-filters" type="button">Clear</button></th></tr></thead><tbody id="endgame-roster-body">
       {% for member in roster %}<tr data-name="{{ member.name|lower }}" data-jobs="" data-dkp="{{ member.dkp }}" data-spent="{{ member.total_spent }}" data-earned="{{ member.lifetime_earned }}" data-last="{{ member.last_event }}"><td><b>{{ member.name }}</b><small>Active raider</small></td><td><strong class="dkp-balance">{{ member.dkp }}</strong></td><td>{{ member.total_spent }}</td><td>{{ member.lifetime_earned }}</td><td>{{ member.last_event }}</td><td><button class="row-menu" type="button" aria-label="Open {{ member.name }} details">•••</button></td></tr>{% endfor %}
