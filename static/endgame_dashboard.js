@@ -180,9 +180,9 @@
     const currentAuctions = payload.current_auctions || payload.auctions.filter(auction => auction.status !== "Confirmed");
     const pastAuctions = payload.past_auctions || payload.auctions.filter(auction => auction.status === "Confirmed");
     const displayedAuctions = [...currentAuctions, ...pastAuctions];
-    document.querySelector("#auction-my-dkp").textContent = `${payload.my_available} DKP${payload.my_reserved ? ` (${payload.my_reserved} committed)` : ""}`;
-    document.querySelector("#auction-bid-cap").textContent = `${payload.dkp.cap} DKP`;
-    document.querySelector("#auction-highest-dkp").textContent = `${payload.dkp.highest} DKP`;
+    document.querySelectorAll('[data-auction-metric="my-dkp"]').forEach(metric => { metric.textContent = `${payload.my_available} DKP${payload.my_reserved ? ` (${payload.my_reserved} committed)` : ""}`; });
+    document.querySelectorAll('[data-auction-metric="bid-cap"]').forEach(metric => { metric.textContent = `${payload.dkp.cap} DKP`; });
+    document.querySelectorAll('[data-auction-metric="highest-dkp"]').forEach(metric => { metric.textContent = `${payload.dkp.highest} DKP`; });
     auctionTooltips = Object.fromEntries(payload.auctions.flatMap(auction => auction.items.map(item => [String(item.id), item.tooltip || {}])));
     auctionRecords = new Map(payload.auctions.map(auction => [String(auction.id), auction]));
     auctionRoot.innerHTML = displayedAuctions.length ? displayedAuctions.map((auction, index) => {

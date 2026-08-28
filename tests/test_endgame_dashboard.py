@@ -1,5 +1,6 @@
 import json
 
+import missions
 from missions import ENDGAME_PRIORITY_ITEMS, create_app
 
 
@@ -27,6 +28,20 @@ def test_dragoon_has_tier_one_priority_on_all_hecatomb_gear():
         "Hecatomb Mittens", "Hecatomb Leggings", "Hecatomb Harness",
     }
     assert all("DRG" in item["p1"] for item in hecatomb_items)
+
+
+def test_whm_and_pup_sky_priority_updates():
+    zenith_slacks = [item for item in ENDGAME_PRIORITY_ITEMS if item["name"] == "Zenith Slacks"]
+    zenith_mitts = next(item for item in ENDGAME_PRIORITY_ITEMS if item["name"] == "Zenith Mitts")
+    dryadic_items = [
+        item for item in (*ENDGAME_PRIORITY_ITEMS, *missions.ENDGAME_AUCTION_EXTRA_DROPS)
+        if item["name"] in {"Shura Haidate", "Shura Zunari Kabuto", "Shura Kote", "Shura Togi", "Dryadic Abjuration: Feet"}
+    ]
+
+    assert zenith_slacks and all("WHM" in item["p1"] for item in zenith_slacks)
+    assert "WHM" in zenith_mitts["p3"]
+    assert len(dryadic_items) == 5
+    assert all("PUP" in item["p1"] for item in dryadic_items)
 
 
 def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
@@ -101,9 +116,8 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert b"Interactive prototype" not in response.data
     assert b"Current bid cap" not in response.data
     assert b"Highest DKP" in response.data
-    assert b"Average balance" in response.data
-    assert b"Bid Cap" in response.data
-    assert b"6 DKP" in response.data
+    assert b"Average balance" not in response.data
+    assert response.data.count(b'data-auction-metric=') == 6
     assert b'"name": "Zenith Mitts"' in response.data
     assert b'"required_level": 73' in response.data
     assert b"P1 may bid" in response.data
