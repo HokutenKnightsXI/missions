@@ -228,6 +228,13 @@
       const sectionHeading = (currentAuctions.length && index === 0) ? `<h3 class="auction-section-title">Current Auctions</h3>` : (pastAuctions.length && index === currentAuctions.length ? `<h3 class="auction-section-title">Past Auctions</h3>` : "");
       return `${sectionHeading}<section id="auction-${auction.id}" class="auction-card ${active ? "active" : "closed"} ${completed ? "completed" : ""} ${auction.paused ? "paused" : ""}"><header><div><span>${safeText(auction.area)} · ${safeText(auction.event_name)}</span><h3>${safeText(auction.boss)}</h3>${pauseControl}${completeControl}${stopControl}</div><div class="auction-clock"><small>${completed ? "Winners / DKP Completed" : (auction.paused ? "Countdown frozen" : (active ? "Bidding closes in" : "Bidding closed"))}</small><b data-auction-ends="${auction.ends_at}" data-auction-paused="${auction.paused ? "true" : "false"}">${auction.paused ? "PAUSED" : (active ? countdownText(auction.ends_at) : "00:00")}</b></div></header>${!active && !completed && payload.is_admin ? `<form id="confirm-auction-${auction.id}" class="auction-confirm-form" method="post" action="/endgame/auctions/${auction.id}/confirm"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><p>Review the suggested winners, then confirm the items that actually dropped.</p></form>` : ""}<div class="auction-item-grid">${items}</div>${!active && !completed && payload.is_admin ? `<button class="button primary auction-confirm-button" type="submit" form="confirm-auction-${auction.id}">Confirm Winners &amp; Deduct DKP</button>` : ""}${completed ? `<p class="auction-completed-note">Winners / DKP Completed${auction.award_count ? ` · ${auction.award_count} award${auction.award_count === 1 ? "" : "s"}` : ""}</p>` : ""}</section>`;
     }).join("") : '<p class="event-empty">No active or recently closed auctions. An administrator can start one for an Endgame event above.</p>';
+    displayedAuctions.filter(auction => auction.status === "Confirmed").forEach(auction => {
+      const cards = [...document.querySelectorAll(`#auction-${auction.id} .auction-item-card`)];
+      auction.items.forEach((item, index) => {
+        if (!item.awards?.length || !cards[index]) return;
+        cards[index].querySelector(".auction-bid-list")?.insertAdjacentHTML("afterend", `<div class="auction-award-summary">${item.awards.map(award => `<span><b>${safeText(award.recipient)}</b> · ${safeText(award.job)} · ${Number(award.dkp_cost)} DKP · ${safeText(award.distribution)}</span>`).join("")}</div>`);
+      });
+    });
     displayedAuctions.forEach(auction => {
       const card = document.getElementById(`auction-${auction.id}`);
       const heading = card?.querySelector("header h3");
@@ -566,15 +573,43 @@
     }
     if (!auction || !auctionDetailDialog) return;
     const status = auction.status === "Confirmed" ? "Winners / DKP Completed" : auction.status;
+    const members = window.ENDGAME_MEMBERS || [];
+    const awardEditor = award => {
+      const recipientOptions = members.map(member => `<option value="${member.id}" ${member.id === award.recipient_member_id ? "selected" : ""}>${safeText(member.name)}</option>`).join("");
+      const jobOptions = (window.ENDGAME_JOBS || []).map(job => `<option ${job === award.job ? "selected" : ""}>${job}</option>`).join("");
+      const priorityOptions = ["P1", "P2", "P3", "Freelot"].map(priority => `<option ${priority === award.distribution ? "selected" : ""}>${priority}</option>`).join("");
+      return `<form class="auction-award-editor" method="post" action="/endgame/loot/${award.id}/update" data-auction-id="${auction.id}"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF)}"><input type="hidden" name="family" value="${safeText(award.family || "Other")}"><input type="hidden" name="classification" value="${safeText(award.classification || "Major Loot")}"><input type="hidden" name="return_to" value="bidding"><label>Item<input name="item" value="${safeText(award.item)}" required></label><label>Recipient<select name="member_id" required>${recipientOptions}</select></label><label>Job<select name="job" required>${jobOptions}</select></label><label>Priority<select name="distribution" required>${priorityOptions}</select></label><label>DKP<input type="number" name="dkp_cost" min="0" max="999" step="1" value="${Number(award.dkp_cost || 0)}" required></label><div><button class="button primary" type="submit">Save Award</button><button class="button danger" type="submit" formaction="/endgame/loot/${award.id}/delete">Remove &amp; Restore DKP</button></div></form>`;
+    };
     const items = auction.items.map(item => {
       const bids = item.bids.length ? `<ul>${item.bids.map(bid => `<li><b>${safeText(bid.name)}</b> / ${safeText(bid.job)} / ${bid.amount} DKP / ${bid.tier === 4 ? "Freelot" : `P${bid.tier}`}</li>`).join("")}</ul>` : "<p>No bids were placed.</p>";
-      return `<article class="auction-detail-item"><h3>${safeText(item.item)}</h3>${item.target_item && item.target_item !== item.item ? `<small>${safeText(item.target_item)}</small>` : ""}${bids}</article>`;
+      const awards = item.awards?.length ? `<section class="auction-detail-awards"><h4>Confirmed awards</h4>${item.awards.map(award => window.ENDGAME_IS_ADMIN ? awardEditor(award) : `<p><b>${safeText(award.item)}</b> / ${safeText(award.recipient)} / ${award.dkp_cost} DKP</p>`).join("")}</section>` : "";
+      return `<article class="auction-detail-item"><h3>${safeText(item.item)}</h3>${item.target_item && item.target_item !== item.item ? `<small>${safeText(item.target_item)}</small>` : ""}${bids}${awards}</article>`;
     }).join("");
     auctionDetailTitle.textContent = `Auction #${auction.id} / ${auction.boss}`;
     auctionDetailContent.innerHTML = `<p class="auction-detail-meta"><b>Event:</b> ${safeText(auction.event_name)} / ${safeText(auction.area)} / ${safeText(status)}</p><div class="auction-detail-items">${items}</div>`;
     if (!auctionDetailDialog.open) auctionDetailDialog.showModal();
   };
   document.querySelector(".auction-detail-close")?.addEventListener("click", () => auctionDetailDialog?.close());
+  auctionDetailContent?.addEventListener("submit", async event => {
+    const form = event.target.closest(".auction-award-editor");
+    if (!form) return;
+    event.preventDefault();
+    const submitter = event.submitter;
+    if (submitter?.formAction?.includes("/delete") && !confirm("Remove this award and restore its DKP to the recipient?")) return;
+    const controls = [...form.querySelectorAll("button")];
+    controls.forEach(button => { button.disabled = true; });
+    try {
+      const response = await fetch(submitter?.formAction || form.action, {
+        method: "POST", body: new FormData(form), headers: {"Accept": "text/html"}, credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error("The archived award could not be updated.");
+      await loadAuctions();
+      await openAuctionDetail(form.dataset.auctionId);
+    } catch (error) {
+      alert(error.message);
+      controls.forEach(button => { button.disabled = false; });
+    }
+  });
   const eventStoreKey = "hokuten-event-overrides";
   const eventOverrides = JSON.parse(localStorage.getItem(eventStoreKey) || "{}");
   const eventState = button => {

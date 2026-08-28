@@ -1432,6 +1432,8 @@ def create_app(test_config=None):
             )
         if "auction_id" not in loot_award_columns:
             get_db().execute("ALTER TABLE endgame_loot_awards ADD COLUMN auction_id INTEGER")
+        if "auction_item_id" not in loot_award_columns:
+            get_db().execute("ALTER TABLE endgame_loot_awards ADD COLUMN auction_item_id INTEGER")
         get_db().execute(
             """UPDATE endgame_loot_awards AS award SET auction_id=(
                    SELECT auction.id FROM endgame_auction_items item
@@ -1448,6 +1450,14 @@ def create_app(test_config=None):
                END
                WHERE event_id IN (SELECT id FROM guild_events WHERE substr(start_at,1,10)='2026-08-20')
                AND lower(item) IN ('w hands','n hands','d legs')"""
+        )
+        get_db().execute(
+            """UPDATE endgame_loot_awards AS award SET auction_item_id=(
+                   SELECT item.id FROM endgame_auction_items item
+                   WHERE item.auction_id=award.auction_id
+                     AND (item.item=award.item OR item.target_item=award.item)
+                   ORDER BY item.id LIMIT 1
+               ) WHERE auction_id IS NOT NULL AND auction_item_id IS NULL"""
         )
         auction_item_columns = {
             row["name"] for row in get_db().execute("PRAGMA table_info(endgame_auction_items)")
@@ -3112,10 +3122,26 @@ def create_app(test_config=None):
             auction = dict(row)
             auction["paused"] = bool(auction.get("paused_at"))
             auction["items"] = []
+            awards_by_item = {}
+            for award_row in get_db().execute(
+                """SELECT l.id,l.auction_item_id,l.item,l.job,l.family,l.distribution,l.classification,l.dkp_cost,
+                          l.recipient_member_id,m.name recipient
+                   FROM endgame_loot_awards l JOIN members m ON m.id=l.recipient_member_id
+                   WHERE l.auction_id=? ORDER BY l.id""", (row["id"],)
+            ).fetchall():
+                award = dict(award_row)
+                awards_by_item.setdefault(award["auction_item_id"], []).append(award)
+            legacy_auction_awards = awards_by_item.pop(None, [])
             for item_row in get_db().execute(
                 "SELECT * FROM endgame_auction_items WHERE auction_id=? ORDER BY id", (row["id"],)
             ).fetchall():
                 item = dict(item_row)
+                item["awards"] = awards_by_item.pop(item["id"], [])
+                # Legacy awards made before auction-item links existed still appear with their auction.
+                item["awards"].extend(
+                    award for award in legacy_auction_awards
+                    if award["item"] in {item["item"], item.get("target_item")}
+                )
                 tooltip_source_name = item.get("target_item") or item["item"]
                 tooltip_name = AUCTION_TOOLTIP_ITEM_ALIASES.get(tooltip_source_name, tooltip_source_name)
                 tooltip_item = AUCTION_TOOLTIP_OVERRIDES.get(
@@ -3455,10 +3481,10 @@ def create_app(test_config=None):
             tier = auction_priority_tier(item, bid["job"])
             get_db().execute(
                 """INSERT INTO endgame_loot_awards
-                   (event_id,recipient_member_id,item,job,family,distribution,classification,dkp_cost,auction_id,recorded_by)
-                   VALUES(?,?,?,?,?,?, 'Major Loot',?,?,?)""",
+                   (event_id,recipient_member_id,item,job,family,distribution,classification,dkp_cost,auction_id,auction_item_id,recorded_by)
+                   VALUES(?,?,?,?,?,?, 'Major Loot',?,?,?,?)""",
                 (auction["event_id"], winner_id, item["item"], bid["job"], item["family"],
-                 f"{'Freelot' if tier == 4 else f'P{tier}'}", bid["amount"], auction_id, actor["id"]),
+                 f"{'Freelot' if tier == 4 else f'P{tier}'}", bid["amount"], auction_id, item["id"], actor["id"]),
             )
             balances[winner_id]["balance"] -= bid["amount"]
             awards += 1
@@ -4186,7 +4212,7 @@ def create_app(test_config=None):
         ).fetchone() if member_id.isdigit() else None
         item = request.form.get("item", "").strip()[:120]
         job = request.form.get("job", "").strip().upper()
-        family = request.form.get("family", "").strip()
+        family = manual_loot_family(item) or request.form.get("family", "").strip()
         distribution = request.form.get("distribution", "").strip()
         classification = request.form.get("classification", "").strip()
         try:
@@ -4211,7 +4237,9 @@ def create_app(test_config=None):
         )
         get_db().commit()
         flash("Loot award updated.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor=("loot" if request.form.get("return_to") == "loot" else "events")))
+        return_to = request.form.get("return_to")
+        anchor = "loot" if return_to == "loot" else "bidding-live" if return_to == "bidding" else "events"
+        return redirect(url_for("endgame_dashboard", _anchor=anchor))
 
     @app.post("/endgame/loot/<int:award_id>/delete")
     @admin_required
@@ -4232,7 +4260,9 @@ def create_app(test_config=None):
         )
         get_db().commit()
         flash(f"Removed {award['item']} and restored {int(round(award['dkp_cost']))} DKP to {award['name']}.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor=("loot" if request.form.get("return_to") == "loot" else "events")))
+        return_to = request.form.get("return_to")
+        anchor = "loot" if return_to == "loot" else "bidding-live" if return_to == "bidding" else "events"
+        return redirect(url_for("endgame_dashboard", _anchor=anchor))
 
     @app.get("/api/job-roster/members")
     def job_roster_members_api():
