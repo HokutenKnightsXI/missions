@@ -1222,11 +1222,11 @@ def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     assert confirmed.status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
     award = database.execute(
-        "SELECT item,dkp_cost,distribution,auction_id FROM endgame_loot_awards WHERE item='Novio Earring' ORDER BY id DESC LIMIT 1"
+        "SELECT id,item,dkp_cost,distribution,auction_id,auction_item_id FROM endgame_loot_awards WHERE item='Novio Earring' ORDER BY id DESC LIMIT 1"
     ).fetchone()
     status = database.execute("SELECT status FROM endgame_auctions WHERE id=?", (auction_id,)).fetchone()[0]
     database.close()
-    assert award == ("Novio Earring", 2.0, "P1", auction_id)
+    assert award == (award[0], "Novio Earring", 2.0, "P1", auction_id, novio["id"])
     assert status == "Confirmed"
     assert client.get("/api/endgame/auctions").get_json()["my_balance"] == 3
     member_payload = client.get("/endgame").data.split(
@@ -1240,6 +1240,22 @@ def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     archived = client.get("/api/endgame/auctions").get_json()
     assert archived["past_auctions"][0]["id"] == auction_id
     assert archived["past_auctions"][0]["award_count"] == 1
+    archived_novio = next(item for item in archived["past_auctions"][0]["items"] if item["id"] == novio["id"])
+    assert archived_novio["awards"] == [{
+        "id": award[0], "auction_item_id": novio["id"], "item": "Novio Earring", "job": "BLM",
+        "family": "Accessories", "distribution": "P1", "classification": "Major Loot", "dkp_cost": 2.0,
+        "recipient_member_id": 1, "recipient": "Imaven",
+    }]
+    changed_award = client.post(f"/endgame/loot/{award[0]}/update", data={
+        "csrf_token": "token", "member_id": "1", "item": "Novio Earring", "job": "BLM",
+        "family": "Accessories", "distribution": "P1", "classification": "Major Loot", "dkp_cost": "1",
+        "return_to": "bidding",
+    })
+    assert changed_award.status_code == 302
+    changed_archive = client.get("/api/endgame/auctions").get_json()
+    changed_novio = next(item for item in changed_archive["past_auctions"][0]["items"] if item["id"] == novio["id"])
+    assert changed_novio["awards"][0]["dkp_cost"] == 1.0
+    assert changed_archive["my_balance"] == 4
     reopened = client.post(f"/endgame/auctions/{auction_id}/reopen", data={"csrf_token": "token"})
     assert reopened.status_code == 302
     reopened_payload = client.get("/api/endgame/auctions").get_json()

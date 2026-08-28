@@ -279,11 +279,13 @@ CREATE TABLE IF NOT EXISTS endgame_loot_awards (
     classification TEXT NOT NULL CHECK(classification IN ('Major Loot','Standard')),
     dkp_cost REAL NOT NULL DEFAULT 0 CHECK(dkp_cost >= 0),
     auction_id INTEGER,
+    auction_item_id INTEGER,
     awarded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     recorded_by INTEGER,
     FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,
     FOREIGN KEY (recipient_member_id) REFERENCES members(id) ON DELETE RESTRICT,
     FOREIGN KEY (auction_id) REFERENCES endgame_auctions(id) ON DELETE SET NULL,
+    FOREIGN KEY (auction_item_id) REFERENCES endgame_auction_items(id) ON DELETE SET NULL,
     FOREIGN KEY (recorded_by) REFERENCES members(id) ON DELETE SET NULL
 );
 
