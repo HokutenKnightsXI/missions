@@ -1453,6 +1453,12 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE ls_bank_items ADD COLUMN sale_channel TEXT NOT NULL DEFAULT ''")
         if bank_columns and "used_event_id" not in bank_columns:
             get_db().execute("ALTER TABLE ls_bank_items ADD COLUMN used_event_id INTEGER")
+        if bank_columns and "purchaser_member_id" not in bank_columns:
+            get_db().execute("ALTER TABLE ls_bank_items ADD COLUMN purchaser_member_id INTEGER")
+            get_db().execute(
+                """UPDATE ls_bank_items SET purchaser_member_id=holder_member_id
+                   WHERE acquisition_kind NOT IN ('Event Drop','Donation')"""
+            )
         get_db().execute(
             """UPDATE ls_bank_items SET status='Held'
                WHERE status='Purchased' AND used_event_id IS NULL AND notes NOT LIKE '%Used:%'"""
@@ -1474,22 +1480,23 @@ def create_app(test_config=None):
                     purchase_gil INTEGER NOT NULL DEFAULT 0 CHECK(purchase_gil >= 0),
                     sale_gil INTEGER NOT NULL DEFAULT 0 CHECK(sale_gil >= 0),
                     sale_channel TEXT NOT NULL DEFAULT '' CHECK(sale_channel IN ('','Auction House','Bazaar')),
-                    holder_member_id INTEGER, used_event_id INTEGER, acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, sold_at TEXT,
+                    holder_member_id INTEGER, purchaser_member_id INTEGER, used_event_id INTEGER, acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, sold_at TEXT,
                     notes TEXT NOT NULL DEFAULT '', recorded_by INTEGER, updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
                     FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE SET NULL,
                     FOREIGN KEY (holder_member_id) REFERENCES members(id) ON DELETE SET NULL,
+                    FOREIGN KEY (purchaser_member_id) REFERENCES members(id) ON DELETE SET NULL,
                     FOREIGN KEY (used_event_id) REFERENCES guild_events(id) ON DELETE SET NULL,
                     FOREIGN KEY (recorded_by) REFERENCES members(id) ON DELETE SET NULL
                 )"""
             )
             get_db().execute(
                 """INSERT INTO ls_bank_items(id,event_id,item,quantity,acquisition_kind,status,purchase_gil,sale_gil,
-                                                sale_channel,holder_member_id,used_event_id,acquired_at,sold_at,notes,recorded_by,updated_at)
+                                                sale_channel,holder_member_id,purchaser_member_id,used_event_id,acquired_at,sold_at,notes,recorded_by,updated_at)
                    SELECT id,event_id,item,quantity,CASE acquisition_kind
                               WHEN 'Purchase' THEN 'Auction House' WHEN 'Pop Item' THEN 'Other'
                               WHEN 'Timeless Hourglass' THEN 'Other' WHEN 'Merc Sell' THEN 'Mercenary'
                               WHEN 'Manual' THEN 'Other' ELSE acquisition_kind END,status,purchase_gil,sale_gil,
-                          COALESCE(sale_channel,''),holder_member_id,used_event_id,acquired_at,sold_at,notes,recorded_by,updated_at
+                          COALESCE(sale_channel,''),holder_member_id,COALESCE(purchaser_member_id,holder_member_id),used_event_id,acquired_at,sold_at,notes,recorded_by,updated_at
                    FROM ls_bank_items_legacy"""
             )
             get_db().execute("DROP TABLE ls_bank_items_legacy")
@@ -2991,11 +2998,12 @@ def create_app(test_config=None):
                 "events": event_history, "loot": loot_history,
             }
         bank_items = [dict(row) for row in get_db().execute(
-            """SELECT b.*,e.name event_name,e.start_at event_start,h.name holder_name,
+            """SELECT b.*,e.name event_name,e.start_at event_start,h.name holder_name,p.name purchaser_name,
                       u.name used_event_name,u.start_at used_event_start
                FROM ls_bank_items b
                LEFT JOIN guild_events e ON e.id=b.event_id
                LEFT JOIN members h ON h.id=b.holder_member_id
+               LEFT JOIN members p ON p.id=b.purchaser_member_id
                LEFT JOIN guild_events u ON u.id=b.used_event_id
                ORDER BY CASE b.status WHEN 'Held' THEN 0 WHEN 'Purchased' THEN 1 ELSE 2 END,b.acquired_at DESC,b.id DESC"""
         ).fetchall()]
@@ -4320,6 +4328,7 @@ def create_app(test_config=None):
         item = request.form.get("item", "").strip()[:120]
         event_id = request.form.get("event_id", "").strip()
         holder_id = request.form.get("holder_member_id", "").strip()
+        purchaser_id = request.form.get("purchaser_member_id", "").strip() or holder_id
         acquisition_kind = request.form.get("acquisition_kind", "").strip()
         status = request.form.get("status", "Held").strip()
         status = "Held" if status == "Drop" else status
@@ -4331,6 +4340,7 @@ def create_app(test_config=None):
         purchase_gil = bank_gil_value(request.form.get("purchase_gil"))
         event = get_db().execute("SELECT id FROM guild_events WHERE id=?", (event_id,)).fetchone() if event_id.isdigit() else None
         holder = get_db().execute("SELECT id,name FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
+        purchaser = get_db().execute("SELECT id,name FROM members WHERE id=?", (purchaser_id,)).fetchone() if purchaser_id.isdigit() else None
         sale_gil = 0
         if acquisition_kind in {"Merc Sell", "Mercenary"}:
             status, sale_gil, purchase_gil = "Sold", purchase_gil, 0
@@ -4341,14 +4351,14 @@ def create_app(test_config=None):
                 or status not in {"Held", "Purchased", "Sold"}
                 or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
                 or (acquisition_kind == "Mercenary" and sale_gil <= 0)
-                or (event_id and not event) or (holder_id and not holder)):
+                or (event_id and not event) or (holder_id and not holder) or (purchaser_id and not purchaser)):
             abort(400, description="Complete the LS Bank item using valid values.")
         actor = require_member_identity()
         get_db().execute(
-            """INSERT INTO ls_bank_items(event_id,item,quantity,acquisition_kind,status,purchase_gil,sale_gil,holder_member_id,notes,recorded_by)
-               VALUES(?,?,?,?,?,?,?,?,?,?)""",
+            """INSERT INTO ls_bank_items(event_id,item,quantity,acquisition_kind,status,purchase_gil,sale_gil,holder_member_id,purchaser_member_id,notes,recorded_by)
+               VALUES(?,?,?,?,?,?,?,?,?,?,?)""",
             (event["id"] if event else None, item, quantity, acquisition_kind, status, purchase_gil, sale_gil,
-             holder["id"] if holder else None, notes, actor["id"]),
+             holder["id"] if holder else None, purchaser["id"] if purchaser else None, notes, actor["id"]),
         )
         get_db().execute(
             "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
@@ -4364,6 +4374,7 @@ def create_app(test_config=None):
         if not entry:
             abort(404)
         holder_id = request.form.get("holder_member_id", "").strip()
+        purchaser_id = request.form.get("purchaser_member_id", "").strip() or holder_id
         status = request.form.get("status", "").strip()
         acquisition_kind = request.form.get("acquisition_kind", entry["acquisition_kind"]).strip()
         event_id = request.form.get("event_id", "").strip()
@@ -4375,12 +4386,13 @@ def create_app(test_config=None):
         submitted_notes = request.form.get("notes")
         notes = entry["notes"] if not (submitted_notes or "").strip() else submitted_notes.strip()[:500]
         holder = get_db().execute("SELECT id,name FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
+        purchaser = get_db().execute("SELECT id,name FROM members WHERE id=?", (purchaser_id,)).fetchone() if purchaser_id.isdigit() else None
         event = get_db().execute("SELECT id FROM guild_events WHERE id=?", (event_id,)).fetchone() if event_id.isdigit() else None
         if acquisition_kind in {"Merc Sell", "Mercenary"}:
             status, sale_gil, purchase_gil = "Sold", purchase_gil, 0
         elif acquisition_kind in {"Pop Item", "Timeless Hourglass"}:
             status, sale_gil = "Purchased", 0
-        if (status not in {"Held", "Purchased", "Sold"} or sale_gil < 0 or purchase_gil < 0 or (holder_id and not holder)
+        if (status not in {"Held", "Purchased", "Sold"} or sale_gil < 0 or purchase_gil < 0 or (holder_id and not holder) or (purchaser_id and not purchaser)
                 or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
                 or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
                 or (acquisition_kind == "Mercenary" and sale_gil <= 0)
@@ -4391,10 +4403,10 @@ def create_app(test_config=None):
         actor = require_member_identity()
         sale_gil = sale_gil if status == "Sold" else 0
         get_db().execute(
-            """UPDATE ls_bank_items SET event_id=?,acquisition_kind=?,purchase_gil=?,holder_member_id=?,status=?,sale_gil=?,sale_channel=?,notes=?,
+            """UPDATE ls_bank_items SET event_id=?,acquisition_kind=?,purchase_gil=?,holder_member_id=?,purchaser_member_id=?,status=?,sale_gil=?,sale_channel=?,notes=?,
                        sold_at=CASE WHEN ?='Sold' THEN COALESCE(sold_at,CURRENT_TIMESTAMP) ELSE NULL END,
                        updated_at=CURRENT_TIMESTAMP WHERE id=?""",
-            (event["id"] if event else None, acquisition_kind, purchase_gil, holder["id"] if holder else None,
+            (event["id"] if event else None, acquisition_kind, purchase_gil, holder["id"] if holder else None, purchaser["id"] if purchaser else None,
              status, sale_gil, sale_channel, notes, status, bank_item_id),
         )
         get_db().execute(
@@ -4446,20 +4458,25 @@ def create_app(test_config=None):
     def bulk_update_ls_bank_items():
         ids = request.form.getlist("entry_id")
         holders = request.form.getlist("holder_member_id")
+        purchasers = request.form.getlist("purchaser_member_id")
+        if not purchasers:
+            purchasers = list(holders)
         statuses = request.form.getlist("status")
         sales = request.form.getlist("sale_gil")
         sources = request.form.getlist("acquisition_kind")
         events = request.form.getlist("event_id")
         purchases = request.form.getlist("purchase_gil")
         notes_list = request.form.getlist("notes")
-        if not ids or not (len(ids) == len(holders) == len(statuses) == len(sales) == len(sources) == len(events) == len(purchases) == len(notes_list)):
+        if not ids or not (len(ids) == len(holders) == len(purchasers) == len(statuses) == len(sales) == len(sources) == len(events) == len(purchases) == len(notes_list)):
             abort(400, description="The LS Bank rows could not be saved together.")
         updates = []
-        for entry_id, holder_id, status, raw_sale_gil, acquisition_kind, event_id, raw_purchase_gil, notes in zip(ids, holders, statuses, sales, sources, events, purchases, notes_list):
+        for entry_id, holder_id, purchaser_id, status, raw_sale_gil, acquisition_kind, event_id, raw_purchase_gil, notes in zip(ids, holders, purchasers, statuses, sales, sources, events, purchases, notes_list):
             if not entry_id.isdigit():
                 abort(400, description="The LS Bank row is invalid.")
             entry = get_db().execute("SELECT id,item,quantity,sale_gil FROM ls_bank_items WHERE id=?", (entry_id,)).fetchone()
             holder = get_db().execute("SELECT id FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
+            purchaser_id = purchaser_id or holder_id
+            purchaser = get_db().execute("SELECT id FROM members WHERE id=?", (purchaser_id,)).fetchone() if purchaser_id.isdigit() else None
             event = get_db().execute("SELECT id FROM guild_events WHERE id=?", (event_id,)).fetchone() if event_id.isdigit() else None
             sale_gil = entry["sale_gil"] if entry and status == "Sold" and not str(raw_sale_gil).strip() else (0 if not str(raw_sale_gil).strip() else bank_gil_value(raw_sale_gil))
             purchase_gil = bank_gil_value(raw_purchase_gil)
@@ -4475,17 +4492,17 @@ def create_app(test_config=None):
                     or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
                     or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
                     or (acquisition_kind == "Mercenary" and sale_gil <= 0)
-                    or (event_id and not event) or (holder_id and not holder)):
+                    or (event_id and not event) or (holder_id and not holder) or (purchaser_id and not purchaser)):
                 abort(400, description="Use valid LS Bank values before saving all rows.")
-            updates.append((event["id"] if event else None, acquisition_kind, purchase_gil, holder["id"] if holder else None, status, sale_gil if status == "Sold" else 0,
+            updates.append((event["id"] if event else None, acquisition_kind, purchase_gil, holder["id"] if holder else None, purchaser["id"] if purchaser else None, status, sale_gil if status == "Sold" else 0,
                             notes.strip()[:500], status, entry["id"], entry["item"], entry["quantity"]))
         actor = require_member_identity()
-        for event_id, acquisition_kind, purchase_gil, holder_id, status, sale_gil, notes, sold_status, entry_id, item, quantity in updates:
+        for event_id, acquisition_kind, purchase_gil, holder_id, purchaser_id, status, sale_gil, notes, sold_status, entry_id, item, quantity in updates:
             get_db().execute(
-                """UPDATE ls_bank_items SET event_id=?,acquisition_kind=?,purchase_gil=?,holder_member_id=?,status=?,sale_gil=?,sale_channel='',notes=?,
+                """UPDATE ls_bank_items SET event_id=?,acquisition_kind=?,purchase_gil=?,holder_member_id=?,purchaser_member_id=?,status=?,sale_gil=?,sale_channel='',notes=?,
                            sold_at=CASE WHEN ?='Sold' THEN COALESCE(sold_at,CURRENT_TIMESTAMP) ELSE NULL END,
                            updated_at=CURRENT_TIMESTAMP WHERE id=?""",
-                (event_id, acquisition_kind, purchase_gil, holder_id, status, sale_gil, notes, sold_status, entry_id),
+                (event_id, acquisition_kind, purchase_gil, holder_id, purchaser_id, status, sale_gil, notes, sold_status, entry_id),
             )
             get_db().execute(
                 "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",

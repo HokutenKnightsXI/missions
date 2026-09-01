@@ -358,6 +358,7 @@ CREATE TABLE IF NOT EXISTS ls_bank_items (
     sale_gil INTEGER NOT NULL DEFAULT 0 CHECK(sale_gil >= 0),
     sale_channel TEXT NOT NULL DEFAULT '' CHECK(sale_channel IN ('','Auction House','Bazaar')),
     holder_member_id INTEGER,
+    purchaser_member_id INTEGER,
     used_event_id INTEGER,
     acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     sold_at TEXT,
@@ -366,6 +367,7 @@ CREATE TABLE IF NOT EXISTS ls_bank_items (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE SET NULL,
     FOREIGN KEY (holder_member_id) REFERENCES members(id) ON DELETE SET NULL,
+    FOREIGN KEY (purchaser_member_id) REFERENCES members(id) ON DELETE SET NULL,
     FOREIGN KEY (used_event_id) REFERENCES guild_events(id) ON DELETE SET NULL,
     FOREIGN KEY (recorded_by) REFERENCES members(id) ON DELETE SET NULL
 );
