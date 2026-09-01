@@ -4527,6 +4527,14 @@ def create_app(test_config=None):
         get_db().commit()
         return bank_saved_response("Removed the LS Bank entry.", deleted=True)
 
+    @app.get("/endgame/bank/purchasers")
+    @admin_required
+    def ls_bank_purchasers():
+        rows = get_db().execute(
+            "SELECT id,purchaser_member_id FROM ls_bank_items"
+        ).fetchall()
+        return jsonify({"purchasers": {str(row["id"]): row["purchaser_member_id"] for row in rows}})
+
     @app.post("/endgame/loot/<int:award_id>/update")
     @admin_required
     def update_endgame_loot(award_id):
