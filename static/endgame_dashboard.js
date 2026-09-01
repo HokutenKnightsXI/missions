@@ -308,7 +308,17 @@
       return editor;
     };
     addInlineEditor(row.cells[1], [source, event]);
-    addInlineEditor(row.cells[2], [form.elements.holder_member_id, purchaser]);
+    const holderLabel = document.createElement("label");
+    holderLabel.className = "bank-inline-field-label";
+    holderLabel.textContent = "Held by";
+    form.elements.holder_member_id.setAttribute("form", form.id);
+    holderLabel.append(form.elements.holder_member_id);
+    const purchaserLabel = document.createElement("label");
+    purchaserLabel.className = "bank-inline-field-label";
+    purchaserLabel.textContent = "Purchased by";
+    purchaser.setAttribute("form", form.id);
+    purchaserLabel.append(purchaser);
+    addInlineEditor(row.cells[2], [holderLabel, purchaserLabel]);
     const purchaseEditor = addInlineEditor(row.cells[3], [purchase]);
     const isUsed = /\bUsed:/.test(row.cells[0]?.textContent || "");
     const heldInventory = ["held", "purchased"].includes(row.dataset.status) && !isUsed;
@@ -779,6 +789,17 @@
   });
   if (document.querySelector(".ls-bank-panel")) {
     filterBankRows();
+    fetch("/endgame/bank/purchasers", {headers: {"Accept": "application/json"}})
+      .then(response => response.ok ? response.json() : Promise.reject())
+      .then(payload => {
+        document.querySelectorAll(".ls-bank-row-editor").forEach(form => {
+          const id = form.action.match(/\/bank\/(\d+)\/update/)?.[1];
+          const purchaser = form.elements.purchaser_member_id;
+          const storedPurchaser = id ? payload.purchasers?.[id] : null;
+          if (purchaser && storedPurchaser) purchaser.value = String(storedPurchaser);
+        });
+      })
+      .catch(() => {});
     fetch("/api/market-prices", {headers: {"Accept": "application/json"}})
       .then(response => response.ok ? response.json() : Promise.reject())
       .then(snapshot => { updateBankItemCatalog(snapshot.prices); updateBankMarketValues(snapshot.prices); })
