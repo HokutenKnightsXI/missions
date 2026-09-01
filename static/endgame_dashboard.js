@@ -171,6 +171,16 @@
   const formatBankGil = value => `${Math.max(0, Math.round(Number(value) || 0)).toLocaleString()}g`;
   const bankItemInput = document.querySelector("#ls-bank-item");
   const bankItemCatalog = document.querySelector("#ls-bank-item-catalog");
+  const bankSource = document.querySelector("#ls-bank-source");
+  const bankNewStatus = document.querySelector("#ls-bank-new-status");
+  bankSource?.addEventListener("change", () => {
+    if (["Pop Item", "Timeless Hourglass"].includes(bankSource.value) && bankNewStatus) bankNewStatus.value = "Purchased";
+  });
+  document.querySelectorAll(".ls-bank-row-editor select[name='status']").forEach(select => {
+    if (![...select.options].some(option => option.value === "Purchased")) select.add(new Option("Purchased", "Purchased"));
+    const savedStatus = select.closest("tr")?.dataset.status;
+    if (savedStatus) select.value = savedStatus[0].toUpperCase() + savedStatus.slice(1);
+  });
   let bankCanonicalItemNames = new Map();
   let bankCatalogNames = [];
   const showBankItemSuggestions = () => {
@@ -243,7 +253,47 @@
       .catch(() => document.querySelectorAll(".bank-market-value").forEach(cell => { cell.textContent = "Market unavailable"; }))
       .finally(() => buttons.forEach(control => { control.disabled = false; control.textContent = "Refresh market"; }));
   };
-  document.querySelectorAll(".refresh-bank-market").forEach(button => button.addEventListener("click", refreshBankMarket));
+  const bankControlsHeader = document.querySelector(".ls-bank-table thead th:last-child");
+  const bankRefreshButtons = [...document.querySelectorAll(".refresh-bank-market")];
+  const bankRefreshButton = bankRefreshButtons.shift();
+  if (bankControlsHeader && bankRefreshButton) {
+    bankRefreshButton.textContent = "Refresh market";
+    bankControlsHeader.append(" ", bankRefreshButton);
+    bankRefreshButtons.forEach(button => button.remove());
+  }
+  bankRefreshButton?.addEventListener("click", refreshBankMarket);
+  let bankSaveAll = document.querySelector("#ls-bank-save-all");
+  if (!bankSaveAll && document.querySelector(".ls-bank-row-editor")) {
+    const controlsHeader = document.querySelector(".ls-bank-table thead th:last-child");
+    if (controlsHeader) {
+      bankSaveAll = document.createElement("button");
+      bankSaveAll.id = "ls-bank-save-all";
+      bankSaveAll.className = "ls-bank-save-all";
+      bankSaveAll.type = "button";
+      bankSaveAll.textContent = "Save all";
+      controlsHeader.append(" ", bankSaveAll);
+    }
+  }
+  bankSaveAll?.addEventListener("click", () => {
+    const rows = [...document.querySelectorAll(".ls-bank-row-editor")];
+    if (!rows.length) return;
+    const body = new URLSearchParams();
+    body.set("csrf_token", rows[0].querySelector("[name='csrf_token']")?.value || "");
+    rows.forEach(form => {
+      const id = form.action.match(/\/bank\/(\d+)\/update/)?.[1];
+      if (!id) return;
+      body.append("entry_id", id);
+      body.append("holder_member_id", form.elements.holder_member_id.value);
+      body.append("status", form.elements.status.value);
+      body.append("sale_gil", form.elements.sale_gil.value);
+      body.append("notes", form.elements.notes.value);
+    });
+    bankSaveAll.disabled = true;
+    bankSaveAll.textContent = "Saving…";
+    fetch("/endgame/bank/bulk-update", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body})
+      .then(response => { if (!response.ok) throw new Error("Unable to save LS Bank rows."); window.location.assign(response.url); })
+      .catch(error => { bankSaveAll.disabled = false; bankSaveAll.textContent = "Save all"; alert(error.message); });
+  });
   if (document.querySelector(".ls-bank-panel")) {
     filterBankRows();
     fetch("/api/market-prices", {headers: {"Accept": "application/json"}})
