@@ -243,6 +243,9 @@ def test_ls_bank_purchases_reduce_cash_and_bulk_sale_prices_mark_items_sold(tmp_
     page = client.get("/endgame#bank").data
     assert b"Purchased" in page
     assert b"Timeless Hourglass" in page
+    assert b'data-bank-cash="225000"' in page
+    assert b'id="bank-held-dropped"' in page
+    assert b'id="bank-held-purchased"' in page
 
 
 def test_past_endgame_events_show_most_recent_first(tmp_path):

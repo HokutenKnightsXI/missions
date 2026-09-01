@@ -175,6 +175,7 @@
   const bankNewStatus = document.querySelector("#ls-bank-new-status");
   bankSource?.addEventListener("change", () => {
     if (["Pop Item", "Timeless Hourglass"].includes(bankSource.value) && bankNewStatus) bankNewStatus.value = "Purchased";
+    if (bankSource.value === "Purchase" && bankNewStatus) bankNewStatus.value = "Held";
   });
   document.querySelectorAll(".ls-bank-row-editor select[name='status']").forEach(select => {
     if (![...select.options].some(option => option.value === "Purchased")) select.add(new Option("Purchased", "Purchased"));
@@ -222,7 +223,18 @@
   });
   const updateBankMarketValues = prices => {
     const byName = Object.fromEntries(Object.values(prices || {}).filter(price => price.name).map(price => [bankMarketKey(price.name), price]));
-    let heldValue = 0;
+    let heldDroppedValue = 0;
+    let heldPurchasedValue = 0;
+    document.querySelectorAll("#ls-bank-body tr[data-bank-search]").forEach(row => {
+      if (row.dataset.status !== "held") return;
+      const purchased = /^(purchase|pop item|timeless hourglass)/.test(row.dataset.source || "");
+      const badge = row.querySelector(".bank-status.held");
+      if (badge) {
+        badge.textContent = purchased ? "Held (Purchased)" : "Held (Dropped)";
+        badge.classList.toggle("purchased", purchased);
+        badge.classList.toggle("dropped", !purchased);
+      }
+    });
     document.querySelectorAll(".bank-market-value").forEach(cell => {
       const price = byName[bankMarketKey(cell.dataset.bankItem)];
       const candidates = [price?.bazaar_lowest, price?.single_recent_average, price?.single_average]
@@ -231,17 +243,22 @@
       const unit = candidates.length ? Math.min(...candidates) : null;
       if (unit == null) { cell.textContent = "—"; cell.title = "No PSXI market value is currently available."; return; }
       const value = Number(unit) * Number(cell.dataset.bankQuantity || 1);
-      heldValue += value;
-      cell.closest("tr").dataset.market = String(value);
+      const row = cell.closest("tr");
+      const purchased = /^(purchase|pop item|timeless hourglass)/.test(row?.dataset.source || "");
+      if (purchased) heldPurchasedValue += value;
+      else heldDroppedValue += value;
+      row.dataset.market = String(value);
       cell.textContent = formatBankGil(value);
       const source = Number(price?.bazaar_lowest) === unit ? "lowest bazaar listing" : "sale average";
       cell.title = `PSXI ${source}: ${formatBankGil(unit)} each`;
     });
     const cash = Number(document.querySelector(".ls-bank-summary")?.dataset.bankCash || 0);
-    const held = document.querySelector("#bank-held-market");
+    const heldDropped = document.querySelector("#bank-held-dropped");
+    const heldPurchased = document.querySelector("#bank-held-purchased");
     const total = document.querySelector("#bank-total-value");
-    if (held) held.textContent = formatBankGil(heldValue);
-    if (total) total.textContent = formatBankGil(cash + heldValue);
+    if (heldDropped) heldDropped.textContent = formatBankGil(heldDroppedValue);
+    if (heldPurchased) heldPurchased.textContent = formatBankGil(heldPurchasedValue);
+    if (total) total.textContent = formatBankGil(cash + heldDroppedValue + heldPurchasedValue);
     filterBankRows();
   };
   const refreshBankMarket = () => {

@@ -2996,7 +2996,9 @@ def create_app(test_config=None):
             ), tuple(officer_names)
         ).fetchall()]
         bank_summary = get_db().execute(
-            """SELECT COALESCE(SUM(purchase_gil),0) purchases,COALESCE(SUM(sale_gil),0) sales,
+            """SELECT COALESCE(SUM(CASE WHEN acquisition_kind IN ('Purchase','Pop Item','Timeless Hourglass')
+                                         THEN purchase_gil ELSE 0 END),0) purchases,
+                      COALESCE(SUM(sale_gil),0) sales,
                       SUM(CASE WHEN status='Held' THEN 1 ELSE 0 END) held_count,
                       SUM(CASE WHEN status='Purchased' THEN 1 ELSE 0 END) purchased_count,
                       SUM(CASE WHEN status='Sold' THEN 1 ELSE 0 END) sold_count
