@@ -352,12 +352,13 @@ CREATE TABLE IF NOT EXISTS ls_bank_items (
     event_id INTEGER,
     item TEXT NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
-    acquisition_kind TEXT NOT NULL CHECK(acquisition_kind IN ('Event Drop','Purchase','Pop Item','Timeless Hourglass','Manual')),
+    acquisition_kind TEXT NOT NULL CHECK(acquisition_kind IN ('Event Drop','Auction House','Bazaar','Donation','Other')),
     status TEXT NOT NULL DEFAULT 'Held' CHECK(status IN ('Held','Purchased','Sold')),
     purchase_gil INTEGER NOT NULL DEFAULT 0 CHECK(purchase_gil >= 0),
     sale_gil INTEGER NOT NULL DEFAULT 0 CHECK(sale_gil >= 0),
     sale_channel TEXT NOT NULL DEFAULT '' CHECK(sale_channel IN ('','Auction House','Bazaar')),
     holder_member_id INTEGER,
+    used_event_id INTEGER,
     acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     sold_at TEXT,
     notes TEXT NOT NULL DEFAULT '',
@@ -365,6 +366,7 @@ CREATE TABLE IF NOT EXISTS ls_bank_items (
     updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE SET NULL,
     FOREIGN KEY (holder_member_id) REFERENCES members(id) ON DELETE SET NULL,
+    FOREIGN KEY (used_event_id) REFERENCES guild_events(id) ON DELETE SET NULL,
     FOREIGN KEY (recorded_by) REFERENCES members(id) ON DELETE SET NULL
 );
 

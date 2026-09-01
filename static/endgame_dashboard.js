@@ -173,14 +173,78 @@
   const bankItemCatalog = document.querySelector("#ls-bank-item-catalog");
   const bankSource = document.querySelector("#ls-bank-source");
   const bankNewStatus = document.querySelector("#ls-bank-new-status");
+  const visibleBankSources = ["Event Drop", "Auction House", "Bazaar", "Donation", "Other"];
+  if (bankSource) {
+    const selectedSource = visibleBankSources.includes(bankSource.value) ? bankSource.value : "Event Drop";
+    bankSource.replaceChildren(...visibleBankSources.map(value => new Option(value, value, false, value === selectedSource)));
+  }
+  if (bankNewStatus) {
+    const heldOption = [...bankNewStatus.options].find(option => option.value === "Held");
+    if (heldOption) heldOption.textContent = "Drop";
+    bankNewStatus.closest("label")?.setAttribute("hidden", "");
+  }
   bankSource?.addEventListener("change", () => {
-    if (["Pop Item", "Timeless Hourglass"].includes(bankSource.value) && bankNewStatus) bankNewStatus.value = "Purchased";
-    if (bankSource.value === "Purchase" && bankNewStatus) bankNewStatus.value = "Held";
+    if (bankNewStatus) bankNewStatus.value = "Held";
   });
   document.querySelectorAll(".ls-bank-row-editor select[name='status']").forEach(select => {
     if (![...select.options].some(option => option.value === "Purchased")) select.add(new Option("Purchased", "Purchased"));
     const savedStatus = select.closest("tr")?.dataset.status;
     if (savedStatus) select.value = savedStatus[0].toUpperCase() + savedStatus.slice(1);
+  });
+  const bankEventOptions = bankSource?.form?.querySelector("select[name='event_id']");
+  const sourceForRow = row => [...(bankSource?.options || [])]
+    .map(option => option.value).filter(Boolean).sort((a, b) => b.length - a.length)
+    .find(value => (row.dataset.source || "").startsWith(value.toLowerCase())) || "Manual";
+  document.querySelectorAll(".ls-bank-row-editor").forEach(form => {
+    const row = form.closest("tr");
+    const statusSelect = form.elements.status;
+    const status = statusSelect?.value || "Held";
+    const source = document.createElement("select");
+    source.name = "acquisition_kind";
+    source.setAttribute("aria-label", "Source");
+    [...(bankSource?.options || [])].forEach(option => source.add(new Option(option.textContent, option.value, false, option.value === sourceForRow(row))));
+    const event = document.createElement("select");
+    event.name = "event_id";
+    event.setAttribute("aria-label", "Source event");
+    [...(bankEventOptions?.options || [])].forEach(option => event.add(new Option(option.textContent, option.value)));
+    const eventText = row.cells[1]?.querySelector("small")?.textContent.trim() || "";
+    const matchingEvent = [...event.options].find(option => eventText && option.textContent.includes(eventText));
+    if (matchingEvent) event.value = matchingEvent.value;
+    const purchase = form.elements.sale_gil;
+    purchase.name = "purchase_gil";
+    purchase.value = row.dataset.purchase || "0";
+    purchase.placeholder = source.value === "Merc Sell" ? "Gil received" : "Purchase gil";
+    purchase.setAttribute("aria-label", "Purchase gil");
+    const statusHidden = document.createElement("input");
+    statusHidden.type = "hidden";
+    statusHidden.name = "status";
+    statusHidden.value = status;
+    statusSelect.remove();
+    form.elements.sale_channel?.remove();
+    form.insertBefore(source, form.firstElementChild?.nextElementSibling);
+    form.insertBefore(event, source.nextElementSibling);
+    form.insertBefore(statusHidden, purchase);
+    source.addEventListener("change", () => {
+      if (statusHidden.value !== "Sold" && statusHidden.value !== "Purchased") statusHidden.value = "Held";
+      purchase.placeholder = "Purchase gil";
+    });
+    if (row.dataset.status === "held") {
+      const usedFor = document.createElement("select");
+      usedFor.name = "used_event_id";
+      usedFor.setAttribute("aria-label", "Event item was used for");
+      usedFor.add(new Option("Used for event", ""));
+      [...(bankEventOptions?.options || [])].filter(option => option.value).forEach(option => usedFor.add(new Option(option.textContent, option.value)));
+      usedFor.add(new Option("Other", "other"));
+      const useButton = document.createElement("button");
+      useButton.type = "submit";
+      useButton.className = "bank-item-used";
+      useButton.textContent = "Item Used";
+      useButton.formAction = form.action.replace(/\/update$/, "/use");
+      useButton.addEventListener("click", event => {
+        if (!usedFor.value) { event.preventDefault(); alert("Choose the event this item was used for, or select Other."); }
+      });
+      form.append(usedFor, useButton);
+    }
   });
   let bankCanonicalItemNames = new Map();
   let bankCatalogNames = [];
@@ -227,7 +291,7 @@
     let heldPurchasedValue = 0;
     document.querySelectorAll("#ls-bank-body tr[data-bank-search]").forEach(row => {
       if (row.dataset.status !== "held") return;
-      const purchased = /^(purchase|pop item|timeless hourglass)/.test(row.dataset.source || "");
+      const purchased = !/^(event drop|donation)/.test(row.dataset.source || "");
       const badge = row.querySelector(".bank-status.held");
       if (badge) {
         badge.textContent = purchased ? "Held (Purchased)" : "Held (Dropped)";
@@ -244,7 +308,7 @@
       if (unit == null) { cell.textContent = "—"; cell.title = "No PSXI market value is currently available."; return; }
       const value = Number(unit) * Number(cell.dataset.bankQuantity || 1);
       const row = cell.closest("tr");
-      const purchased = /^(purchase|pop item|timeless hourglass)/.test(row?.dataset.source || "");
+      const purchased = !/^(event drop|donation)/.test(row?.dataset.source || "");
       if (purchased) heldPurchasedValue += value;
       else heldDroppedValue += value;
       row.dataset.market = String(value);
@@ -261,6 +325,33 @@
     if (total) total.textContent = formatBankGil(cash + heldDroppedValue + heldPurchasedValue);
     filterBankRows();
   };
+  const bankDetailDialog = document.createElement("dialog");
+  bankDetailDialog.className = "ls-bank-detail-dialog";
+  document.body.append(bankDetailDialog);
+  const bankDetailRows = kind => [...document.querySelectorAll("#ls-bank-body tr[data-bank-search]")].filter(row => {
+    const source = row.dataset.source || "";
+    if (kind === "cash") return row.dataset.status === "sold" || !/^(event drop|donation)/.test(source);
+    const purchased = !/^(event drop|donation)/.test(source);
+    return row.dataset.status === "held" && (kind === "purchased" ? purchased : !purchased);
+  }).map(row => {
+    const holder = row.querySelector(".ls-bank-row-editor select[name='holder_member_id'] option:checked")?.textContent || row.cells[2]?.textContent.trim() || "Unassigned";
+    const item = row.cells[0]?.querySelector("b")?.textContent.trim() || "Item";
+    const source = row.cells[1]?.textContent.trim() || "";
+    const market = row.querySelector(".bank-market-value")?.textContent.trim() || "—";
+    const cash = row.dataset.status === "sold" ? row.cells[5]?.textContent.match(/[\d,]+g/)?.[0] || "—" : `-${Number(row.dataset.purchase || 0).toLocaleString()}g`;
+    return {holder, item, source, value: kind === "cash" ? cash : market};
+  });
+  const openBankDetail = (kind, title) => {
+    const rows = bankDetailRows(kind);
+    bankDetailDialog.innerHTML = `<form method="dialog"><button class="ls-bank-detail-close" aria-label="Close">×</button></form><h2>${title}</h2><table><thead><tr><th>Officer</th><th>Item / source</th><th>Value</th></tr></thead><tbody>${rows.length ? rows.map(row => `<tr><td>${safeText(row.holder)}</td><td><b>${safeText(row.item)}</b><small>${safeText(row.source)}</small></td><td>${safeText(row.value)}</td></tr>`).join("") : '<tr><td colspan="3">No entries.</td></tr>'}</tbody></table>`;
+    bankDetailDialog.showModal();
+  };
+  [["#bank-cash-balance", "cash", "LS Gil balance"], ["#bank-held-dropped", "dropped", "Held dropped items"], ["#bank-held-purchased", "purchased", "Held purchased items"]].forEach(([selector, kind, title]) => {
+    const metric = document.querySelector(selector);
+    if (!metric) return;
+    metric.closest("article")?.classList.add("ls-bank-detail-trigger");
+    metric.closest("article")?.addEventListener("click", () => openBankDetail(kind, title));
+  });
   const refreshBankMarket = () => {
     const buttons = [...document.querySelectorAll(".refresh-bank-market")];
     buttons.forEach(control => { control.disabled = true; control.textContent = "Refreshing…"; });
@@ -302,7 +393,10 @@
       body.append("entry_id", id);
       body.append("holder_member_id", form.elements.holder_member_id.value);
       body.append("status", form.elements.status.value);
-      body.append("sale_gil", form.elements.sale_gil.value);
+      body.append("sale_gil", "");
+      body.append("acquisition_kind", form.elements.acquisition_kind.value);
+      body.append("event_id", form.elements.event_id.value);
+      body.append("purchase_gil", form.elements.purchase_gil.value);
       body.append("notes", form.elements.notes.value);
     });
     bankSaveAll.disabled = true;
