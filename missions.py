@@ -1453,10 +1453,14 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE ls_bank_items ADD COLUMN sale_channel TEXT NOT NULL DEFAULT ''")
         if bank_columns and "used_event_id" not in bank_columns:
             get_db().execute("ALTER TABLE ls_bank_items ADD COLUMN used_event_id INTEGER")
+        get_db().execute(
+            """UPDATE ls_bank_items SET status='Held'
+               WHERE status='Purchased' AND used_event_id IS NULL AND notes NOT LIKE '%Used:%'"""
+        )
         bank_table_sql = (get_db().execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name='ls_bank_items'"
         ).fetchone() or {"sql": ""})["sql"] or ""
-        if bank_columns and ("Purchased" not in bank_table_sql or "'Pop Item'" in bank_table_sql):
+        if bank_columns and ("Purchased" not in bank_table_sql or "'Pop Item'" in bank_table_sql or "'Mercenary'" not in bank_table_sql):
             # SQLite cannot alter a CHECK constraint in place.  Preserve every
             # treasury row while widening the status/source choices.
             get_db().execute("DROP INDEX IF EXISTS idx_ls_bank_status")
@@ -1465,7 +1469,7 @@ def create_app(test_config=None):
                 """CREATE TABLE ls_bank_items (
                     id INTEGER PRIMARY KEY AUTOINCREMENT, event_id INTEGER, item TEXT NOT NULL,
                     quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
-                    acquisition_kind TEXT NOT NULL CHECK(acquisition_kind IN ('Event Drop','Auction House','Bazaar','Donation','Other')),
+                    acquisition_kind TEXT NOT NULL CHECK(acquisition_kind IN ('Event Drop','Auction House','Bazaar','Donation','Other','Mercenary')),
                     status TEXT NOT NULL DEFAULT 'Held' CHECK(status IN ('Held','Purchased','Sold')),
                     purchase_gil INTEGER NOT NULL DEFAULT 0 CHECK(purchase_gil >= 0),
                     sale_gil INTEGER NOT NULL DEFAULT 0 CHECK(sale_gil >= 0),
@@ -1483,7 +1487,7 @@ def create_app(test_config=None):
                                                 sale_channel,holder_member_id,used_event_id,acquired_at,sold_at,notes,recorded_by,updated_at)
                    SELECT id,event_id,item,quantity,CASE acquisition_kind
                               WHEN 'Purchase' THEN 'Auction House' WHEN 'Pop Item' THEN 'Other'
-                              WHEN 'Timeless Hourglass' THEN 'Other' WHEN 'Merc Sell' THEN 'Other'
+                              WHEN 'Timeless Hourglass' THEN 'Other' WHEN 'Merc Sell' THEN 'Mercenary'
                               WHEN 'Manual' THEN 'Other' ELSE acquisition_kind END,status,purchase_gil,sale_gil,
                           COALESCE(sale_channel,''),holder_member_id,used_event_id,acquired_at,sold_at,notes,recorded_by,updated_at
                    FROM ls_bank_items_legacy"""
@@ -4300,6 +4304,16 @@ def create_app(test_config=None):
             return -1
         return value if 0 <= value <= 2_000_000_000 else -1
 
+    def bank_source_requires_purchase_price(source):
+        return source in {"Auction House", "Bazaar", "Other"}
+
+    def bank_saved_response(message, **payload):
+        """Keep in-place LS Bank controls from forcing a dashboard reload."""
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify({"ok": True, "message": message, **payload})
+        flash(message, "success")
+        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+
     @app.post("/endgame/bank")
     @admin_required
     def record_ls_bank_item():
@@ -4308,6 +4322,7 @@ def create_app(test_config=None):
         holder_id = request.form.get("holder_member_id", "").strip()
         acquisition_kind = request.form.get("acquisition_kind", "").strip()
         status = request.form.get("status", "Held").strip()
+        status = "Held" if status == "Drop" else status
         notes = request.form.get("notes", "").strip()[:500]
         try:
             quantity = int(request.form.get("quantity", "1"))
@@ -4317,13 +4332,15 @@ def create_app(test_config=None):
         event = get_db().execute("SELECT id FROM guild_events WHERE id=?", (event_id,)).fetchone() if event_id.isdigit() else None
         holder = get_db().execute("SELECT id,name FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
         sale_gil = 0
-        if acquisition_kind == "Merc Sell":
+        if acquisition_kind in {"Merc Sell", "Mercenary"}:
             status, sale_gil, purchase_gil = "Sold", purchase_gil, 0
         elif acquisition_kind in {"Pop Item", "Timeless Hourglass"}:
             status = "Purchased"
         if (not item or not 1 <= quantity <= 9999 or purchase_gil < 0
-                or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
+                or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
                 or status not in {"Held", "Purchased", "Sold"}
+                or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
+                or (acquisition_kind == "Mercenary" and sale_gil <= 0)
                 or (event_id and not event) or (holder_id and not holder)):
             abort(400, description="Complete the LS Bank item using valid values.")
         actor = require_member_identity()
@@ -4338,8 +4355,7 @@ def create_app(test_config=None):
             (actor["id"], "LS Bank", "Item recorded", f"{quantity}x {item} / {acquisition_kind}"),
         )
         get_db().commit()
-        flash(f"Added {quantity}x {item} to the LS Bank.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+        return bank_saved_response(f"Added {quantity}x {item} to the LS Bank.")
 
     @app.post("/endgame/bank/<int:bank_item_id>/update")
     @admin_required
@@ -4360,12 +4376,14 @@ def create_app(test_config=None):
         notes = entry["notes"] if not (submitted_notes or "").strip() else submitted_notes.strip()[:500]
         holder = get_db().execute("SELECT id,name FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
         event = get_db().execute("SELECT id FROM guild_events WHERE id=?", (event_id,)).fetchone() if event_id.isdigit() else None
-        if acquisition_kind == "Merc Sell":
+        if acquisition_kind in {"Merc Sell", "Mercenary"}:
             status, sale_gil, purchase_gil = "Sold", purchase_gil, 0
         elif acquisition_kind in {"Pop Item", "Timeless Hourglass"}:
             status, sale_gil = "Purchased", 0
         if (status not in {"Held", "Purchased", "Sold"} or sale_gil < 0 or purchase_gil < 0 or (holder_id and not holder)
-                or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
+                or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
+                or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
+                or (acquisition_kind == "Mercenary" and sale_gil <= 0)
                 or (event_id and not event)
                 or (status == "Sold" and sale_channel not in {"", "Auction House", "Bazaar"})
                 or (status != "Sold" and sale_channel)):
@@ -4384,8 +4402,8 @@ def create_app(test_config=None):
             (actor["id"], "LS Bank", "Item updated", f"{entry['quantity']}x {entry['item']} / {status}"),
         )
         get_db().commit()
-        flash("LS Bank item updated.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+        return bank_saved_response("LS Bank item updated.", status=status, sale_gil=sale_gil,
+                                   purchase_gil=purchase_gil, source=acquisition_kind)
 
     @app.post("/endgame/bank/<int:bank_item_id>/use")
     @admin_required
@@ -4393,7 +4411,7 @@ def create_app(test_config=None):
         entry = get_db().execute("SELECT * FROM ls_bank_items WHERE id=?", (bank_item_id,)).fetchone()
         used_event_id = request.form.get("used_event_id", "").strip()
         event = get_db().execute("SELECT id,name FROM guild_events WHERE id=?", (used_event_id,)).fetchone() if used_event_id.isdigit() else None
-        if not entry or entry["status"] != "Held" or (used_event_id not in {"other", ""} and not event):
+        if not entry or entry["status"] not in {"Held", "Purchased"} or (used_event_id not in {"other", ""} and not event):
             abort(400, description="Choose a valid event or Other before using an LS Bank item.")
         use_note = f"Used: {event['name'] if event else 'Other'}"
         notes = f"{entry['notes']} · {use_note}".strip(" ·")[:500]
@@ -4405,8 +4423,23 @@ def create_app(test_config=None):
         get_db().execute("INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
                          (actor["id"], "LS Bank", "Item used", f"{entry['quantity']}x {entry['item']} / {use_note}"))
         get_db().commit()
-        flash(f"Marked {entry['item']} as used for {event['name'] if event else 'Other'}.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+        return bank_saved_response(f"Marked {entry['item']} as used for {event['name'] if event else 'Other'}.", status="Used")
+
+    @app.post("/endgame/bank/<int:bank_item_id>/reopen")
+    @admin_required
+    def reopen_ls_bank_item(bank_item_id):
+        entry = get_db().execute("SELECT * FROM ls_bank_items WHERE id=?", (bank_item_id,)).fetchone()
+        if not entry or entry["status"] != "Sold":
+            abort(400, description="Only sold LS Bank items can be returned to held inventory.")
+        actor = require_member_identity()
+        get_db().execute(
+            """UPDATE ls_bank_items SET status='Held',sale_gil=0,sale_channel='',sold_at=NULL,
+                       updated_at=CURRENT_TIMESTAMP WHERE id=?""", (bank_item_id,)
+        )
+        get_db().execute("INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+                         (actor["id"], "LS Bank", "Sale reopened", f"{entry['quantity']}x {entry['item']}"))
+        get_db().commit()
+        return bank_saved_response(f"Returned {entry['item']} to held inventory and cleared its sale value.", status="Held")
 
     @app.post("/endgame/bank/bulk-update")
     @admin_required
@@ -4425,21 +4458,23 @@ def create_app(test_config=None):
         for entry_id, holder_id, status, raw_sale_gil, acquisition_kind, event_id, raw_purchase_gil, notes in zip(ids, holders, statuses, sales, sources, events, purchases, notes_list):
             if not entry_id.isdigit():
                 abort(400, description="The LS Bank row is invalid.")
-            entry = get_db().execute("SELECT id,item,quantity FROM ls_bank_items WHERE id=?", (entry_id,)).fetchone()
+            entry = get_db().execute("SELECT id,item,quantity,sale_gil FROM ls_bank_items WHERE id=?", (entry_id,)).fetchone()
             holder = get_db().execute("SELECT id FROM members WHERE id=?", (holder_id,)).fetchone() if holder_id.isdigit() else None
             event = get_db().execute("SELECT id FROM guild_events WHERE id=?", (event_id,)).fetchone() if event_id.isdigit() else None
-            sale_gil = 0 if not str(raw_sale_gil).strip() else bank_gil_value(raw_sale_gil)
+            sale_gil = entry["sale_gil"] if entry and status == "Sold" and not str(raw_sale_gil).strip() else (0 if not str(raw_sale_gil).strip() else bank_gil_value(raw_sale_gil))
             purchase_gil = bank_gil_value(raw_purchase_gil)
             # A filled sale price is the quick bulk-sale action; a blank field
             # leaves the selected state intact.
-            if status == "Held" and str(raw_sale_gil).strip() and sale_gil > 0:
+            if status in {"Held", "Purchased"} and str(raw_sale_gil).strip() and sale_gil > 0:
                 status = "Sold"
-            if acquisition_kind == "Merc Sell":
+            if acquisition_kind in {"Merc Sell", "Mercenary"}:
                 status, sale_gil, purchase_gil = "Sold", purchase_gil, 0
             elif acquisition_kind in {"Pop Item", "Timeless Hourglass"}:
                 status, sale_gil = "Purchased", 0
             if (not entry or sale_gil < 0 or purchase_gil < 0 or status not in {"Held", "Purchased", "Sold"}
-                    or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
+                    or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
+                    or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
+                    or (acquisition_kind == "Mercenary" and sale_gil <= 0)
                     or (event_id and not event) or (holder_id and not holder)):
                 abort(400, description="Use valid LS Bank values before saving all rows.")
             updates.append((event["id"] if event else None, acquisition_kind, purchase_gil, holder["id"] if holder else None, status, sale_gil if status == "Sold" else 0,
@@ -4457,8 +4492,7 @@ def create_app(test_config=None):
                 (actor["id"], "LS Bank", "Item updated", f"{quantity}x {item} / {status}"),
             )
         get_db().commit()
-        flash(f"Saved {len(updates)} LS Bank entries.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+        return bank_saved_response(f"Saved {len(updates)} LS Bank entries.", count=len(updates))
 
     @app.post("/endgame/bank/<int:bank_item_id>/delete")
     @admin_required
@@ -4473,8 +4507,7 @@ def create_app(test_config=None):
             (actor["id"], "LS Bank", "Item removed", f"{entry['quantity']}x {entry['item']}"),
         )
         get_db().commit()
-        flash("Removed the LS Bank entry.", "success")
-        return redirect(url_for("endgame_dashboard", _anchor="bank"))
+        return bank_saved_response("Removed the LS Bank entry.", deleted=True)
 
     @app.post("/endgame/loot/<int:award_id>/update")
     @admin_required

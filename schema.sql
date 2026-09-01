@@ -352,7 +352,7 @@ CREATE TABLE IF NOT EXISTS ls_bank_items (
     event_id INTEGER,
     item TEXT NOT NULL,
     quantity INTEGER NOT NULL DEFAULT 1 CHECK(quantity > 0),
-    acquisition_kind TEXT NOT NULL CHECK(acquisition_kind IN ('Event Drop','Auction House','Bazaar','Donation','Other')),
+    acquisition_kind TEXT NOT NULL CHECK(acquisition_kind IN ('Event Drop','Auction House','Bazaar','Donation','Other','Mercenary')),
     status TEXT NOT NULL DEFAULT 'Held' CHECK(status IN ('Held','Purchased','Sold')),
     purchase_gil INTEGER NOT NULL DEFAULT 0 CHECK(purchase_gil >= 0),
     sale_gil INTEGER NOT NULL DEFAULT 0 CHECK(sale_gil >= 0),

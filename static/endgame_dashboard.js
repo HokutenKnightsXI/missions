@@ -173,18 +173,23 @@
   const bankItemCatalog = document.querySelector("#ls-bank-item-catalog");
   const bankSource = document.querySelector("#ls-bank-source");
   const bankNewStatus = document.querySelector("#ls-bank-new-status");
-  const visibleBankSources = ["Event Drop", "Auction House", "Bazaar", "Donation", "Other"];
+  const visibleBankSources = ["Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary"];
   if (bankSource) {
     const selectedSource = visibleBankSources.includes(bankSource.value) ? bankSource.value : "Event Drop";
     bankSource.replaceChildren(...visibleBankSources.map(value => new Option(value, value, false, value === selectedSource)));
   }
   if (bankNewStatus) {
     const heldOption = [...bankNewStatus.options].find(option => option.value === "Held");
-    if (heldOption) heldOption.textContent = "Drop";
+    if (heldOption) { heldOption.textContent = "Drop"; heldOption.value = "Held"; }
     bankNewStatus.closest("label")?.setAttribute("hidden", "");
   }
   bankSource?.addEventListener("change", () => {
     if (bankNewStatus) bankNewStatus.value = "Held";
+    const purchaseInput = bankSource.form?.querySelector("input[name='purchase_gil']");
+    const purchaseLabel = purchaseInput?.closest("label");
+    const labelText = purchaseLabel?.childNodes?.[0];
+    if (labelText) labelText.nodeValue = bankSource.value === "Mercenary" ? "Gil received" : "Purchase gil";
+    if (purchaseInput) purchaseInput.placeholder = bankSource.value === "Mercenary" ? "Gil received" : "0";
   });
   document.querySelectorAll(".ls-bank-row-editor select[name='status']").forEach(select => {
     if (![...select.options].some(option => option.value === "Purchased")) select.add(new Option("Purchased", "Purchased"));
@@ -195,8 +200,22 @@
   const sourceForRow = row => [...(bankSource?.options || [])]
     .map(option => option.value).filter(Boolean).sort((a, b) => b.length - a.length)
     .find(value => (row.dataset.source || "").startsWith(value.toLowerCase())) || "Manual";
+  const showBankSaveMessage = message => {
+    let notice = document.querySelector("#ls-bank-save-notice");
+    if (!notice) {
+      notice = document.createElement("div");
+      notice.id = "ls-bank-save-notice";
+      notice.className = "ls-bank-save-notice";
+      document.querySelector(".ls-bank-panel")?.prepend(notice);
+    }
+    notice.textContent = message;
+    notice.hidden = false;
+    clearTimeout(showBankSaveMessage.timer);
+    showBankSaveMessage.timer = setTimeout(() => { notice.hidden = true; }, 3500);
+  };
   document.querySelectorAll(".ls-bank-row-editor").forEach(form => {
     const row = form.closest("tr");
+    form.id ||= `ls-bank-editor-${form.action.match(/\/bank\/(\d+)\/update/)?.[1] || Math.random().toString(36).slice(2)}`;
     const statusSelect = form.elements.status;
     const status = statusSelect?.value || "Held";
     const source = document.createElement("select");
@@ -208,43 +227,298 @@
     event.setAttribute("aria-label", "Source event");
     [...(bankEventOptions?.options || [])].forEach(option => event.add(new Option(option.textContent, option.value)));
     const eventText = row.cells[1]?.querySelector("small")?.textContent.trim() || "";
+    row.dataset.bankSourceLabel = row.cells[1]?.childNodes[0]?.textContent.trim() || row.dataset.source || "";
+    row.dataset.bankEventLabel = eventText;
     const matchingEvent = [...event.options].find(option => eventText && option.textContent.includes(eventText));
     if (matchingEvent) event.value = matchingEvent.value;
     const purchase = form.elements.sale_gil;
     purchase.name = "purchase_gil";
     purchase.value = row.dataset.purchase || "0";
-    purchase.placeholder = source.value === "Merc Sell" ? "Gil received" : "Purchase gil";
-    purchase.setAttribute("aria-label", "Purchase gil");
+    purchase.placeholder = ["Merc Sell", "Mercenary"].includes(source.value) ? "Gil received" : "Purchase gil";
+    purchase.setAttribute("aria-label", ["Merc Sell", "Mercenary"].includes(source.value) ? "Gil received" : "Purchase gil");
     const statusHidden = document.createElement("input");
     statusHidden.type = "hidden";
     statusHidden.name = "status";
     statusHidden.value = status;
+    const inlineSave = document.createElement("button");
+    inlineSave.type = "submit";
+    inlineSave.className = "bank-inline-save";
+    inlineSave.hidden = true;
+    inlineSave.tabIndex = -1;
     statusSelect.remove();
     form.elements.sale_channel?.remove();
-    form.insertBefore(source, form.firstElementChild?.nextElementSibling);
-    form.insertBefore(event, source.nextElementSibling);
     form.insertBefore(statusHidden, purchase);
+    form.append(inlineSave);
     source.addEventListener("change", () => {
-      if (statusHidden.value !== "Sold" && statusHidden.value !== "Purchased") statusHidden.value = "Held";
-      purchase.placeholder = "Purchase gil";
+      if (statusHidden.value !== "Sold") statusHidden.value = "Held";
+      purchase.placeholder = ["Merc Sell", "Mercenary"].includes(source.value) ? "Gil received" : "Purchase gil";
+      row.dataset.source = source.value.toLowerCase();
+      row.dataset.bankSourceLabel = source.value;
+      const action = form.querySelector(".bank-mark-sold");
+      if (action) action.textContent = source.value === "Mercenary" ? "Record gil" : "Mark Sold";
     });
-    if (row.dataset.status === "held") {
+    const addInlineEditor = (cell, controls) => {
+      const editor = document.createElement("span");
+      editor.className = "bank-inline-editor";
+      controls.forEach(control => { control.setAttribute("form", form.id); editor.append(control); });
+      const save = document.createElement("button");
+      save.type = "submit";
+      save.className = "bank-inline-save-control";
+      save.textContent = "Save";
+      save.setAttribute("form", form.id);
+      editor.append(save);
+      cell.append(editor);
+      cell.classList.add("bank-editable-cell");
+      cell.title = "Click to edit";
+      cell.addEventListener("click", click => {
+        if (click.target.closest("select,input,button")) return;
+        document.querySelectorAll(".bank-inline-editor.open").forEach(open => {
+          if (open !== editor) open.classList.remove("open");
+        });
+        editor.classList.toggle("open");
+      });
+      controls.forEach(control => {
+        control.addEventListener("input", () => { form.dataset.bankDirty = "true"; });
+        control.addEventListener("change", () => { form.dataset.bankDirty = "true"; });
+      });
+      cell.addEventListener("focusout", () => setTimeout(() => {
+        if (form.dataset.bankDirty !== "true" || cell.contains(document.activeElement)) return;
+        form.dataset.bankDirty = "";
+        form.requestSubmit(inlineSave);
+      }, 120));
+      return editor;
+    };
+    addInlineEditor(row.cells[1], [source, event]);
+    addInlineEditor(row.cells[2], [form.elements.holder_member_id]);
+    const purchaseEditor = addInlineEditor(row.cells[3], [purchase]);
+    const isUsed = /\bUsed:/.test(row.cells[0]?.textContent || "");
+    const heldInventory = ["held", "purchased"].includes(row.dataset.status) && !isUsed;
+    if (heldInventory) {
+      const badge = row.querySelector(".bank-status");
+      const kind = document.createElement("select");
+      kind.className = "bank-held-kind";
+      kind.setAttribute("aria-label", "Held item classification");
+      kind.add(new Option("Held (Dropped)", "dropped"));
+      kind.add(new Option("Held (Purchased)", "purchased"));
+      const saveKind = document.createElement("button");
+      saveKind.type = "submit";
+      saveKind.className = "bank-inline-save-control";
+      saveKind.textContent = "Save";
+      saveKind.setAttribute("form", form.id);
+      const isPurchased = !/^(event drop|donation)/.test(source.value || "");
+      kind.value = isPurchased ? "purchased" : "dropped";
+      const applyHeldKind = () => {
+        const purchased = kind.value === "purchased";
+        source.value = purchased ? "Auction House" : "Event Drop";
+        if (!purchased) purchase.value = "0";
+        source.dispatchEvent(new Event("change"));
+        statusHidden.value = "Held";
+        if (badge) {
+          badge.textContent = purchased ? "Held (Purchased)" : "Held (Dropped)";
+          badge.classList.toggle("purchased", purchased);
+          badge.classList.toggle("dropped", !purchased);
+        }
+        if (purchased) {
+          purchaseEditor.classList.add("open");
+          purchase.focus();
+        }
+      };
+      kind.addEventListener("change", applyHeldKind);
+      if (badge) {
+        badge.classList.add("bank-status-editable");
+        badge.title = "Click to change between dropped and purchased";
+        badge.addEventListener("click", event => {
+          event.stopPropagation();
+          kind.hidden = false;
+          saveKind.hidden = false;
+          badge.hidden = true;
+          kind.focus();
+        });
+        kind.addEventListener("blur", blurEvent => {
+          if (blurEvent.relatedTarget === saveKind) return;
+          kind.hidden = true;
+          saveKind.hidden = true;
+          badge.hidden = false;
+          if (kind.value === "dropped" && form.dataset.bankDirty === "true") {
+            form.dataset.bankDirty = "";
+            form.requestSubmit(inlineSave);
+          }
+        });
+        kind.hidden = true;
+        saveKind.hidden = true;
+        row.cells[5].insertBefore(kind, badge.nextSibling);
+        row.cells[5].insertBefore(saveKind, kind.nextSibling);
+      }
+    }
+    let saleInput;
+    const canMarkSold = heldInventory;
+    if (canMarkSold) {
+      const sale = document.createElement("input");
+      sale.type = "number";
+      sale.name = "sale_gil";
+      sale.min = "0";
+      sale.max = "2000000000";
+      sale.placeholder = "Sale gil";
+      sale.setAttribute("aria-label", "Sale gil; Save all marks this item sold");
+      sale.setAttribute("form", form.id);
+      sale.className = "bank-sale-gil";
+      row.cells[5].append(sale);
+      saleInput = sale;
       const usedFor = document.createElement("select");
       usedFor.name = "used_event_id";
       usedFor.setAttribute("aria-label", "Event item was used for");
       usedFor.add(new Option("Used for event", ""));
       [...(bankEventOptions?.options || [])].filter(option => option.value).forEach(option => usedFor.add(new Option(option.textContent, option.value)));
       usedFor.add(new Option("Other", "other"));
-      const useButton = document.createElement("button");
-      useButton.type = "submit";
-      useButton.className = "bank-item-used";
-      useButton.textContent = "Item Used";
-      useButton.formAction = form.action.replace(/\/update$/, "/use");
-      useButton.addEventListener("click", event => {
+      const confirmUse = document.createElement("button");
+      confirmUse.type = "submit";
+      confirmUse.className = "bank-confirm-used";
+      confirmUse.textContent = "Confirm";
+      confirmUse.formAction = form.action.replace(/\/update$/, "/use");
+      confirmUse.addEventListener("click", event => {
         if (!usedFor.value) { event.preventDefault(); alert("Choose the event this item was used for, or select Other."); }
       });
-      form.append(usedFor, useButton);
+      usedFor.addEventListener("change", () => { confirmUse.hidden = !usedFor.value; });
+      confirmUse.hidden = true;
+      form.append(usedFor, confirmUse);
     }
+    if (row.dataset.status === "sold") {
+      const saleText = [...row.cells[5].querySelectorAll("small")].find(node => /[\d,]+g/.test(node.textContent));
+      if (saleText) {
+        saleText.classList.add("bank-sale-editable");
+        saleText.title = "Click to edit sale value";
+        saleText.addEventListener("click", () => {
+          if (row.cells[5].querySelector("input[name='sale_gil']")) return;
+          const sale = document.createElement("input");
+          sale.type = "number";
+          sale.name = "sale_gil";
+          sale.min = "0";
+          sale.max = "2000000000";
+          sale.value = (saleText.textContent.match(/[\d,]+g/)?.[0] || "0").replace(/[^\d]/g, "");
+          sale.setAttribute("aria-label", "Sold gil");
+          sale.setAttribute("form", form.id);
+          sale.className = "bank-sale-gil";
+          const saveSale = document.createElement("button");
+          saveSale.type = "submit";
+          saveSale.textContent = "Save";
+          saveSale.className = "bank-save-sale";
+          saveSale.setAttribute("form", form.id);
+          saleText.hidden = true;
+          row.cells[5].append(sale, saveSale);
+          sale.focus();
+        });
+      }
+      const reopen = document.createElement("button");
+      reopen.type = "submit";
+      reopen.className = "bank-reopen-sale";
+      reopen.textContent = "Reopen";
+      reopen.formAction = form.action.replace(/\/update$/, "/reopen");
+      reopen.title = "Return to held inventory and clear the sale value";
+      form.append(reopen);
+    }
+    const saveButton = [...form.querySelectorAll("button[type='submit']")].find(button => button.textContent.trim() === "Save");
+    if (canMarkSold && saveButton) {
+      saveButton.classList.add("bank-mark-sold");
+      saveButton.textContent = "Mark Sold";
+      saveButton.addEventListener("click", event => {
+        const mercenaryIncome = source.value === "Mercenary";
+        if (!mercenaryIncome && !Number(saleInput?.value || 0)) {
+          event.preventDefault();
+          alert("Enter the sale gil amount before marking this item sold.");
+          saleInput?.focus();
+          return;
+        }
+        if (mercenaryIncome && !Number(purchase.value || 0)) {
+          event.preventDefault();
+          alert("Enter the gil received before recording a mercenary payment.");
+          purchaseEditor.classList.add("open");
+          purchase.focus();
+          return;
+        }
+        statusHidden.value = "Sold";
+      });
+    } else if (row.dataset.status === "sold" && saveButton) {
+      saveButton.remove();
+    }
+    const setLeadingText = (cell, text) => {
+      const node = [...cell.childNodes].find(child => child.nodeType === Node.TEXT_NODE);
+      if (node) node.nodeValue = text;
+      else cell.prepend(document.createTextNode(text));
+    };
+    const renderSold = saleGil => {
+      row.dataset.status = "sold";
+      statusHidden.value = "Sold";
+      const badge = row.querySelector(".bank-status");
+      if (badge) { badge.hidden = false; badge.textContent = "Sold"; badge.className = "bank-status sold"; }
+      row.cells[5].querySelectorAll(".bank-sale-gil,.bank-held-kind,.bank-sale-editable").forEach(node => node.remove());
+      if (!row.cells[5].querySelector("small")) {
+        const saleText = document.createElement("small");
+        saleText.textContent = formatBankGil(saleGil);
+        row.cells[5].append(saleText);
+      }
+      form.querySelectorAll(".bank-item-used,.bank-confirm-used,select[name='used_event_id'],button[type='submit']").forEach(button => {
+        if (button.textContent.trim() !== "Remove") button.remove();
+      });
+      if (!form.querySelector(".bank-reopen-sale")) {
+        const reopen = document.createElement("button");
+        reopen.type = "submit";
+        reopen.className = "bank-reopen-sale";
+        reopen.textContent = "Reopen";
+        reopen.formAction = form.action.replace(/\/update$/, "/reopen");
+        form.append(reopen);
+      }
+    };
+    form.addEventListener("submit", submitEvent => {
+      const submitter = submitEvent.submitter;
+      if (!submitter || submitter.dataset.bankAsync === "false") return;
+      submitEvent.preventDefault();
+      // formAction on an externally-associated button can resolve to the
+      // current page even without a formaction attribute.  Only honor an
+      // explicit override; ordinary cell saves must use this row's update URL.
+      const endpoint = submitter.getAttribute("formaction") || form.action;
+      const isDelete = /\/delete$/.test(endpoint);
+      if (isDelete && !confirm("Remove this LS Bank entry?")) return;
+      submitter.disabled = true;
+      fetch(endpoint, {method: "POST", headers: {"Accept": "application/json"}, body: new FormData(form)})
+        .then(async response => {
+          const payload = await response.json().catch(() => ({}));
+          if (!response.ok || !payload.ok) throw new Error(payload.message || "Unable to save the LS Bank item.");
+          return payload;
+        })
+        .then(payload => {
+          if (payload.deleted) { row.remove(); showBankSaveMessage(payload.message); return; }
+          if (payload.status === "Sold") renderSold(payload.sale_gil);
+          else if (payload.status === "Used") {
+            row.dataset.status = "purchased";
+            const badge = row.querySelector(".bank-status");
+            if (badge) { badge.textContent = "Used"; badge.className = "bank-status used"; }
+            row.cells[5].querySelectorAll(".bank-sale-gil,.bank-held-kind").forEach(node => node.remove());
+            form.querySelectorAll(".bank-item-used,.bank-confirm-used,select[name='used_event_id']").forEach(node => node.remove());
+          } else if (payload.status === "Held") {
+            row.dataset.status = "held";
+            statusHidden.value = "Held";
+            row.cells[5].querySelector("small")?.remove();
+            const badge = row.querySelector(".bank-status");
+            if (badge) { badge.textContent = !/^(event drop|donation)/.test(source.value) ? "Held (Purchased)" : "Held (Dropped)"; badge.className = "bank-status held"; }
+          }
+          setLeadingText(row.cells[1], source.value);
+          setLeadingText(row.cells[2], form.elements.holder_member_id.selectedOptions[0]?.textContent || "Unassigned");
+          const savedPurchase = payload.purchase_gil ?? form.elements.purchase_gil.value;
+          setLeadingText(row.cells[3], formatBankGil(savedPurchase));
+          row.dataset.purchase = String(savedPurchase || "0");
+          row.querySelectorAll(".bank-inline-editor.open").forEach(editor => editor.classList.remove("open"));
+          const openKind = row.querySelector(".bank-held-kind:not([hidden])");
+          if (openKind) {
+            openKind.hidden = true;
+            openKind.nextElementSibling.hidden = true;
+            row.querySelector(".bank-status")?.removeAttribute("hidden");
+          }
+          showBankSaveMessage(payload.message);
+          refreshBankBalance();
+        })
+        .catch(error => alert(error.message))
+        .finally(() => { submitter.disabled = false; });
+    });
   });
   let bankCanonicalItemNames = new Map();
   let bankCatalogNames = [];
@@ -285,19 +559,52 @@
     const canonical = bankCanonicalItemNames.get(bankMarketKey(bankItemInput.value));
     if (canonical) bankItemInput.value = canonical;
   });
+  let bankLatestMarketPrices = {};
+  const refreshBankBalance = () => {
+    let cash = 0;
+    document.querySelectorAll("#ls-bank-body tr[data-bank-search]").forEach(row => {
+      const source = row.dataset.source || "";
+      const purchased = !/^(event drop|donation)/.test(source);
+      if (purchased) cash -= Number(row.dataset.purchase || 0);
+      if (row.dataset.status === "sold") {
+        const sale = row.cells[5]?.textContent.match(/[\d,]+g/)?.[0] || "0";
+        cash += Number(sale.replace(/[^\d]/g, ""));
+      }
+    });
+    const summary = document.querySelector(".ls-bank-summary");
+    if (summary) summary.dataset.bankCash = String(cash);
+    const balance = document.querySelector("#bank-cash-balance");
+    if (balance) balance.textContent = formatBankGil(cash);
+    updateBankMarketValues(bankLatestMarketPrices);
+  };
   const updateBankMarketValues = prices => {
+    bankLatestMarketPrices = prices || bankLatestMarketPrices;
     const byName = Object.fromEntries(Object.values(prices || {}).filter(price => price.name).map(price => [bankMarketKey(price.name), price]));
     let heldDroppedValue = 0;
     let heldPurchasedValue = 0;
     document.querySelectorAll("#ls-bank-body tr[data-bank-search]").forEach(row => {
-      if (row.dataset.status !== "held") return;
+      const explicitlyUsed = /\bUsed:/.test(row.cells[0]?.textContent || "");
+      const heldPurchased = row.dataset.status === "purchased" && !explicitlyUsed;
+      if (heldPurchased && !row.querySelector(".bank-market-value")) {
+        const label = row.cells[0]?.querySelector("b")?.textContent.trim() || "";
+        const [, quantity = "1", item = label] = label.match(/^(\d+)×\s+(.+)$/) || [];
+        row.cells[4].innerHTML = `<span class="bank-market-value" data-bank-item="${safeText(item)}" data-bank-quantity="${safeText(quantity)}">Loading…</span>`;
+      }
+      if (row.dataset.status !== "held" && !heldPurchased) return;
       const purchased = !/^(event drop|donation)/.test(row.dataset.source || "");
-      const badge = row.querySelector(".bank-status.held");
+      const badge = row.querySelector(".bank-status");
       if (badge) {
         badge.textContent = purchased ? "Held (Purchased)" : "Held (Dropped)";
+        badge.classList.remove("purchased");
+        badge.classList.add("held");
         badge.classList.toggle("purchased", purchased);
         badge.classList.toggle("dropped", !purchased);
       }
+    });
+    document.querySelectorAll("#ls-bank-body tr[data-status='purchased']").forEach(row => {
+      if (!/\bUsed:/.test(row.cells[0]?.textContent || "")) return;
+      const badge = row.querySelector(".bank-status");
+      if (badge) { badge.textContent = "Used"; badge.classList.add("used"); }
     });
     document.querySelectorAll(".bank-market-value").forEach(cell => {
       const price = byName[bankMarketKey(cell.dataset.bankItem)];
@@ -334,16 +641,25 @@
     const purchased = !/^(event drop|donation)/.test(source);
     return row.dataset.status === "held" && (kind === "purchased" ? purchased : !purchased);
   }).map(row => {
-    const holder = row.querySelector(".ls-bank-row-editor select[name='holder_member_id'] option:checked")?.textContent || row.cells[2]?.textContent.trim() || "Unassigned";
+    const holder = row.querySelector("select[name='holder_member_id'] option:checked")?.textContent || row.cells[2]?.textContent.trim() || "Unassigned";
     const item = row.cells[0]?.querySelector("b")?.textContent.trim() || "Item";
-    const source = row.cells[1]?.textContent.trim() || "";
+    const source = [row.dataset.bankSourceLabel, row.dataset.bankEventLabel].filter(Boolean).join(" · ");
     const market = row.querySelector(".bank-market-value")?.textContent.trim() || "—";
     const cash = row.dataset.status === "sold" ? row.cells[5]?.textContent.match(/[\d,]+g/)?.[0] || "—" : `-${Number(row.dataset.purchase || 0).toLocaleString()}g`;
     return {holder, item, source, value: kind === "cash" ? cash : market};
   });
   const openBankDetail = (kind, title) => {
     const rows = bankDetailRows(kind);
-    bankDetailDialog.innerHTML = `<form method="dialog"><button class="ls-bank-detail-close" aria-label="Close">×</button></form><h2>${title}</h2><table><thead><tr><th>Officer</th><th>Item / source</th><th>Value</th></tr></thead><tbody>${rows.length ? rows.map(row => `<tr><td>${safeText(row.holder)}</td><td><b>${safeText(row.item)}</b><small>${safeText(row.source)}</small></td><td>${safeText(row.value)}</td></tr>`).join("") : '<tr><td colspan="3">No entries.</td></tr>'}</tbody></table>`;
+    const groups = [...rows.reduce((all, row) => {
+      const amount = Number(String(row.value).replace(/[^\d-]/g, "")) * (String(row.value).trim().startsWith("-") ? -1 : 1);
+      const group = all.get(row.holder) || {holder: row.holder, amount: 0, rows: []};
+      group.amount += amount;
+      group.rows.push({...row, amount});
+      all.set(row.holder, group);
+      return all;
+    }, new Map()).values()].sort((left, right) => right.amount - left.amount);
+    const gil = amount => `${amount < 0 ? "−" : ""}${Math.abs(Math.round(amount)).toLocaleString()}g`;
+    bankDetailDialog.innerHTML = `<form method="dialog"><button class="ls-bank-detail-close" aria-label="Close">×</button></form><h2>${title}</h2><table><thead><tr><th>Officer</th><th>Current total</th></tr></thead><tbody>${groups.length ? groups.map(group => `<tr><td><details><summary><b>${safeText(group.holder)}</b><small>Expand log · ${group.rows.length} entr${group.rows.length === 1 ? "y" : "ies"}</small></summary><ol>${group.rows.map(row => `<li><b>${safeText(row.item)}</b><small>${safeText(row.source)}</small><span>${gil(row.amount)}</span></li>`).join("")}</ol></details></td><td>${gil(group.amount)}</td></tr>`).join("") : '<tr><td colspan="2">No entries.</td></tr>'}</tbody></table>`;
     bankDetailDialog.showModal();
   };
   [["#bank-cash-balance", "cash", "LS Gil balance"], ["#bank-held-dropped", "dropped", "Held dropped items"], ["#bank-held-purchased", "purchased", "Held purchased items"]].forEach(([selector, kind, title]) => {
@@ -393,7 +709,7 @@
       body.append("entry_id", id);
       body.append("holder_member_id", form.elements.holder_member_id.value);
       body.append("status", form.elements.status.value);
-      body.append("sale_gil", "");
+      body.append("sale_gil", form.elements.sale_gil?.value || "");
       body.append("acquisition_kind", form.elements.acquisition_kind.value);
       body.append("event_id", form.elements.event_id.value);
       body.append("purchase_gil", form.elements.purchase_gil.value);
@@ -401,9 +717,31 @@
     });
     bankSaveAll.disabled = true;
     bankSaveAll.textContent = "Saving…";
-    fetch("/endgame/bank/bulk-update", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded"}, body})
-      .then(response => { if (!response.ok) throw new Error("Unable to save LS Bank rows."); window.location.assign(response.url); })
-      .catch(error => { bankSaveAll.disabled = false; bankSaveAll.textContent = "Save all"; alert(error.message); });
+    fetch("/endgame/bank/bulk-update", {method: "POST", headers: {"Content-Type": "application/x-www-form-urlencoded", "Accept": "application/json"}, body})
+      .then(async response => {
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.ok) throw new Error(payload.message || "Unable to save LS Bank rows.");
+        rows.forEach(form => {
+          const row = form.closest("tr");
+          const sale = form.elements.acquisition_kind?.value === "Mercenary"
+            ? Number(form.elements.purchase_gil?.value || 0)
+            : Number(form.elements.sale_gil?.value || 0);
+          if (!sale || !row) return;
+          row.dataset.status = "sold";
+          const badge = row.querySelector(".bank-status");
+          if (badge) { badge.textContent = "Sold"; badge.className = "bank-status sold"; }
+          row.cells[5].querySelector(".bank-sale-gil")?.remove();
+          if (!row.cells[5].querySelector("small")) {
+            const saleText = document.createElement("small");
+            saleText.textContent = formatBankGil(sale);
+            row.cells[5].append(saleText);
+          }
+        });
+        showBankSaveMessage(payload.message || "LS Bank entries saved.");
+        refreshBankBalance();
+      })
+      .catch(error => alert(error.message))
+      .finally(() => { bankSaveAll.disabled = false; bankSaveAll.textContent = "Save all"; });
   });
   if (document.querySelector(".ls-bank-panel")) {
     filterBankRows();
