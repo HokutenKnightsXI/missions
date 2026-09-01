@@ -197,9 +197,7 @@ def test_ls_bank_tracks_event_items_sales_and_officer_custody(tmp_path):
     database = sqlite3.connect(app.config["DATABASE"])
     assert database.execute("SELECT status,sale_gil,sale_channel,notes FROM ls_bank_items WHERE id=?", (bank_item_id,)).fetchone() == ("Sold", 450000, "Bazaar", "Sold in Jeuno")
     database.close()
-    returned = client.post(f"/endgame/bank/{bank_item_id}/update", data={
-        "csrf_token": "token", "holder_member_id": str(holder_id), "status": "Held", "sale_channel": "", "sale_gil": "450000",
-    })
+    returned = client.post(f"/endgame/bank/{bank_item_id}/reopen", data={"csrf_token": "token"})
     assert returned.status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
     assert database.execute("SELECT status,sale_gil,sale_channel,notes,sold_at FROM ls_bank_items WHERE id=?", (bank_item_id,)).fetchone() == ("Held", 0, "", "Sold in Jeuno", None)
