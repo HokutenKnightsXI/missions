@@ -220,8 +220,8 @@ def test_ls_bank_purchases_reduce_cash_and_bulk_sale_prices_mark_items_sold(tmp_
     sign_in(client, member_id=1, admin=True)
     holder_id = 1
     created = client.post("/endgame/bank", data={
-        "csrf_token": "token", "item": "Timeless Hourglass", "acquisition_kind": "Timeless Hourglass",
-        "status": "Purchased", "quantity": "1", "purchase_gil": "500000", "holder_member_id": str(holder_id),
+        "csrf_token": "token", "item": "Timeless Hourglass", "acquisition_kind": "Auction House",
+        "status": "Held", "quantity": "1", "purchase_gil": "500000", "holder_member_id": str(holder_id),
     })
     assert created.status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
@@ -232,16 +232,21 @@ def test_ls_bank_purchases_reduce_cash_and_bulk_sale_prices_mark_items_sold(tmp_
     database.close()
     saved = client.post("/endgame/bank/bulk-update", data={
         "csrf_token": "token", "entry_id": [str(purchased_id), str(held_id)],
-        "holder_member_id": [str(holder_id), str(holder_id)], "status": ["Purchased", "Held"],
-        "sale_gil": ["", "725000"], "notes": ["Dynamis run", "Bulk sold"],
+        "holder_member_id": [str(holder_id), str(holder_id)], "status": ["Held", "Held"],
+        "sale_gil": ["", "725000"], "acquisition_kind": ["Auction House", "Event Drop"],
+        "event_id": ["", ""], "purchase_gil": ["500000", "0"], "notes": ["Dynamis run", "Bulk sold"],
     })
     assert saved.status_code == 302
     database = sqlite3.connect(app.config["DATABASE"])
-    assert database.execute("SELECT status,sale_gil,notes FROM ls_bank_items WHERE id=?", (purchased_id,)).fetchone() == ("Purchased", 0, "Dynamis run")
+    assert database.execute("SELECT status,sale_gil,notes FROM ls_bank_items WHERE id=?", (purchased_id,)).fetchone() == ("Held", 0, "Dynamis run")
     assert database.execute("SELECT status,sale_gil,notes FROM ls_bank_items WHERE id=?", (held_id,)).fetchone() == ("Sold", 725000, "Bulk sold")
     database.close()
+    used = client.post(f"/endgame/bank/{purchased_id}/use", data={"csrf_token": "token", "used_event_id": "other"})
+    assert used.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT status,notes FROM ls_bank_items WHERE id=?", (purchased_id,)).fetchone() == ("Purchased", "Dynamis run · Used: Other")
+    database.close()
     page = client.get("/endgame#bank").data
-    assert b"Purchased" in page
     assert b"Timeless Hourglass" in page
     assert b'data-bank-cash="225000"' in page
     assert b'id="bank-held-dropped"' in page
