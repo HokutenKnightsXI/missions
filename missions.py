@@ -267,7 +267,7 @@ LOGIN_CHARACTERS = (
     "Kaeru", "Firewater", "Anonym", "Ramenwarrior", "Kalindra", "Eunos",
     "Brewski", "Bodom", "Werx", "Palumbo", "Hikari", "Gravekeeper",
 )
-DISCORD_ADMIN_CHARACTERS = ("Imaven", "Sexualpotato", "Vlathgar", "Cartuja", "Ramenwarrior")
+DISCORD_ADMIN_CHARACTERS = ("Imaven", "Sexualpotato", "Vlathgar", "Cartuja", "Ramenwarrior", "Chickenbanana")
 AVAILABILITY_MODES = {
     "now": "Today/Now — PM Me",
     "after": "Any Time After",
@@ -4381,7 +4381,8 @@ def create_app(test_config=None):
         raw_purchase_gil = request.form.get("purchase_gil")
         purchase_gil = entry["purchase_gil"] if raw_purchase_gil is None else bank_gil_value(raw_purchase_gil)
         raw_sale_gil = request.form.get("sale_gil")
-        sale_gil = 0 if not str(raw_sale_gil or "").strip() else bank_gil_value(raw_sale_gil)
+        sale_gil = (entry["sale_gil"] if status == "Sold" and not str(raw_sale_gil or "").strip()
+                    else (0 if not str(raw_sale_gil or "").strip() else bank_gil_value(raw_sale_gil)))
         sale_channel = request.form.get("sale_channel", entry["sale_channel"]).strip()
         submitted_notes = request.form.get("notes")
         notes = entry["notes"] if not (submitted_notes or "").strip() else submitted_notes.strip()[:500]
