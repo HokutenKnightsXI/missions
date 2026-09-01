@@ -68,10 +68,24 @@ def test_blue_magic_catalog_includes_horizon_chain_affinity_properties():
     ])}
     assert spells["Screwdriver"]["properties"] == ["Transfixion", "Scission"]
     assert spells["Ram Charge"]["properties"] == ["Fragmentation"]
-    assert spells["Quadratic Continuum"]["properties"] == ["Scission", "Distortion"]
+    assert spells["Quadratic Continuum"]["properties"] == ["Reverberation", "Scission"]
 
 
 def test_horizon_seraph_blade_retains_its_transfixion_property():
     sql = "INSERT INTO `weapon_skills` VALUES (37,'seraph_blade',0x00000000000000000000000200000000000000000000,3,125,0,0,0,3,1,0,4,0,0,0,0);"
     seraph_blade = parse_weapon_skills(sql)[0]
     assert seraph_blade["properties"] == ["Scission", "Transfixion"]
+
+
+def test_skillchain_calculator_uses_current_chain_affinity_catalog_version():
+    script = Path("static/skillchain_calculator.js").read_text(encoding="utf-8")
+    assert 'skillchain_catalog.json?v=5' in script
+
+
+def test_skillchain_page_cache_busts_the_calculator_script(tmp_path):
+    app = create_app({"TESTING": True, "DATABASE": str(tmp_path / "skillchains.db"), "SECRET_KEY": "test", "AUTH_DISABLED": False})
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["is_editor"] = True
+        session["member_id"] = 1
+    assert b"skillchain_calculator.js?v=13" in client.get("/skillchain-calculator").data
