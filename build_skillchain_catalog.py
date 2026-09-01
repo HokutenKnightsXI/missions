@@ -59,7 +59,10 @@ HORIZON_BLUE_SKILLCHAIN_PROPERTIES = {
     "Disseverment": ("Distortion",),
     "Ram Charge": ("Fragmentation",),
     "Vertical Cleave": ("Gravitation",),
-    "Quadratic Continuum": ("Scission", "Distortion"),
+    # Verified in-game on HorizonXI: Seraph Blade closes into Quad. Continuum
+    # as Reverberation.  Horizon's live behavior therefore differs from the
+    # inherited retail/Chains data, which lists Distortion / Scission.
+    "Quadratic Continuum": ("Reverberation", "Scission"),
 }
 
 # The upstream weapon-skill dataset omits a secondary property that is present
