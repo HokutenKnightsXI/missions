@@ -212,6 +212,39 @@ def test_ls_bank_tracks_event_items_sales_and_officer_custody(tmp_path):
     assert b"Refresh market" in page.data
 
 
+def test_ls_bank_purchases_reduce_cash_and_bulk_sale_prices_mark_items_sold(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    holder_id = 1
+    created = client.post("/endgame/bank", data={
+        "csrf_token": "token", "item": "Timeless Hourglass", "acquisition_kind": "Timeless Hourglass",
+        "status": "Purchased", "quantity": "1", "purchase_gil": "500000", "holder_member_id": str(holder_id),
+    })
+    assert created.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    purchased_id = database.execute("SELECT id FROM ls_bank_items WHERE item='Timeless Hourglass'").fetchone()[0]
+    database.execute("INSERT INTO ls_bank_items(item,quantity,acquisition_kind,status,holder_member_id) VALUES('Behemoth Hide',1,'Event Drop','Held',?)", (holder_id,))
+    held_id = database.execute("SELECT id FROM ls_bank_items WHERE item='Behemoth Hide'").fetchone()[0]
+    database.commit()
+    database.close()
+    saved = client.post("/endgame/bank/bulk-update", data={
+        "csrf_token": "token", "entry_id": [str(purchased_id), str(held_id)],
+        "holder_member_id": [str(holder_id), str(holder_id)], "status": ["Purchased", "Held"],
+        "sale_gil": ["", "725000"], "notes": ["Dynamis run", "Bulk sold"],
+    })
+    assert saved.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT status,sale_gil,notes FROM ls_bank_items WHERE id=?", (purchased_id,)).fetchone() == ("Purchased", 0, "Dynamis run")
+    assert database.execute("SELECT status,sale_gil,notes FROM ls_bank_items WHERE id=?", (held_id,)).fetchone() == ("Sold", 725000, "Bulk sold")
+    database.close()
+    page = client.get("/endgame#bank").data
+    assert b"Purchased" in page
+    assert b"Timeless Hourglass" in page
+
+
 def test_past_endgame_events_show_most_recent_first(tmp_path):
     app = make_app(tmp_path)
     client = app.test_client()

@@ -56,5 +56,5 @@
   [...typeFilter.options].slice(1).sort((a,b) => a.text.localeCompare(b.text)).forEach(option => typeFilter.append(option));
   Object.assign(typeFilter.parentElement.style, {display:"flex", alignItems:"center", gap:"6px", color:"#a9bed1", fontSize:"10px", fontWeight:"900", textTransform:"uppercase", letterSpacing:".06em"});
   Object.assign(typeFilter.style, {padding:"8px", border:"1px solid #365773", borderRadius:"7px", background:"#071522", color:"#f7fbff", font:"inherit", textTransform:"none", letterSpacing:"0"});
-  fetch("/static/skillchain_catalog.json?v=1").then(response => response.json()).then(data => {catalog=data; summary.textContent=`${data.actions.length} Horizon-era actions loaded. Results are ordered by final skillchain level, then weapon-skill requirement.`; renderPlayers(); calculate();}).catch(() => {summary.textContent="The skillchain catalog could not be loaded.";});
+  fetch("/static/skillchain_catalog.json?v=2").then(response => response.json()).then(data => {catalog=data; summary.textContent=`${data.actions.length} Horizon-era actions loaded. Results are ordered by final skillchain level, then weapon-skill requirement.`; renderPlayers(); calculate();}).catch(() => {summary.textContent="The skillchain catalog could not be loaded.";});
 })();

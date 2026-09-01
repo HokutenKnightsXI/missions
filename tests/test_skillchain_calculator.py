@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from build_skillchain_catalog import build, parse_blood_pacts, parse_skill_caps, supplement_blue_magic
+from build_skillchain_catalog import build, parse_blood_pacts, parse_skill_caps, parse_weapon_skills, supplement_blue_magic
 from missions import create_app
 
 
@@ -68,4 +68,10 @@ def test_blue_magic_catalog_includes_horizon_chain_affinity_properties():
     ])}
     assert spells["Screwdriver"]["properties"] == ["Transfixion", "Scission"]
     assert spells["Ram Charge"]["properties"] == ["Fragmentation"]
-    assert "Quadratic Continuum" not in spells
+    assert spells["Quadratic Continuum"]["properties"] == ["Scission", "Distortion"]
+
+
+def test_horizon_seraph_blade_retains_its_transfixion_property():
+    sql = "INSERT INTO `weapon_skills` VALUES (37,'seraph_blade',0x00000000000000000000000200000000000000000000,3,125,0,0,0,3,1,0,4,0,0,0,0);"
+    seraph_blade = parse_weapon_skills(sql)[0]
+    assert seraph_blade["properties"] == ["Scission", "Transfixion"]

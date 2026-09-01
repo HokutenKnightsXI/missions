@@ -24,8 +24,7 @@ ERA_RANK_OVERRIDES = {("dagger", "THF"): 2, ("axe", "BST"): 2, ("katana", "NIN")
 
 # LandSandBoat's current Blue Magic action-script directory has only a small
 # subset of the era spells.  HorizonXI's level-75 list supplies the remaining
-# physical spells and their Chain Affinity properties.  Quadratic Continuum is
-# deliberately omitted because Horizon marks its property as unconfirmed.
+# physical spells and their Chain Affinity properties.
 HORIZON_BLUE_SKILLCHAIN_PROPERTIES = {
     "Foot Kick": ("Detonation",),
     "Power Attack": ("Reverberation",),
@@ -60,6 +59,14 @@ HORIZON_BLUE_SKILLCHAIN_PROPERTIES = {
     "Disseverment": ("Distortion",),
     "Ram Charge": ("Fragmentation",),
     "Vertical Cleave": ("Gravitation",),
+    "Quadratic Continuum": ("Scission", "Distortion"),
+}
+
+# The upstream weapon-skill dataset omits a secondary property that is present
+# on HorizonXI.  Keep this small override alongside the Horizon Blue Magic
+# list so regenerated catalogs preserve Horizon-era behavior.
+HORIZON_WEAPON_SKILL_PROPERTY_OVERRIDES = {
+    "Seraph Blade": ("Scission", "Transfixion"),
 }
 
 
@@ -95,12 +102,14 @@ def parse_weapon_skills(sql: str, skill_ranks: dict[str, dict[str, int]] | None 
         fields = [int(value.rstrip(")")) for value in values.split(",")]
         weapon_type, skill_level = fields[0], fields[1]
         properties = [SC_PROPERTIES.get(value) for value in fields[8:11] if value]
+        name = display_name(name)
+        properties = list(HORIZON_WEAPON_SKILL_PROPERTY_OVERRIDES.get(name, properties))
         if weapon_type not in WEAPONS or not properties or not 0 < skill_level <= 276:
             continue
         job_flags = bytes.fromhex(jobs_hex)
         jobs = [job for job, flag in zip(JOBS, job_flags) if flag]
         catalog.append({
-            "id": f"ws:{ident}", "name": display_name(name), "kind": "Weapon Skill",
+            "id": f"ws:{ident}", "name": name, "kind": "Weapon Skill",
             "weapon": WEAPONS[weapon_type], "jobs": jobs, "skill_level": skill_level,
             "skill_ranks": {job: skill_ranks.get(SKILL_NAMES[weapon_type], {}).get(job, 1) for job in jobs},
             "level_requirement": 0, "properties": properties,
