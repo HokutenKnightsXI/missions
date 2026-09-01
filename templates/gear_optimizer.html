@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block title %}Gear Optimizer &middot; Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=20) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=18) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_select.css', v=1) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static', filename='gear_optimizer.css', v=21) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_catalog.css', v=18) }}"><link rel="stylesheet" href="{{ url_for('static', filename='gear_select.css', v=1) }}">{% endblock %}
 {% block content %}
 <section class="gear-hero">
   <div><p class="eyebrow">HorizonXI &middot; Level 75 &middot; Treasures era</p><h1>Gear Optimizer</h1><p>Choose a job, level, race, and stat to build the strongest eligible set and browse every matching item by slot.</p></div>
@@ -22,6 +22,15 @@
     <p id="gear-import-instructions" {{ 'hidden' if archived_gear }}>Paste the copied inventory list from your HorizonXI character page. Equippable item names are matched against the optimizer catalog; materials, key items, and consumables are ignored.</p>
     <textarea id="gear-import-text" rows="9" placeholder="Paste your copied HorizonXI inventory here..." {{ 'hidden' if archived_gear }}></textarea>
     <div class="gear-import-actions"><a class="gear-action-button gear-profile-button" href="https://horizonxi.com/players/{{ member.name|urlencode }}" target="_blank" rel="noopener">Open Horizon Profile</a><button type="button" id="gear-import-button" class="gear-action-button" {{ 'hidden' if archived_gear }}>Import Gear</button><button type="button" id="gear-import-success" class="gear-import-success" disabled {{ '' if archived_gear else 'hidden' }}>&#10003; Import Successful</button><button type="button" id="gear-clear-import" class="gear-action-button secondary">Clear Imported Gear</button><strong id="gear-import-status">No gear imported</strong></div>
+  </div>
+</details>
+
+<details class="gear-value-section" id="gear-value-section">
+  <summary><span>Gear value</span><strong id="gear-liquid-value">Loading market value…</strong><span id="gear-value-collapse" class="gear-collapse-button" aria-hidden="true">&#9656;</span></summary>
+  <div class="gear-value-body">
+    <p>Estimated liquid value uses the lowest PSXI bazaar listing when available, otherwise the recent sale average. Rare/Ex equipment is excluded.</p>
+    <div class="gear-value-filters"><label>Search<input id="gear-value-search" type="search" placeholder="Item name"></label><label>Inventory slot<select id="gear-value-slot"><option value="">All slots</option></select></label><label>Job<select id="gear-value-job"><option value="">All jobs</option></select></label><strong id="gear-value-count"></strong></div>
+    <div class="gear-value-table-wrap"><table class="gear-value-table"><thead><tr><th><button type="button" data-gear-value-sort="name">Item</button></th><th><button type="button" data-gear-value-sort="quantity">Qty</button></th><th><button type="button" data-gear-value-sort="slot">Slot</button></th><th><button type="button" data-gear-value-sort="jobs">Jobs</button></th><th><button type="button" data-gear-value-sort="unit">Each</button></th><th><button type="button" data-gear-value-sort="total">Total</button></th></tr></thead><tbody id="gear-value-rows"><tr><td colspan="6">Import gear to calculate its liquid value.</td></tr></tbody></table></div>
   </div>
 </details>
 
@@ -62,5 +71,5 @@ window.GEAR_OPTIMIZER={{ {
   'csrf': csrf_token()
 }|tojson }};
 </script>
-<script src="{{ url_for('static', filename='gear_optimizer.js', v=21) }}"></script>
+<script src="{{ url_for('static', filename='gear_optimizer.js', v=23) }}"></script>
 {% endblock %}
