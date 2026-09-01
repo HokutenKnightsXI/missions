@@ -4312,9 +4312,6 @@ def create_app(test_config=None):
             return -1
         return value if 0 <= value <= 2_000_000_000 else -1
 
-    def bank_source_requires_purchase_price(source):
-        return source in {"Auction House", "Bazaar", "Other"}
-
     def bank_saved_response(message, **payload):
         """Keep in-place LS Bank controls from forcing a dashboard reload."""
         if request.accept_mimetypes.best == "application/json":
@@ -4349,7 +4346,6 @@ def create_app(test_config=None):
         if (not item or not 1 <= quantity <= 9999 or purchase_gil < 0
                 or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
                 or status not in {"Held", "Purchased", "Sold"}
-                or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
                 or (acquisition_kind == "Mercenary" and sale_gil <= 0)
                 or (event_id and not event) or (holder_id and not holder) or (purchaser_id and not purchaser)):
             abort(400, description="Complete the LS Bank item using valid values.")
@@ -4395,7 +4391,6 @@ def create_app(test_config=None):
             status, sale_gil = "Purchased", 0
         if (status not in {"Held", "Purchased", "Sold"} or sale_gil < 0 or purchase_gil < 0 or (holder_id and not holder) or (purchaser_id and not purchaser)
                 or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
-                or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
                 or (acquisition_kind == "Mercenary" and sale_gil <= 0)
                 or (event_id and not event)
                 or (status == "Sold" and sale_channel not in {"", "Auction House", "Bazaar"})
@@ -4491,7 +4486,6 @@ def create_app(test_config=None):
                 status, sale_gil = "Purchased", 0
             if (not entry or sale_gil < 0 or purchase_gil < 0 or status not in {"Held", "Purchased", "Sold"}
                     or acquisition_kind not in {"Event Drop", "Auction House", "Bazaar", "Donation", "Other", "Mercenary", "Purchase", "Pop Item", "Timeless Hourglass", "Merc Sell", "Manual"}
-                    or (status == "Held" and bank_source_requires_purchase_price(acquisition_kind) and purchase_gil <= 0)
                     or (acquisition_kind == "Mercenary" and sale_gil <= 0)
                     or (event_id and not event) or (holder_id and not holder) or (purchaser_id and not purchaser)):
                 abort(400, description="Use valid LS Bank values before saving all rows.")
