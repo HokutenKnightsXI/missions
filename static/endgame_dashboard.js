@@ -183,6 +183,18 @@
     if (heldOption) { heldOption.textContent = "Drop"; heldOption.value = "Held"; }
     bankNewStatus.closest("label")?.setAttribute("hidden", "");
   }
+  const bankAddHolder = bankSource?.form?.querySelector("select[name='holder_member_id']");
+  if (bankAddHolder && !bankSource.form?.querySelector("select[name='purchaser_member_id']")) {
+    const purchaserLabel = document.createElement("label");
+    purchaserLabel.textContent = "Purchased by";
+    const purchaser = document.createElement("select");
+    purchaser.name = "purchaser_member_id";
+    purchaser.setAttribute("aria-label", "Officer who paid for the item");
+    purchaser.add(new Option("Same as held by", ""));
+    [...bankAddHolder.options].filter(option => option.value).forEach(option => purchaser.add(new Option(option.textContent, option.value)));
+    purchaserLabel.append(purchaser);
+    bankAddHolder.closest("label")?.after(purchaserLabel);
+  }
   bankSource?.addEventListener("change", () => {
     if (bankNewStatus) bankNewStatus.value = "Held";
     const purchaseInput = bankSource.form?.querySelector("input[name='purchase_gil']");
@@ -236,6 +248,9 @@
     purchase.value = row.dataset.purchase || "0";
     purchase.placeholder = ["Merc Sell", "Mercenary"].includes(source.value) ? "Gil received" : "Purchase gil";
     purchase.setAttribute("aria-label", ["Merc Sell", "Mercenary"].includes(source.value) ? "Gil received" : "Purchase gil");
+    const purchaser = form.elements.holder_member_id.cloneNode(true);
+    purchaser.name = "purchaser_member_id";
+    purchaser.setAttribute("aria-label", "Purchased by");
     const statusHidden = document.createElement("input");
     statusHidden.type = "hidden";
     statusHidden.name = "status";
@@ -256,6 +271,10 @@
       row.dataset.bankSourceLabel = source.value;
       const action = form.querySelector(".bank-mark-sold");
       if (action) action.textContent = source.value === "Mercenary" ? "Record gil" : "Mark Sold";
+      if (source.value === "Mercenary") {
+        purchaseEditor.classList.add("open");
+        purchase.focus();
+      }
     });
     const addInlineEditor = (cell, controls) => {
       const editor = document.createElement("span");
@@ -289,7 +308,7 @@
       return editor;
     };
     addInlineEditor(row.cells[1], [source, event]);
-    addInlineEditor(row.cells[2], [form.elements.holder_member_id]);
+    addInlineEditor(row.cells[2], [form.elements.holder_member_id, purchaser]);
     const purchaseEditor = addInlineEditor(row.cells[3], [purchase]);
     const isUsed = /\bUsed:/.test(row.cells[0]?.textContent || "");
     const heldInventory = ["held", "purchased"].includes(row.dataset.status) && !isUsed;
@@ -382,32 +401,33 @@
       confirmUse.hidden = true;
       form.append(usedFor, confirmUse);
     }
+    const enableSoldSaleEdit = saleText => {
+      saleText.classList.add("bank-sale-editable");
+      saleText.title = "Click to edit sale value";
+      saleText.addEventListener("click", () => {
+        if (row.cells[5].querySelector("input[name='sale_gil']")) return;
+        const sale = document.createElement("input");
+        sale.type = "number";
+        sale.name = "sale_gil";
+        sale.min = "0";
+        sale.max = "2000000000";
+        sale.value = (saleText.textContent.match(/[\d,]+g/)?.[0] || "0").replace(/[^\d]/g, "");
+        sale.setAttribute("aria-label", "Sold gil");
+        sale.setAttribute("form", form.id);
+        sale.className = "bank-sale-gil";
+        const saveSale = document.createElement("button");
+        saveSale.type = "submit";
+        saveSale.textContent = "Save";
+        saveSale.className = "bank-save-sale";
+        saveSale.setAttribute("form", form.id);
+        saleText.hidden = true;
+        row.cells[5].append(sale, saveSale);
+        sale.focus();
+      });
+    };
     if (row.dataset.status === "sold") {
       const saleText = [...row.cells[5].querySelectorAll("small")].find(node => /[\d,]+g/.test(node.textContent));
-      if (saleText) {
-        saleText.classList.add("bank-sale-editable");
-        saleText.title = "Click to edit sale value";
-        saleText.addEventListener("click", () => {
-          if (row.cells[5].querySelector("input[name='sale_gil']")) return;
-          const sale = document.createElement("input");
-          sale.type = "number";
-          sale.name = "sale_gil";
-          sale.min = "0";
-          sale.max = "2000000000";
-          sale.value = (saleText.textContent.match(/[\d,]+g/)?.[0] || "0").replace(/[^\d]/g, "");
-          sale.setAttribute("aria-label", "Sold gil");
-          sale.setAttribute("form", form.id);
-          sale.className = "bank-sale-gil";
-          const saveSale = document.createElement("button");
-          saveSale.type = "submit";
-          saveSale.textContent = "Save";
-          saveSale.className = "bank-save-sale";
-          saveSale.setAttribute("form", form.id);
-          saleText.hidden = true;
-          row.cells[5].append(sale, saveSale);
-          sale.focus();
-        });
-      }
+      if (saleText) enableSoldSaleEdit(saleText);
       const reopen = document.createElement("button");
       reopen.type = "submit";
       reopen.className = "bank-reopen-sale";
@@ -450,12 +470,11 @@
       statusHidden.value = "Sold";
       const badge = row.querySelector(".bank-status");
       if (badge) { badge.hidden = false; badge.textContent = "Sold"; badge.className = "bank-status sold"; }
-      row.cells[5].querySelectorAll(".bank-sale-gil,.bank-held-kind,.bank-sale-editable").forEach(node => node.remove());
-      if (!row.cells[5].querySelector("small")) {
-        const saleText = document.createElement("small");
-        saleText.textContent = formatBankGil(saleGil);
-        row.cells[5].append(saleText);
-      }
+      row.cells[5].querySelectorAll(".bank-sale-gil,.bank-held-kind,.bank-sale-editable,.bank-save-sale").forEach(node => node.remove());
+      const saleText = document.createElement("small");
+      saleText.textContent = formatBankGil(saleGil);
+      row.cells[5].append(saleText);
+      enableSoldSaleEdit(saleText);
       form.querySelectorAll(".bank-item-used,.bank-confirm-used,select[name='used_event_id'],button[type='submit']").forEach(button => {
         if (button.textContent.trim() !== "Remove") button.remove();
       });
@@ -478,6 +497,12 @@
       const endpoint = submitter.getAttribute("formaction") || form.action;
       const isDelete = /\/delete$/.test(endpoint);
       if (isDelete && !confirm("Remove this LS Bank entry?")) return;
+      if (source.value === "Mercenary" && !Number(purchase.value || 0)) {
+        alert("Enter the Gil received amount before recording a Mercenary payment.");
+        purchaseEditor.classList.add("open");
+        purchase.focus();
+        return;
+      }
       submitter.disabled = true;
       fetch(endpoint, {method: "POST", headers: {"Accept": "application/json"}, body: new FormData(form)})
         .then(async response => {
@@ -607,20 +632,26 @@
       if (badge) { badge.textContent = "Used"; badge.classList.add("used"); }
     });
     document.querySelectorAll(".bank-market-value").forEach(cell => {
+      const row = cell.closest("tr");
       const price = byName[bankMarketKey(cell.dataset.bankItem)];
       const candidates = [price?.bazaar_lowest, price?.single_recent_average, price?.single_average]
         .filter(value => value !== null && value !== undefined && value !== "")
         .map(Number).filter(value => Number.isFinite(value) && value > 0);
-      const unit = candidates.length ? Math.min(...candidates) : null;
+      const timelessHourglass = bankMarketKey(cell.dataset.bankItem) === "timelesshourglass";
+      const purchaseFallback = Number(row?.dataset.purchase || 0) / Math.max(1, Number(cell.dataset.bankQuantity || 1));
+      const unit = timelessHourglass && purchaseFallback > 0
+        ? purchaseFallback
+        : (candidates.length ? Math.min(...candidates) : null);
       if (unit == null) { cell.textContent = "—"; cell.title = "No PSXI market value is currently available."; return; }
       const value = Number(unit) * Number(cell.dataset.bankQuantity || 1);
-      const row = cell.closest("tr");
       const purchased = !/^(event drop|donation)/.test(row?.dataset.source || "");
       if (purchased) heldPurchasedValue += value;
       else heldDroppedValue += value;
       row.dataset.market = String(value);
       cell.textContent = formatBankGil(value);
-      const source = Number(price?.bazaar_lowest) === unit ? "lowest bazaar listing" : "sale average";
+      const source = timelessHourglass && purchaseFallback > 0
+        ? "recorded purchase value"
+        : (Number(price?.bazaar_lowest) === unit ? "lowest bazaar listing" : "sale average");
       cell.title = `PSXI ${source}: ${formatBankGil(unit)} each`;
     });
     const cash = Number(document.querySelector(".ls-bank-summary")?.dataset.bankCash || 0);
@@ -641,7 +672,9 @@
     const purchased = !/^(event drop|donation)/.test(source);
     return row.dataset.status === "held" && (kind === "purchased" ? purchased : !purchased);
   }).map(row => {
-    const holder = row.querySelector("select[name='holder_member_id'] option:checked")?.textContent || row.cells[2]?.textContent.trim() || "Unassigned";
+    const heldBy = row.querySelector("select[name='holder_member_id'] option:checked")?.textContent || row.cells[2]?.textContent.trim() || "Unassigned";
+    const purchasedBy = row.querySelector("select[name='purchaser_member_id'] option:checked")?.textContent || heldBy;
+    const holder = kind === "cash" && row.dataset.status !== "sold" ? purchasedBy : heldBy;
     const item = row.cells[0]?.querySelector("b")?.textContent.trim() || "Item";
     const source = [row.dataset.bankSourceLabel, row.dataset.bankEventLabel].filter(Boolean).join(" · ");
     const market = row.querySelector(".bank-market-value")?.textContent.trim() || "—";
@@ -651,7 +684,7 @@
   const openBankDetail = (kind, title) => {
     const rows = bankDetailRows(kind);
     const groups = [...rows.reduce((all, row) => {
-      const amount = Number(String(row.value).replace(/[^\d-]/g, "")) * (String(row.value).trim().startsWith("-") ? -1 : 1);
+      const amount = Number(String(row.value).replace(/[^\d-]/g, ""));
       const group = all.get(row.holder) || {holder: row.holder, amount: 0, rows: []};
       group.amount += amount;
       group.rows.push({...row, amount});
@@ -708,6 +741,7 @@
       if (!id) return;
       body.append("entry_id", id);
       body.append("holder_member_id", form.elements.holder_member_id.value);
+      body.append("purchaser_member_id", form.elements.purchaser_member_id.value);
       body.append("status", form.elements.status.value);
       body.append("sale_gil", form.elements.sale_gil?.value || "");
       body.append("acquisition_kind", form.elements.acquisition_kind.value);
