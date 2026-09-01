@@ -16,6 +16,8 @@
   const activeSearchControl = document.querySelector("#gear-active-search");
   let ownedCounts = new Map(Object.entries(data.archived || {}).map(([id, count]) => [Number(id), Number(count)]));
   let catalog = [];
+  let marketPrices = {};
+  let gearValueSort = { key: "total", direction: -1 };
   const slotOrder = [
     "main", "sub", "ranged", "ammo",
     "head", "neck", "ear1", "ear2",
@@ -61,6 +63,54 @@
   const rarityBadge = item => {
     const label = rarityLabel(item);
     return label ? element("span", `gear-rarity${item.rare ? " rare" : ""}${item.ex ? " ex" : ""}`, label) : null;
+  };
+  const marketKey = value => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  const formatGil = value => `${Math.max(0, Math.round(Number(value) || 0)).toLocaleString()}g`;
+  const liquidUnitValue = item => {
+    const price = marketPrices[marketKey(item.name)];
+    const values = [price?.bazaar_lowest, price?.single_recent_average, price?.single_average]
+      .map(Number).filter(value => Number.isFinite(value) && value > 0);
+    return values.length ? Math.min(...values) : 0;
+  };
+  const renderGearValue = () => {
+    const totalNode = document.querySelector("#gear-liquid-value");
+    const body = document.querySelector("#gear-value-rows");
+    if (!totalNode || !body) return;
+    const owned = catalog.filter(item => ownedCounts.has(Number(item.item_id)) && !item.ex).map(item => {
+      const quantity = ownedCounts.get(Number(item.item_id)) || 0;
+      const unit = liquidUnitValue(item);
+      return { item, quantity, unit, total: quantity * unit, slot: (item.slots || [item.slot]).join(" / "), jobs: (item.jobs || []).join(" / ") || "All Jobs" };
+    });
+    const total = owned.reduce((sum, row) => sum + row.total, 0);
+    totalNode.textContent = formatGil(total);
+    const slotControl = document.querySelector("#gear-value-slot");
+    const jobControl = document.querySelector("#gear-value-job");
+    const currentSlot = slotControl.value, currentJob = jobControl.value;
+    const slots = [...new Set(owned.flatMap(row => (row.item.slots || [row.item.slot]).filter(Boolean)))].sort();
+    const jobs = [...new Set(owned.flatMap(row => row.item.jobs || []))].sort();
+    slotControl.replaceChildren(new Option("All slots", ""), ...slots.map(value => new Option(value, value)));
+    jobControl.replaceChildren(new Option("All jobs", ""), ...jobs.map(value => new Option(value, value)));
+    slotControl.value = slots.includes(currentSlot) ? currentSlot : "";
+    jobControl.value = jobs.includes(currentJob) ? currentJob : "";
+    const query = document.querySelector("#gear-value-search").value.trim().toLowerCase();
+    const filtered = owned.filter(row => (!query || row.item.name.toLowerCase().includes(query)) &&
+      (!slotControl.value || (row.item.slots || [row.item.slot]).includes(slotControl.value)) &&
+      (!jobControl.value || (row.item.jobs || []).includes(jobControl.value)));
+    filtered.sort((left, right) => {
+      const a = gearValueSort.key === "name" ? left.item.name : left[gearValueSort.key];
+      const b = gearValueSort.key === "name" ? right.item.name : right[gearValueSort.key];
+      return (typeof a === "number" ? a - b : String(a).localeCompare(String(b))) * gearValueSort.direction;
+    });
+    document.querySelector("#gear-value-count").textContent = `${filtered.length} sellable item${filtered.length === 1 ? "" : "s"}`;
+    body.replaceChildren(...(filtered.length ? filtered.map(row => {
+      const tr = document.createElement("tr");
+      const icon = document.createElement("img"); icon.src = `https://static.ffxiah.com/images/icon/${row.item.item_id}.png`; icon.alt = ""; icon.className = "gear-value-icon";
+      const name = element("td"); name.append(icon, document.createTextNode(row.item.name)); bindTooltip(name, row.item);
+      tr.append(name);
+      [row.quantity, row.slot, row.jobs, row.unit ? formatGil(row.unit) : "No price", row.total ? formatGil(row.total) : "—"].forEach(value => tr.append(element("td", "", value)));
+      return tr;
+    }) : [element("tr", "", "")]).map(node => node));
+    if (!filtered.length) { const cell = body.querySelector("td") || document.createElement("td"); cell.colSpan = 6; cell.textContent = owned.length ? "No sellable items match these filters." : "Import gear to calculate its liquid value."; if (!cell.parentElement) { const row = body.querySelector("tr"); row.append(cell); } }
   };
 
   const tooltip = element("aside", "gear-item-tooltip");
@@ -474,6 +524,7 @@
       document.querySelector("#gear-import-text").value = "";
       showImportedState(true);
       refresh();
+      renderGearValue();
     } catch (error) {
       document.querySelector("#gear-import-status").textContent = error.message;
     } finally {
@@ -492,6 +543,7 @@
       setInitialized = false;
       updateImportStatus();
       refresh();
+      renderGearValue();
     } catch (error) {
       document.querySelector("#gear-import-status").textContent = error.message;
     }
@@ -518,6 +570,17 @@
     renderActiveItems();
   });
   activeSearchControl.addEventListener("input", renderActiveItems);
+  ["#gear-value-search", "#gear-value-slot", "#gear-value-job"].forEach(selector => {
+    document.querySelector(selector).addEventListener(selector.includes("search") ? "input" : "change", renderGearValue);
+  });
+  document.querySelector("#gear-value-section").addEventListener("toggle", event => {
+    document.querySelector("#gear-value-collapse").innerHTML = event.currentTarget.open ? "&#9662;" : "&#9656;";
+  });
+  document.querySelectorAll("[data-gear-value-sort]").forEach(button => button.addEventListener("click", () => {
+    const key = button.dataset.gearValueSort;
+    gearValueSort = { key, direction: gearValueSort.key === key ? -gearValueSort.direction : (key === "name" ? 1 : -1) };
+    renderGearValue();
+  }));
 
   const safeSetName = () => document.querySelector("#gear-set-name").value.trim() || "Hokuten Gear Set";
   const xmlEscape = value => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\"/g, "&quot;").replace(/'/g, "&apos;");
@@ -581,8 +644,16 @@
         });
       });
       refresh();
+      renderGearValue();
     })
     .catch(error => {
       document.querySelector("#gear-catalog-count").textContent = error.message;
     });
+  fetch("/api/market-prices", {headers: {"Accept": "application/json"}})
+    .then(response => response.ok ? response.json() : Promise.reject())
+    .then(snapshot => {
+      marketPrices = Object.fromEntries(Object.values(snapshot.prices || {}).filter(price => price.name).map(price => [marketKey(price.name), price]));
+      renderGearValue();
+    })
+    .catch(() => { document.querySelector("#gear-liquid-value").textContent = "Market unavailable"; });
 })();
