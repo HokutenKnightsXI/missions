@@ -176,6 +176,29 @@ def test_dynamis_lotting_uses_horizon_levels_and_locks_after_officer_approval(tm
     database.close()
 
 
+def test_dynamis_lotting_accepts_a_single_eligible_job(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute("INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'','BLM',75)")
+    database.commit()
+    database.close()
+
+    assert b"One eligible Dynamis job is available" in client.get("/endgame").data
+    requested = client.post("/endgame/dynamis-lot-requests", data={
+        "csrf_token": "token", "main_job": "BLM", "secondary_job": "",
+    })
+    assert requested.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute(
+        "SELECT requested_main,requested_secondary FROM dynamis_lot_change_requests WHERE member_id=1"
+    ).fetchone() == ("BLM", "")
+    database.close()
+
+
 def test_member_detail_includes_members_added_after_the_historical_roster(tmp_path):
     import sqlite3
 
