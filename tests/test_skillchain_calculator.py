@@ -79,7 +79,7 @@ def test_horizon_seraph_blade_retains_its_transfixion_property():
 
 def test_skillchain_calculator_uses_current_chain_affinity_catalog_version():
     script = Path("static/skillchain_calculator.js").read_text(encoding="utf-8")
-    assert 'skillchain_catalog.json?v=5' in script
+    assert 'skillchain_catalog.json?v=6' in script
 
 
 def test_skillchain_page_cache_busts_the_calculator_script(tmp_path):
@@ -88,4 +88,12 @@ def test_skillchain_page_cache_busts_the_calculator_script(tmp_path):
     with client.session_transaction() as session:
         session["is_editor"] = True
         session["member_id"] = 1
-    assert b"skillchain_calculator.js?v=13" in client.get("/skillchain-calculator").data
+    assert b"skillchain_calculator.js?v=14" in client.get("/skillchain-calculator").data
+
+
+def test_horizon_blue_magic_reference_spells_are_present_with_properties():
+    spells = {spell["name"]: spell for spell in supplement_blue_magic([], [
+        {"spell": "Empty Thrash", "spell_level": 34, "spell_type": "Physical"},
+    ])}
+    assert spells["Vanity Dive"]["properties"] == ["Scission"]
+    assert spells["Empty Thrash"]["properties"] == ["Compression", "Scission"]
