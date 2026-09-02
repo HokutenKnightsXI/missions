@@ -1612,7 +1612,7 @@ def create_app(test_config=None):
                 """ALTER TABLE alliance_slots RENAME TO alliance_slots_legacy;
                    CREATE TABLE alliance_slots (
                        event_id INTEGER NOT NULL,
-                       party_number INTEGER NOT NULL CHECK(party_number BETWEEN 1 AND 3),
+                       party_number INTEGER NOT NULL CHECK(party_number BETWEEN 1 AND 6),
                        slot_number INTEGER NOT NULL CHECK(slot_number BETWEEN 1 AND 6),
                        member_id INTEGER,
                        custom_name TEXT NOT NULL DEFAULT '',
@@ -1633,6 +1633,33 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE alliance_slots ADD COLUMN updated_by INTEGER")
         if "updated_at" not in slot_columns:
             get_db().execute("ALTER TABLE alliance_slots ADD COLUMN updated_at TEXT NOT NULL DEFAULT ''")
+        slot_definition = get_db().execute(
+            "SELECT sql FROM sqlite_master WHERE type='table' AND name='alliance_slots'"
+        ).fetchone()["sql"] or ""
+        if "BETWEEN 1 AND 3" in slot_definition:
+            get_db().executescript(
+                """ALTER TABLE alliance_slots RENAME TO alliance_slots_legacy;
+                   CREATE TABLE alliance_slots (
+                       event_id INTEGER NOT NULL,
+                       party_number INTEGER NOT NULL CHECK(party_number BETWEEN 1 AND 6),
+                       slot_number INTEGER NOT NULL CHECK(slot_number BETWEEN 1 AND 6),
+                       member_id INTEGER,
+                       custom_name TEXT NOT NULL DEFAULT '',
+                       job TEXT NOT NULL,
+                       updated_by INTEGER,
+                       updated_at TEXT NOT NULL DEFAULT '',
+                       PRIMARY KEY (event_id, party_number, slot_number),
+                       UNIQUE (event_id, member_id),
+                       FOREIGN KEY (event_id) REFERENCES alliance_events(id) ON DELETE CASCADE,
+                       FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE,
+                       FOREIGN KEY (updated_by) REFERENCES members(id) ON DELETE SET NULL
+                   );
+                   INSERT INTO alliance_slots
+                       (event_id,party_number,slot_number,member_id,custom_name,job,updated_by,updated_at)
+                   SELECT event_id,party_number,slot_number,member_id,custom_name,job,updated_by,updated_at
+                   FROM alliance_slots_legacy;
+                   DROP TABLE alliance_slots_legacy;"""
+            )
         gear_columns = {
             row["name"] for row in get_db().execute("PRAGMA table_info(gear_ownership)")
         }
@@ -2161,6 +2188,7 @@ def create_app(test_config=None):
             assignments=assignments, roster=list(roster.values()), jobs=JOBS,
             role_jobs=ALLIANCE_ROLE_JOBS, owner=owner, guild_events=guild_events,
             shared_mode=shared_mode, share_url=share_url, change_history=change_history,
+            has_second_alliance=any(row["party_number"] > 3 for row in slot_rows),
         )
 
     @app.post("/alliance-builder/save")
@@ -2225,7 +2253,7 @@ def create_app(test_config=None):
         }
         selected_members = set()
         slots = []
-        for party_number in range(1, 4):
+        for party_number in range(1, 7):
             for slot_number in range(1, 7):
                 member_value = request.form.get(f"member_{party_number}_{slot_number}", "").strip()
                 custom_name = request.form.get(f"custom_name_{party_number}_{slot_number}", "").strip()
@@ -2257,7 +2285,7 @@ def create_app(test_config=None):
             db.execute(
                 """INSERT INTO alliance_change_log(event_id,actor_member_id,action,details)
                    VALUES(?,?,?,?)""",
-                (event_id, owner["id"], "Layout saved", f"{len(slots)} of 18 slots assigned"),
+                (event_id, owner["id"], "Layout saved", f"{len(slots)} of 36 slots assigned"),
             )
             db.commit()
         except sqlite3.DatabaseError:
@@ -2407,7 +2435,7 @@ def create_app(test_config=None):
         payload = request.get_json(silent=True) or {}
         expected_version = payload.get("version")
         submitted = payload.get("slots")
-        if not isinstance(expected_version, int) or not isinstance(submitted, list) or len(submitted) > 18:
+        if not isinstance(expected_version, int) or not isinstance(submitted, list) or len(submitted) > 36:
             abort(400, description="Invalid collaborative alliance update.")
         roster_jobs = {
             (row["member_id"], row["job"]) for row in db.execute(
@@ -2424,7 +2452,7 @@ def create_app(test_config=None):
             member_value = str(item.get("member_id") or "").strip()
             custom_name = str(item.get("custom_name") or "").strip()
             job = str(item.get("job") or "").strip().upper()
-            if not isinstance(party, int) or party not in range(1, 4) or not isinstance(slot, int) or slot not in range(1, 7):
+            if not isinstance(party, int) or party not in range(1, 7) or not isinstance(slot, int) or slot not in range(1, 7):
                 abort(400, description="Invalid alliance position.")
             if custom_name:
                 if member_value or len(custom_name) > 40 or job not in JOBS:

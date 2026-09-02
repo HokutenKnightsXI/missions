@@ -31,15 +31,16 @@ def identify(client, member_id):
         session["member_id"] = member_id
 
 
-def test_alliance_builder_uses_job_roster_and_three_parties(app):
+def test_alliance_builder_supports_two_three_party_alliances(app):
     maven, _lion = add_roster(app)
     client = app.test_client()
     identify(client, maven)
     page = client.get("/alliance-builder")
     assert page.status_code == 200
     assert b"Alliance Party Maker" in page.data
-    assert page.data.count(b'class="alliance-party"') == 3
-    assert page.data.count(b'class="party-slot"') == 18
+    assert page.data.count(b'class="alliance-party"') == 6
+    assert page.data.count(b'class="party-slot"') == 36
+    assert b"Add Second Alliance" in page.data
     assert b'"PLD": 75' in page.data and b'"WHM": 75' in page.data
     assert b"Alliance Builder" in page.data
     assert b"+ Load Saved Alliance" in page.data
@@ -49,7 +50,7 @@ def test_alliance_builder_uses_job_roster_and_three_parties(app):
     assert b"Character search" not in page.data
     assert b'class="roster-inline-filters"' in page.data
     assert b'id="alliance-character-search"' in page.data
-    assert page.data.count(b'class="add-custom-slot"') == 18
+    assert page.data.count(b'class="add-custom-slot"') == 36
     assert b'id="custom-alliance-dialog"' in page.data
     assert b"Alliance name <i>Required</i>" in page.data
     assert b'id="pick-event-date"' in page.data
@@ -58,6 +59,8 @@ def test_alliance_builder_uses_job_roster_and_three_parties(app):
     assert b"Level 75 Jobs" in page.data
     script = client.get("/static/alliance_builder.js")
     assert b"dragstart" in script.data and b"drag-over" in script.data
+    assert b"No RSVP - available roster jobs below" in script.data
+    assert b"(!signedUp||signedUp.has" not in script.data
 
 
 def test_member_can_save_and_reopen_own_alliance_layout(app):
@@ -97,6 +100,25 @@ def test_custom_character_assignment_is_saved_and_reopened(app):
             "SELECT member_id,custom_name,job FROM alliance_slots"
         ).fetchone()
         assert slot == (None, "Guestplayer", "BRD")
+        database.close()
+
+
+def test_second_alliance_slots_are_saved_and_reopened(app):
+    maven, _lion = add_roster(app)
+    client = app.test_client()
+    identify(client, maven)
+    response = client.post("/alliance-builder/save", data={
+        "name": "Dynamis Second Alliance",
+        "member_4_1": str(maven), "job_4_1": "PLD",
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    assert b'id="second-alliance" open' in response.data
+    with app.app_context():
+        database = sqlite3.connect(app.config["DATABASE"])
+        slot = database.execute(
+            "SELECT party_number,slot_number,member_id,job FROM alliance_slots"
+        ).fetchone()
+        assert slot == (4, 1, maven, "PLD")
         database.close()
 
 

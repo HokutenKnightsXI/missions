@@ -122,10 +122,13 @@ CREATE TABLE IF NOT EXISTS alliance_events (
 
 CREATE TABLE IF NOT EXISTS alliance_slots (
     event_id INTEGER NOT NULL,
-    party_number INTEGER NOT NULL CHECK(party_number BETWEEN 1 AND 3),
+    party_number INTEGER NOT NULL CHECK(party_number BETWEEN 1 AND 6),
     slot_number INTEGER NOT NULL CHECK(slot_number BETWEEN 1 AND 6),
-    member_id INTEGER NOT NULL,
+    member_id INTEGER,
+    custom_name TEXT NOT NULL DEFAULT '',
     job TEXT NOT NULL,
+    updated_by INTEGER,
+    updated_at TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (event_id, party_number, slot_number),
     UNIQUE (event_id, member_id),
     FOREIGN KEY (event_id) REFERENCES alliance_events(id) ON DELETE CASCADE,
