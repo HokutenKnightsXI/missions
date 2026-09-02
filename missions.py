@@ -2665,7 +2665,12 @@ def create_app(test_config=None):
             member_row = get_db().execute(
                 "SELECT id FROM members WHERE name=? COLLATE NOCASE", (name,)
             ).fetchone()
-            member_id = member_row["id"] if member_row else None
+            if not member_row:
+                # Historical attendance defaults are not membership records.
+                # Once an officer removes a member, never let this legacy list
+                # recreate them in Member Detail or the Dynamis directory.
+                continue
+            member_id = member_row["id"]
             reviewed_at = job_change_reviews.get(member_id)
             job_cooldown_until = ""
             job_cooldown_label = ""

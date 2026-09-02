@@ -253,6 +253,23 @@ def test_member_detail_keeps_a_level_75_drk_dynamis_eligible(tmp_path):
     assert details[str(nurnin_id)]["job_levels"] == {"DRK": 75}
 
 
+def test_removed_historical_members_do_not_reappear_in_member_detail(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    starnack = database.execute("SELECT id FROM members WHERE name='Starnack'").fetchone()
+    if starnack:
+        database.execute("DELETE FROM members WHERE id=?", (starnack[0],))
+    database.commit()
+    database.close()
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    page = client.get("/endgame")
+    assert b'data-name="starnack"' not in page.data
+    assert b'"name": "Starnack"' not in page.data
+
+
 def test_member_detail_includes_members_added_after_the_historical_roster(tmp_path):
     import sqlite3
 
