@@ -2993,6 +2993,7 @@ def create_app(test_config=None):
                 "main_job": member["main_job"], "secondary_job": member["secondary_job"],
                 "dynamis_main": member["dynamis_main"],
                 "dynamis_secondary": member["dynamis_secondary"],
+                "dynamis_eligible_jobs": selection.get("eligible_jobs", {}),
                 "dkp": member["dkp"], "total_spent": member["total_spent"],
                 "lifetime_earned": member["lifetime_earned"],
                 "last_event": member["last_event"],
@@ -3119,6 +3120,42 @@ def create_app(test_config=None):
         db.commit()
         flash(f"{member['name']}'s Dynamis lotting request was {decision.lower()}.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="dynamis"))
+
+    @app.post("/endgame/dynamis-lot-registrations/<int:member_id>")
+    @admin_required
+    def update_dynamis_lot_registration(member_id):
+        db = get_db()
+        member = db.execute("SELECT id,name FROM members WHERE id=?", (member_id,)).fetchone()
+        if not member:
+            abort(404)
+        main_job = request.form.get("main_job", "").strip().upper()
+        secondary_job = request.form.get("secondary_job", "").strip().upper()
+        eligible_jobs = {
+            row["job"] for row in db.execute(
+                "SELECT job FROM member_jobs WHERE member_id=? AND level>=71", (member_id,)
+            ).fetchall() if row["job"] in DYNAMIS_RELIC
+        }
+        selected_jobs = {job for job in (main_job, secondary_job) if job}
+        if (main_job and secondary_job and main_job == secondary_job) or not selected_jobs <= eligible_jobs:
+            abort(400, description="Choose distinct level 71+ Dynamis-eligible jobs from this member's roster.")
+        if selected_jobs:
+            db.execute(
+                """INSERT INTO dynamis_lot_registrations(member_id,main_job,secondary_job,updated_at)
+                   VALUES(?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(member_id) DO UPDATE SET
+                   main_job=excluded.main_job,secondary_job=excluded.secondary_job,updated_at=CURRENT_TIMESTAMP""",
+                (member_id, main_job, secondary_job),
+            )
+        else:
+            db.execute("DELETE FROM dynamis_lot_registrations WHERE member_id=?", (member_id,))
+        actor = require_member_identity()
+        db.execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "Dynamis Lotting", "Officer registration update",
+             f"{member['name']}: {main_job or 'Unassigned'} / {secondary_job or 'Unassigned'}"),
+        )
+        db.commit()
+        flash(f"Updated {member['name']}'s Dynamis lotting jobs.", "success")
+        return redirect(url_for("endgame_dashboard", _anchor="jobs"))
 
     def current_dkp_balances():
         """Calculate available DKP from endgame attendance minus recorded awards."""

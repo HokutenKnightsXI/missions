@@ -165,6 +165,15 @@ def test_dynamis_lotting_uses_horizon_levels_and_locks_after_officer_approval(tm
     })
     assert locked.status_code == 400
     assert b"once every 30 days" in locked.data
+    officer_update = client.post("/endgame/dynamis-lot-registrations/1", data={
+        "csrf_token": "token", "main_job": "BLM", "secondary_job": "",
+    })
+    assert officer_update.status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute(
+        "SELECT main_job,secondary_job FROM dynamis_lot_registrations WHERE member_id=1"
+    ).fetchone() == ("BLM", "")
+    database.close()
 
 
 def test_ls_bank_tracks_event_items_sales_and_officer_custody(tmp_path):
