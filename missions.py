@@ -486,6 +486,9 @@ DYNAMIS_RELIC = {
     "NIN": (("Koga Hatsuburi", "Head", "Dynamis - Windurst"), ("Koga Chainmail", "Body", "Dynamis - Beaucedine"), ("Koga Tekko", "Hands", "Dynamis - Xarcabard"), ("Koga Hakama", "Legs", "Dynamis - San d'Oria"), ("Koga Kyahan", "Feet", "Dynamis - Jeuno")),
     "DRG": (("Wyrm Armet", "Head", "Dynamis - Xarcabard"), ("Wyrm Mail", "Body", "Dynamis - Beaucedine"), ("Wyrm Finger Gauntlets", "Hands", "Dynamis - Jeuno"), ("Wyrm Brais", "Legs", "Dynamis - Bastok"), ("Wyrm Greaves", "Feet", "Dynamis - San d'Oria")),
     "SMN": (("Summoner's Horn", "Head", "Dynamis - Xarcabard"), ("Summoner's Doublet", "Body", "Dynamis - Beaucedine"), ("Summoner's Bracers", "Hands", "Dynamis - Bastok"), ("Summoner's Spats", "Legs", "Dynamis - Windurst"), ("Summoner's Pigaches", "Feet", "Dynamis - San d'Oria")),
+    "BLU": (("Mirage Keffiyeh", "Head", "Dynamis - Xarcabard"), ("Mirage Jubbah", "Body", "Dynamis - Beaucedine"), ("Mirage Bazubands", "Hands", "Dynamis - San d'Oria"), ("Mirage Shalwar", "Legs", "Dynamis - Bastok"), ("Mirage Charuqs", "Feet", "Dynamis - Windurst")),
+    "COR": (("Commodore Tricorne", "Head", "Dynamis - Xarcabard"), ("Commodore Frac", "Body", "Dynamis - Beaucedine"), ("Commodore Gants", "Hands", "Dynamis - Jeuno"), ("Commodore Culottes", "Legs", "Dynamis - San d'Oria"), ("Commodore Bottes", "Feet", "Dynamis - Bastok")),
+    "PUP": (("Pantin Taj", "Head", "Dynamis - Xarcabard"), ("Pantin Tobe", "Body", "Dynamis - Beaucedine"), ("Pantin Dastanas", "Hands", "Dynamis - Windurst"), ("Pantin Churidars", "Legs", "Dynamis - Jeuno"), ("Pantin Babouches", "Feet", "Dynamis - San d'Oria")),
 }
 LIMBUS_LOOT = {
     "Proto-Omega": (("Omega's Eye", "Homam Zucchetto", "Head"), ("Omega's Heart", "Homam Corazza", "Body"), ("Omega's Foreleg", "Homam Manopolas", "Hands"), ("Omega's Hind Leg", "Homam Cosciales", "Legs"), ("Omega's Tail", "Homam Gambieras", "Feet")),
@@ -525,6 +528,9 @@ DYNAMIS_ACCESSORIES = {
     "NIN": ("Koga Sarashi", "Waist", ("Dynamis - Valkurm", "Dynamis - Buburimu")),
     "DRG": ("Wyrm Belt", "Waist", ("Dynamis - Buburimu", "Dynamis - Qufim")),
     "SMN": ("Summoner's Cape", "Back", ("Dynamis - Valkurm", "Dynamis - Qufim")),
+    "BLU": ("Mirage Mantle", "Back", ("Dynamis - Buburimu", "Dynamis - Valkurm")),
+    "COR": ("Commodore Belt", "Waist", ("Dynamis - Qufim",)),
+    "PUP": ("Pantin Cape", "Back", ("Dynamis - Buburimu", "Dynamis - Qufim")),
 }
 JOB_COLORS = {
     "WAR": "#b84b42", "MNK": "#d47a3f", "WHM": "#e8e3d5", "BLM": "#7456a8",
@@ -2953,6 +2959,7 @@ def create_app(test_config=None):
             selection = dynamis_by_member.get(member["id"], {})
             member["dynamis_main"] = selection.get("main_job", "")
             member["dynamis_secondary"] = selection.get("secondary_job", "")
+            member["dynamis_eligible_jobs"] = selection.get("eligible_jobs", {})
         dynamis_drops = dynamis_catalog()
         gear_catalog = gear_catalog_by_name(str(Path(app.root_path) / "static" / "gear_catalog.json"))
         for drop in dynamis_drops:
@@ -3044,7 +3051,8 @@ def create_app(test_config=None):
                 "main_job": member["main_job"], "secondary_job": member["secondary_job"],
                 "dynamis_main": member["dynamis_main"],
                 "dynamis_secondary": member["dynamis_secondary"],
-                "dynamis_eligible_jobs": selection.get("eligible_jobs", {}),
+                "dynamis_eligible_jobs": member["dynamis_eligible_jobs"],
+                "job_levels": member["job_levels"],
                 "dkp": member["dkp"], "total_spent": member["total_spent"],
                 "lifetime_earned": member["lifetime_earned"],
                 "last_event": member["last_event"],

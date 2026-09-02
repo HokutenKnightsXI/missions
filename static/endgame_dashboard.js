@@ -148,6 +148,21 @@
   const adminAudit = [...(window.ENDGAME_SERVER_AUDIT || []), ...JSON.parse(localStorage.getItem(adminAuditKey) || "[]")];
   let auditSort = {key: "at", direction: -1};
   const safeText = value => String(value ?? "").replace(/[&<>"']/g, character => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[character]));
+  if (window.ENDGAME_IS_ADMIN) {
+    const dynamisDirectory = document.querySelector(".dynamis-member-directory");
+    const dynamisMembers = Object.values(window.ENDGAME_MEMBER_DETAILS || {})
+      .filter(member => Object.keys(member.dynamis_eligible_jobs || {}).length || Object.values(member.job_levels || {}).some(level => Number(level) >= 71))
+      .sort((left, right) => left.name.localeCompare(right.name));
+    if (dynamisDirectory && dynamisMembers.length) {
+      const dynamisOptions = (member, selected) => [`<option value="">Unassigned</option>`, ...Object.entries(Object.keys(member.dynamis_eligible_jobs || {}).length ? member.dynamis_eligible_jobs : (member.job_levels || {}))
+        .filter(([, level]) => Number(level) >= 71).sort(([left], [right]) => left.localeCompare(right))
+        .map(([job, level]) => `<option value="${safeText(job)}"${job === selected ? " selected" : ""}>${safeText(job)} · Lv.${Number(level)}</option>`)].join("");
+      const editor = document.createElement("details");
+      editor.className = "officer-dynamis-registration-editor";
+      editor.innerHTML = `<summary><span>Officer lotting-job editor</span><small>Set one or two eligible jobs directly</small></summary><div>${dynamisMembers.map(member => `<form method="post" action="/endgame/dynamis-lot-registrations/${Number(member.id)}"><input type="hidden" name="csrf_token" value="${safeText(window.ENDGAME_CSRF || "")}"><b>${safeText(member.name)}</b><label>Main lot<select name="main_job">${dynamisOptions(member, member.dynamis_main)}</select></label><label>Secondary lot<select name="secondary_job">${dynamisOptions(member, member.dynamis_secondary)}</select></label><button class="button primary" type="submit">Save</button></form>`).join("")}</div>`;
+      dynamisDirectory.append(editor);
+    }
+  }
   const bankSearch = document.querySelector("#ls-bank-search");
   const bankHolderFilter = document.querySelector("#ls-bank-holder-filter");
   const bankStatusFilter = document.querySelector("#ls-bank-status-filter");
@@ -1388,7 +1403,8 @@
       dialogEyebrow.textContent = "Member event and award history";
       dialogTitle.textContent = member.name;
       const completedEvents = member.events.filter(row => !row.is_upcoming);
-      const dynamisJobs = Object.entries(member.dynamis_eligible_jobs || {}).sort(([left], [right]) => left.localeCompare(right));
+      const dynamisEligibility = Object.keys(member.dynamis_eligible_jobs || {}).length ? member.dynamis_eligible_jobs : (member.job_levels || {});
+      const dynamisJobs = Object.entries(dynamisEligibility).filter(([, level]) => Number(level) >= 71).sort(([left], [right]) => left.localeCompare(right));
       const dynamisOptions = dynamisJobs.map(([job, level]) => `<option value="${safeText(job)}">${safeText(job)} · Lv.${Number(level)}</option>`).join("");
       const selectedDynamisOptions = current => dynamisOptions.replace(`value="${safeText(current)}"`, `value="${safeText(current)}" selected`);
       const dynamisEditor = window.ENDGAME_IS_ADMIN ? (dynamisJobs.length

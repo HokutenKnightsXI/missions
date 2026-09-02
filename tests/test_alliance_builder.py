@@ -59,6 +59,7 @@ def test_alliance_builder_supports_two_three_party_alliances(app):
     assert b"Level 75 Jobs" in page.data
     script = client.get("/static/alliance_builder.js")
     assert b"dragstart" in script.data and b"drag-over" in script.data
+    assert b"selected-member" in script.data
     assert b"No RSVP - available roster jobs below" in script.data
     assert b"(!signedUp||signedUp.has" not in script.data
 
