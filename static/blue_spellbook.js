@@ -317,7 +317,7 @@
 
   Promise.all([
     fetch("/static/blue_spell_farming.json?v=3").then(response => response.json()),
-    fetch("/static/skillchain_catalog.json?v=3").then(response => response.json()),
+    fetch("/static/skillchain_catalog.json?v=6").then(response => response.json()),
   ]).then(([farming, skillchains]) => {
     const unique = new Map();
     farming.rows.forEach(row => { if (!unique.has(row.spell)) unique.set(row.spell, row); });

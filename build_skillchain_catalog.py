@@ -38,7 +38,9 @@ HORIZON_BLUE_SKILLCHAIN_PROPERTIES = {
     "Bludgeon": ("Liquefaction",),
     "Claw Cyclone": ("Scission",),
     "Screwdriver": ("Transfixion", "Scission"),
+    "Vanity Dive": ("Scission",),
     "Grand Slam": ("Induration",),
+    "Empty Thrash": ("Compression", "Scission"),
     "Smite of Rage": ("Detonation",),
     "Pinecone Bomb": ("Liquefaction",),
     "Jet Stream": ("Impaction",),
@@ -64,6 +66,10 @@ HORIZON_BLUE_SKILLCHAIN_PROPERTIES = {
     # inherited retail/Chains data, which lists Distortion / Scission.
     "Quadratic Continuum": ("Reverberation", "Scission"),
 }
+# Vanity Dive is an Horizon-era physical spell in the skillchain reference but
+# is absent from the imported spell-farming metadata.  Keep its level here so
+# the party calculator still offers it.
+HORIZON_BLUE_SPELL_LEVEL_OVERRIDES = {"Vanity Dive": 28}
 
 # The upstream weapon-skill dataset omits a secondary property that is present
 # on HorizonXI.  Keep this small override alongside the Horizon Blue Magic
@@ -159,12 +165,13 @@ def supplement_blue_magic(parsed_spells: list[dict], farm_rows: list[dict]) -> l
     parsed = {spell["name"]: spell for spell in parsed_spells}
     for name, properties in HORIZON_BLUE_SKILLCHAIN_PROPERTIES.items():
         farm_spell = farming_spells.get(name)
-        if farm_spell and farm_spell.get("spell_type") == "Physical":
+        level = farm_spell.get("spell_level") if farm_spell else HORIZON_BLUE_SPELL_LEVEL_OVERRIDES.get(name)
+        if level and (not farm_spell or farm_spell.get("spell_type") == "Physical"):
             parsed[name] = {
                 "id": f"blu:{name.casefold()}", "name": name,
                 "kind": "Blue Magic (Chain Affinity)", "weapon": "Blue Magic",
-                "jobs": ["BLU"], "skill_level": farm_spell["spell_level"],
-                "level_requirement": farm_spell["spell_level"],
+                "jobs": ["BLU"], "skill_level": level,
+                "level_requirement": level,
                 "properties": list(properties),
             }
     return list(parsed.values())

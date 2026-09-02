@@ -2893,6 +2893,7 @@ def create_app(test_config=None):
             dynamis_members.append({
                 "id": member["id"], "name": member["name"], "main_job": main_job,
                 "secondary_job": secondary_job, "eligible_jobs": eligible_jobs,
+                "has_registration": member["id"] in dynamis_registrations,
                 "cooldown_until": cooldown_until,
             })
         dynamis_members.sort(key=lambda member: member["name"].casefold())

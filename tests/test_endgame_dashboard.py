@@ -145,6 +145,7 @@ def test_dynamis_lotting_uses_horizon_levels_and_locks_after_officer_approval(tm
     assert b'aria-label="Show lot priority for' in page.data
     assert b"BLM \xc2\xb7 Lv.75" in page.data
     assert b"DRG \xc2\xb7 Lv.70" not in page.data
+    assert b"Request Lotting Jobs" in page.data
     assert client.post("/endgame/dynamis-lot-requests", data={
         "csrf_token": "token", "main_job": "BLM", "secondary_job": "RDM",
     }).status_code == 302
