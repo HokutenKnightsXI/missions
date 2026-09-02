@@ -176,6 +176,43 @@ def test_dynamis_lotting_uses_horizon_levels_and_locks_after_officer_approval(tm
     database.close()
 
 
+def test_member_detail_includes_members_added_after_the_historical_roster(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute("INSERT INTO members(name) VALUES('Nurnin')")
+    database.commit()
+    database.close()
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+
+    page = client.get("/endgame")
+    assert b'data-name="nurnin"' in page.data
+    member_payload = page.data.split(b"window.ENDGAME_MEMBER_DETAILS=", 1)[1].split(b";</script>", 1)[0]
+    assert any(member["name"] == "Nurnin" for member in json.loads(member_payload).values())
+
+
+def test_admin_can_remove_member_and_revoke_their_existing_session(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.execute("INSERT INTO members(name) VALUES('Departed')")
+    departed_id = database.execute("SELECT id FROM members WHERE name='Departed'").fetchone()[0]
+    database.commit()
+    database.close()
+    officer = app.test_client()
+    sign_in(officer, member_id=1, admin=True)
+    assert officer.post(f"/members/{departed_id}/delete", data={"csrf_token": "token"}).status_code == 302
+    database = sqlite3.connect(app.config["DATABASE"])
+    assert database.execute("SELECT 1 FROM members WHERE id=?", (departed_id,)).fetchone() is None
+    database.close()
+    departed = app.test_client()
+    sign_in(departed, member_id=departed_id)
+    assert departed.get("/endgame").status_code == 302
+
+
 def test_ls_bank_tracks_event_items_sales_and_officer_custody(tmp_path):
     import sqlite3
 
