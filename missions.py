@@ -1030,10 +1030,17 @@ def create_app(test_config=None):
             csrf_token()
 
     def is_editor():
-        return bool(app.config.get("AUTH_DISABLED") or session.get("is_editor") or session.get("is_admin"))
+        if app.config.get("AUTH_DISABLED"):
+            return True
+        if not (session.get("is_editor") or session.get("is_admin")):
+            return False
+        member_id = current_member_id()
+        return bool(member_id and get_db().execute(
+            "SELECT 1 FROM members WHERE id=?", (member_id,)
+        ).fetchone())
 
     def is_admin():
-        if session.get("is_admin") or (app.config.get("AUTH_DISABLED") and current_member_id() is None):
+        if app.config.get("AUTH_DISABLED") and current_member_id() is None:
             return True
         member_id = current_member_id()
         if not member_id:
@@ -1042,12 +1049,12 @@ def create_app(test_config=None):
             "SELECT name, discord_user_id, discord_admin FROM members WHERE id=?",
             (member_id,),
         ).fetchone()
-        return bool(member and discord_ready() and (
+        return bool(member and (session.get("is_admin") or (discord_ready() and (
             member["discord_admin"]
             or (member["discord_user_id"] and member["name"].casefold() in {
                 name.casefold() for name in DISCORD_ADMIN_CHARACTERS
             })
-        ))
+        ))))
 
     def discord_ready():
         return all(app.config.get(key) for key in (
@@ -2645,6 +2652,22 @@ def create_app(test_config=None):
                 "cooldown": cooldown, "job_cooldown_until": job_cooldown_until,
                 "job_cooldown_label": job_cooldown_label,
                 "job_levels": roster_job_levels.get(member_id, {}),
+            })
+        # Dynamis is built from the complete member table.  Keep Member Detail
+        # in sync by adding any member absent from the historical baseline
+        # roster (for example, members added after that snapshot).
+        roster_member_ids = {member["id"] for member in prototype_roster if member["id"]}
+        for member_row in get_db().execute("SELECT id,name FROM members ORDER BY name COLLATE NOCASE").fetchall():
+            if member_row["id"] in roster_member_ids:
+                continue
+            main_job, secondary_job = registration_overrides.get(member_row["name"].casefold(), ("", ""))
+            prototype_roster.append({
+                "id": member_row["id"], "name": member_row["name"],
+                "main_job": main_job, "secondary_job": secondary_job,
+                "eligible": 0, "attended": 0, "attendance": 0, "tier": 3,
+                "major_wins": 0, "last_major_win": "â€”", "cooldown": False,
+                "job_cooldown_until": "", "job_cooldown_label": "",
+                "job_levels": roster_job_levels.get(member_row["id"], {}),
             })
         prototype_roster.sort(key=lambda member: member["name"].casefold())
         prototype_loot = (
@@ -5647,10 +5670,20 @@ def create_app(test_config=None):
     @admin_required
     def delete_member(member_id):
         db = get_db()
+        target = db.execute("SELECT id,name FROM members WHERE id=?", (member_id,)).fetchone()
+        if not target:
+            abort(404)
+        actor = require_member_identity()
+        if target["id"] == actor["id"] or target["name"].casefold() == "imaven":
+            abort(400, description="You cannot remove the administrator account or your own account.")
+        db.execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "Members", "Member removed", target["name"]),
+        )
         db.execute("DELETE FROM members WHERE id=?", (member_id,))
         db.commit()
-        flash("Member removed.", "success")
-        return redirect(url_for("index"))
+        flash(f"{target['name']} was removed and their website access was revoked.", "success")
+        return redirect(request.referrer or url_for("index"))
 
     with app.app_context():
         init_db()
