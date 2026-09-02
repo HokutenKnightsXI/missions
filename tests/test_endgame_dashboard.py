@@ -231,6 +231,14 @@ def test_dynamis_registered_directory_has_officer_editor(tmp_path):
     assert b"dynamis-lot-registrations" in script.data
 
 
+def test_dynamis_catalog_click_does_not_apply_the_job_filter(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    script = client.get("/static/endgame_dashboard.js")
+    selected_item_block = script.data.split(b"const selectDynamisCatalogItem", 1)[1].split(b"document.querySelectorAll", 1)[0]
+    assert b"dynamisCatalogJobFilter.value" not in selected_item_block
+
+
 def test_member_detail_keeps_a_level_75_drk_dynamis_eligible(tmp_path):
     import json
     import sqlite3

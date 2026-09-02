@@ -67,7 +67,6 @@
     const job = card.dataset.dynamisDropJob || "";
     const item = card.querySelector("b")?.textContent.trim() || "Selected item";
     if (dynamisCatalogZoneFilter) dynamisCatalogZoneFilter.value = area;
-    if (dynamisCatalogJobFilter) dynamisCatalogJobFilter.value = job;
     if (dynamisZoneFilter) dynamisZoneFilter.value = area;
     if (dynamisJobFilter) dynamisJobFilter.value = job;
     document.querySelectorAll(".dynamis-lot-panel:not(.dynamis-legacy-layout) #dynamis-drop-list article").forEach(entry => {
