@@ -199,6 +199,60 @@ def test_dynamis_lotting_accepts_a_single_eligible_job(tmp_path):
     database.close()
 
 
+def test_dynamis_lotting_recognizes_blu_cor_and_pup_roster_jobs(tmp_path):
+    import sqlite3
+
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    database = sqlite3.connect(app.config["DATABASE"])
+    database.executemany(
+        "INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'',?,75)",
+        [("BLU",), ("COR",), ("PUP",)],
+    )
+    database.commit()
+    database.close()
+
+    page = client.get("/endgame")
+    assert b"BLU \xc2\xb7 Lv.75" in page.data
+    assert b"COR \xc2\xb7 Lv.75" in page.data
+    assert b"PUP \xc2\xb7 Lv.75" in page.data
+    assert client.post("/endgame/dynamis-lot-registrations/1", data={
+        "csrf_token": "token", "main_job": "PUP", "secondary_job": "",
+    }).status_code == 302
+
+
+def test_dynamis_registered_directory_has_officer_editor(tmp_path):
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    script = client.get("/static/endgame_dashboard.js")
+    assert b"Officer lotting-job editor" in script.data
+    assert b"dynamis-lot-registrations" in script.data
+
+
+def test_member_detail_keeps_a_level_75_drk_dynamis_eligible(tmp_path):
+    import json
+    import sqlite3
+
+    app = make_app(tmp_path)
+    database = sqlite3.connect(app.config["DATABASE"])
+    nurnin_id = database.execute("INSERT INTO members(name) VALUES('Nurnin')").lastrowid
+    database.execute(
+        "INSERT INTO member_jobs(member_id,custom_name,job,level) VALUES(?,?,?,?)",
+        (nurnin_id, "", "DRK", 75),
+    )
+    database.commit()
+    database.close()
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    page = client.get("/endgame")
+    payload = page.data.split(b"window.ENDGAME_MEMBER_DETAILS=", 1)[1].split(b";</script>", 1)[0]
+    details = json.loads(payload)
+    assert details[str(nurnin_id)]["dynamis_eligible_jobs"] == {"DRK": 75}
+    assert details[str(nurnin_id)]["job_levels"] == {"DRK": 75}
+
+
 def test_member_detail_includes_members_added_after_the_historical_roster(tmp_path):
     import sqlite3
 
