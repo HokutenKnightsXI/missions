@@ -3119,9 +3119,10 @@ def create_app(test_config=None):
                 "SELECT job FROM member_jobs WHERE member_id=? AND level>=71", (member["id"],)
             ).fetchall() if row["job"] in DYNAMIS_RELIC
         }
-        if (main_job not in eligible_jobs or secondary_job not in eligible_jobs
-                or main_job == secondary_job):
-            abort(400, description="Choose two different Dynamis jobs at level 71 or higher on your roster.")
+        if (main_job not in eligible_jobs
+                or (secondary_job and secondary_job not in eligible_jobs)
+                or (secondary_job and main_job == secondary_job)):
+            abort(400, description="Choose a main Dynamis job and, optionally, a different secondary job at level 71 or higher on your roster.")
         db = get_db()
         if db.execute("SELECT 1 FROM dynamis_lot_change_requests WHERE member_id=? AND status='Pending'", (member["id"],)).fetchone():
             abort(400, description="You already have a pending Dynamis lotting request.")
@@ -3135,7 +3136,7 @@ def create_app(test_config=None):
             (member["id"], main_job, secondary_job),
         )
         db.commit()
-        flash("Your Dynamis main/secondary lot request was sent to officers.", "success")
+        flash("Your Dynamis lotting job request was sent to officers.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="dynamis"))
 
     @app.post("/endgame/dynamis-lot-requests/<int:request_id>/review")
