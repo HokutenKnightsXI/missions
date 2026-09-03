@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 {% block title %}Endgame Operations · Hokuten Knights{% endblock %}
-{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=31) }}">{% endblock %}
+{% block head %}<link rel="stylesheet" href="{{ url_for('static',filename='endgame_dashboard.css',v=34) }}">{% endblock %}
 {% block content %}
 <section class="endgame-shell">
   <header class="endgame-hero">
@@ -39,6 +39,7 @@
     <button type="button" data-endgame-tab="priority"><span>03</span>Item Seratim</button>
     <button type="button" data-endgame-tab="loot"><span>04</span>Linkshell Loot</button>
     <button type="button" data-endgame-tab="dynamis"><span>05</span>Dynamis Lotting</button>
+    <button type="button" data-endgame-tab="dynamis-payout"><span>06</span>Dynamis Payout</button>
   </nav>
 
   <section class="endgame-panel active" data-endgame-panel="bidding-live">
@@ -106,6 +107,7 @@
     {% if can_create_guild_events() and pending_dynamis_requests %}<section class="dynamis-review-card"><h3>Officer approval queue</h3>{% for change in pending_dynamis_requests %}<article><b>{{ change.member_name }}</b><span>{{ change.requested_main }} / {{ change.requested_secondary }}</span><form method="post" action="{{ url_for('review_dynamis_lot_change',request_id=change.id) }}"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="button primary" name="decision" value="Approved">Approve</button><button class="button danger" name="decision" value="Denied">Deny</button></form></article>{% endfor %}</section>{% endif %}
   </section>
 
+  {% include "dynamis_payout_tracker.html" %}
   </div>
   <section class="endgame-bank-view" data-endgame-view-panel="bank" hidden>
     <section class="endgame-panel ls-bank-panel">

@@ -272,6 +272,62 @@ CREATE TABLE IF NOT EXISTS dynamis_lot_change_requests (
 CREATE UNIQUE INDEX IF NOT EXISTS idx_dynamis_lot_change_pending
 ON dynamis_lot_change_requests(member_id) WHERE status='Pending';
 
+CREATE TABLE IF NOT EXISTS dynamis_payouts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL UNIQUE,
+    zone TEXT NOT NULL DEFAULT '',
+    entry_cost INTEGER NOT NULL DEFAULT 1000000 CHECK(entry_cost >= 0),
+    lungo_quantity INTEGER NOT NULL DEFAULT 0 CHECK(lungo_quantity >= 0),
+    montiont_quantity INTEGER NOT NULL DEFAULT 0 CHECK(montiont_quantity >= 0),
+    byne_quantity INTEGER NOT NULL DEFAULT 0 CHECK(byne_quantity >= 0),
+    lungo_market_value INTEGER NOT NULL DEFAULT 0 CHECK(lungo_market_value >= 0),
+    montiont_market_value INTEGER NOT NULL DEFAULT 0 CHECK(montiont_market_value >= 0),
+    byne_market_value INTEGER NOT NULL DEFAULT 0 CHECK(byne_market_value >= 0),
+    lungo_actual_sale INTEGER,
+    montiont_actual_sale INTEGER,
+    byne_actual_sale INTEGER,
+    whiteshell_quantity INTEGER NOT NULL DEFAULT 0 CHECK(whiteshell_quantity >= 0),
+    bronzepiece_quantity INTEGER NOT NULL DEFAULT 0 CHECK(bronzepiece_quantity >= 0),
+    byne_single_quantity INTEGER NOT NULL DEFAULT 0 CHECK(byne_single_quantity >= 0),
+    whiteshell_market_value INTEGER NOT NULL DEFAULT 0 CHECK(whiteshell_market_value >= 0),
+    bronzepiece_market_value INTEGER NOT NULL DEFAULT 0 CHECK(bronzepiece_market_value >= 0),
+    byne_single_market_value INTEGER NOT NULL DEFAULT 0 CHECK(byne_single_market_value >= 0),
+    whiteshell_actual_sale INTEGER,
+    bronzepiece_actual_sale INTEGER,
+    byne_single_actual_sale INTEGER,
+    created_by INTEGER,
+    created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES guild_events(id) ON DELETE CASCADE,
+    FOREIGN KEY (created_by) REFERENCES members(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS dynamis_payout_attendance (
+    payout_id INTEGER NOT NULL,
+    member_id INTEGER NOT NULL,
+    attended INTEGER NOT NULL DEFAULT 1 CHECK(attended IN (0,1)),
+    entry_paid INTEGER NOT NULL DEFAULT 0 CHECK(entry_paid IN (0,1)),
+    payout_paid INTEGER NOT NULL DEFAULT 0 CHECK(payout_paid IN (0,1)),
+    added_manually INTEGER NOT NULL DEFAULT 0 CHECK(added_manually IN (0,1)),
+    PRIMARY KEY (payout_id, member_id),
+    FOREIGN KEY (payout_id) REFERENCES dynamis_payouts(id) ON DELETE CASCADE,
+    FOREIGN KEY (member_id) REFERENCES members(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_dynamis_payout_attendance_payout
+ON dynamis_payout_attendance(payout_id, attended);
+
+CREATE TABLE IF NOT EXISTS dynamis_payout_sales (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    payout_id INTEGER NOT NULL,
+    item TEXT NOT NULL,
+    buyer_member_id INTEGER,
+    sale_gil INTEGER NOT NULL DEFAULT 0 CHECK(sale_gil >= 0),
+    sold INTEGER NOT NULL DEFAULT 0 CHECK(sold IN (0,1)),
+    FOREIGN KEY (payout_id) REFERENCES dynamis_payouts(id) ON DELETE CASCADE,
+    FOREIGN KEY (buyer_member_id) REFERENCES members(id) ON DELETE SET NULL
+);
+
 CREATE TABLE IF NOT EXISTS endgame_loot_awards (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_id INTEGER NOT NULL,
