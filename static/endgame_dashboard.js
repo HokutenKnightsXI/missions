@@ -23,10 +23,41 @@
   };
   tabs.forEach(tab => tab.addEventListener("click", () => activate(tab.dataset.endgameTab)));
   const requested = location.hash.slice(1);
-  if (["bidding-live", "jobs", "priority", "loot", "dynamis"].includes(requested) || requested.startsWith("auction-")) { activateView("dkp-loot"); activate(requested.startsWith("auction-") ? "bidding-live" : requested); }
+  if (["bidding-live", "jobs", "priority", "loot", "dynamis", "dynamis-payout"].includes(requested) || requested.startsWith("auction-")) { activateView("dkp-loot"); activate(requested.startsWith("auction-") ? "bidding-live" : requested); }
   else if (requested === "bank") activateView("bank");
   else if (["events", "pops", "admin-audit"].includes(requested)) { activateView("operations"); activate(requested); }
   else activateView("calendar");
+  const payoutAttendanceForm = document.querySelector("#payout-attendance-form");
+  const payoutAddForm = document.querySelector("[data-payout-async='add']");
+  const submitPayoutForm = async form => {
+    const response = await fetch(form.action, {method: "POST", body: new FormData(form), headers: {Accept: "application/json"}});
+    if (!response.ok) throw new Error("Unable to save payout attendance.");
+    return response.json();
+  };
+  payoutAttendanceForm?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const submitter = event.submitter;
+    if (submitter?.name) submitter.disabled = true;
+    try {
+      const payload = await submitPayoutForm(payoutAttendanceForm);
+      if (payload.removed_member_id) document.querySelector(`#payout-attendance-form tr [name='attended_${payload.removed_member_id}']`)?.closest("tr")?.remove();
+    } catch (error) { alert(error.message); }
+    finally { if (submitter?.name) submitter.disabled = false; }
+  });
+  payoutAddForm?.addEventListener("submit", async event => {
+    event.preventDefault();
+    const selected = payoutAddForm.querySelector("select[name='member_id']");
+    const label = selected?.selectedOptions[0]?.textContent.trim() || "Member";
+    try {
+      const payload = await submitPayoutForm(payoutAddForm);
+      const tbody = document.querySelector(".dynamis-payout-attendance-table tbody");
+      if (tbody && !tbody.querySelector(`[name='attended_${payload.member_id}']`)) {
+        const action = payoutAttendanceForm.action;
+        tbody.insertAdjacentHTML("beforeend", `<tr><td><b>${safeText(label)}</b><small>Manually added</small></td><td><input type="checkbox" name="attended_${payload.member_id}" value="1" checked></td><td><input type="checkbox" name="entry_paid_${payload.member_id}" value="1"></td><td><input type="checkbox" name="payout_paid_${payload.member_id}" value="1"></td><td><button class="button danger" name="remove_member_id" value="${payload.member_id}">Remove</button></td></tr>`);
+      }
+      selected.value = "";
+    } catch (error) { alert(error.message); }
+  });
   const dynamisJobFilter = document.querySelector("#dynamis-job-filter");
   const dynamisZoneFilter = document.querySelector("#dynamis-zone-filter");
   const dynamisCatalogZoneFilter = document.querySelector("#dynamis-catalog-zone-filter");

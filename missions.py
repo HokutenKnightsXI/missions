@@ -1462,6 +1462,21 @@ def create_app(test_config=None):
             get_db().execute("ALTER TABLE endgame_loot_awards ADD COLUMN auction_id INTEGER")
         if "auction_item_id" not in loot_award_columns:
             get_db().execute("ALTER TABLE endgame_loot_awards ADD COLUMN auction_item_id INTEGER")
+        payout_columns = {row["name"] for row in get_db().execute("PRAGMA table_info(dynamis_payouts)")}
+        for column, definition in {
+            "zone": "TEXT NOT NULL DEFAULT ''",
+            "whiteshell_quantity": "INTEGER NOT NULL DEFAULT 0",
+            "bronzepiece_quantity": "INTEGER NOT NULL DEFAULT 0",
+            "byne_single_quantity": "INTEGER NOT NULL DEFAULT 0",
+            "whiteshell_market_value": "INTEGER NOT NULL DEFAULT 0",
+            "bronzepiece_market_value": "INTEGER NOT NULL DEFAULT 0",
+            "byne_single_market_value": "INTEGER NOT NULL DEFAULT 0",
+            "whiteshell_actual_sale": "INTEGER",
+            "bronzepiece_actual_sale": "INTEGER",
+            "byne_single_actual_sale": "INTEGER",
+        }.items():
+            if payout_columns and column not in payout_columns:
+                get_db().execute(f"ALTER TABLE dynamis_payouts ADD COLUMN {column} {definition}")
         bank_columns = {row["name"] for row in get_db().execute("PRAGMA table_info(ls_bank_items)")}
         if bank_columns and "sale_channel" not in bank_columns:
             get_db().execute("ALTER TABLE ls_bank_items ADD COLUMN sale_channel TEXT NOT NULL DEFAULT ''")
@@ -2589,6 +2604,60 @@ def create_app(test_config=None):
             sort_job=sort_job, direction=direction, level_75_counts=level_75_counts,
         )
 
+    def is_dynamis_payout_event(event):
+        """Whether an Endgame calendar event can have a Dynamis payout sheet."""
+        return bool(
+            event and is_endgame_guild_event(event) and "dynamis" in " ".join(
+                str(event.get(field, "")) for field in ("name", "location", "description")
+            ).casefold()
+        )
+
+    def dynamis_payout_market_values():
+        """Get per-item PSXI estimates without making the payout tracker depend on a live request."""
+        names = ("Lungo-Nango Jadeshell", "Montiont Silverpiece", "100 Byne Bill",
+                 "T. Whiteshell", "O. Bronzepiece", "Byne Bill")
+        # PSXI abbreviates the two Dynamis 100 currencies and calls the
+        # single denomination "1 Byne Bill" in its market feed.
+        market_names = {
+            "Lungo-Nango Jadeshell": {"Lungo-Nango Jadeshell", "L. Jadeshell"},
+            "Montiont Silverpiece": {"Montiont Silverpiece", "M. Silverpiece"},
+            "100 Byne Bill": {"100 Byne Bill"},
+            "T. Whiteshell": {"T. Whiteshell"},
+            "O. Bronzepiece": {"O. Bronzepiece"},
+            "Byne Bill": {"Byne Bill", "1 Byne Bill"},
+        }
+        values = {name: 0 for name in names}
+        try:
+            snapshot = market_snapshot(
+                app.config["PSXI_MARKET_CACHE"], app.config.get("PSXI_API_TOKEN", "")
+            )
+        except (HTTPError, URLError, TimeoutError, json.JSONDecodeError, OSError):
+            return values
+        for price in snapshot.get("prices", {}).values():
+            name = str(price.get("name", ""))
+            payout_name = next((key for key, aliases in market_names.items() if name in aliases), None)
+            if not payout_name:
+                continue
+            for candidate in (price.get("bazaar_lowest"), price.get("single_recent_average"), price.get("single_average"), price.get("single_last")):
+                try:
+                    numeric = int(float(candidate))
+                except (TypeError, ValueError):
+                    continue
+                if numeric >= 0:
+                    values[payout_name] = numeric
+                    break
+        return values
+
+    def payout_gil_value(raw, allow_blank=False):
+        raw = str(raw if raw is not None else "").strip()
+        if allow_blank and not raw:
+            return None
+        try:
+            value = int(raw)
+        except (TypeError, ValueError):
+            return -1
+        return value if 0 <= value <= 2_000_000_000 else -1
+
     @app.get("/endgame")
     @editor_required
     def endgame_dashboard():
@@ -3091,6 +3160,72 @@ def create_app(test_config=None):
                       SUM(CASE WHEN status='Sold' THEN 1 ELSE 0 END) sold_count
                FROM ls_bank_items"""
         ).fetchone()
+        dynamis_payout_events = [
+            event for event in guild_events if is_dynamis_payout_event(event)
+        ]
+        dynamis_payout_events.sort(key=lambda event: (event["start_at"], event["id"]), reverse=True)
+        selected_payout_event_id = request.args.get("payout_event", "").strip()
+        if not selected_payout_event_id.isdigit() and dynamis_payout_events:
+            selected_payout_event_id = str(dynamis_payout_events[0]["id"])
+        selected_payout_event = next(
+            (event for event in dynamis_payout_events if str(event["id"]) == selected_payout_event_id), None
+        )
+        dynamis_payout = None
+        dynamis_payout_attendees = []
+        dynamis_payout_items = []
+        if selected_payout_event:
+            payout_row = get_db().execute(
+                "SELECT * FROM dynamis_payouts WHERE event_id=?", (selected_payout_event["id"],)
+            ).fetchone()
+            if payout_row:
+                dynamis_payout = dict(payout_row)
+                dynamis_payout_attendees = [dict(row) for row in get_db().execute(
+                    """SELECT a.*,m.name FROM dynamis_payout_attendance a
+                       JOIN members m ON m.id=a.member_id WHERE a.payout_id=?
+                       ORDER BY a.attended DESC,m.name COLLATE NOCASE""", (payout_row["id"],)
+                ).fetchall()]
+                attendee_count = sum(bool(row["attended"]) for row in dynamis_payout_attendees)
+                dynamis_payout["attendee_count"] = attendee_count
+                dynamis_payout["entry_per_person"] = round(dynamis_payout["entry_cost"] / attendee_count) if attendee_count else 0
+                currency_fields = (
+                    ("Lungo-Nango Jadeshell", "lungo", "Lungo", "Hundreds"),
+                    ("Montiont Silverpiece", "montiont", "Montiont", "Hundreds"),
+                    ("100 Byne Bill", "byne", "100 Byne", "Hundreds"),
+                    ("T. Whiteshell", "whiteshell", "T. Whiteshell", "Singles"),
+                    ("O. Bronzepiece", "bronzepiece", "O. Bronzepiece", "Singles"),
+                    ("Byne Bill", "byne_single", "Byne Bill", "Singles"),
+                )
+                for item_name, key, label, group in currency_fields:
+                    quantity = dynamis_payout[f"{key}_quantity"]
+                    market_total = quantity * dynamis_payout[f"{key}_market_value"]
+                    actual_sale = dynamis_payout[f"{key}_actual_sale"]
+                    effective_total = actual_sale if actual_sale is not None else market_total
+                    dynamis_payout_items.append({
+                        "name": item_name, "label": label, "key": key, "group": group, "quantity": quantity,
+                        "market_value": dynamis_payout[f"{key}_market_value"],
+                        "market_total": market_total, "actual_sale": actual_sale,
+                        "effective_total": effective_total,
+                        "market_url": f"https://www.psxi.gg/s/horizonxi/?item={quote(item_name)}",
+                    })
+                sold_loot_total = get_db().execute(
+                    "SELECT COALESCE(SUM(sale_gil),0) total FROM dynamis_payout_sales WHERE payout_id=? AND sold=1",
+                    (payout_row["id"],),
+                ).fetchone()["total"]
+                dynamis_payout["sold_loot_total"] = sold_loot_total
+                dynamis_payout["total_value"] = sum(item["effective_total"] for item in dynamis_payout_items) + sold_loot_total
+                dynamis_payout["payout_per_person"] = round(dynamis_payout["total_value"] / attendee_count) if attendee_count else 0
+                dynamis_payout["net_per_person"] = dynamis_payout["payout_per_person"] - dynamis_payout["entry_per_person"]
+        payout_member_choices = [dict(row) for row in get_db().execute(
+            "SELECT id,name FROM members ORDER BY name COLLATE NOCASE"
+        ).fetchall()]
+        dynamis_payout_zones = tuple(dict.fromkeys(drop["area"] for drop in dynamis_catalog()))
+        dynamis_payout_sale_items = []
+        if dynamis_payout:
+            dynamis_payout_sale_items = [dict(row) for row in get_db().execute(
+                """SELECT s.*,m.name buyer_name FROM dynamis_payout_sales s
+                   LEFT JOIN members m ON m.id=s.buyer_member_id WHERE s.payout_id=? ORDER BY s.id DESC""",
+                (dynamis_payout["id"],),
+            ).fetchall()]
         return render_template(
             "endgame_dashboard.html", roster=prototype_roster,
             loot=persistent_loot, pop_items=pop_items, pop_targets=pop_targets,
@@ -3118,6 +3253,14 @@ def create_app(test_config=None):
             bank_items=bank_items,
             bank_officers=bank_officers,
             bank_summary=dict(bank_summary),
+            dynamis_payout_events=dynamis_payout_events,
+            selected_payout_event=selected_payout_event,
+            dynamis_payout=dynamis_payout,
+            dynamis_payout_attendees=dynamis_payout_attendees,
+            dynamis_payout_items=dynamis_payout_items,
+            dynamis_payout_zones=dynamis_payout_zones,
+            dynamis_payout_sale_items=dynamis_payout_sale_items,
+            payout_member_choices=payout_member_choices,
             dkp_highest=dkp_highest, dkp_average=dkp_average,
             dkp_bid_cap=dkp_bid_cap,
         )
@@ -3222,6 +3365,194 @@ def create_app(test_config=None):
         db.commit()
         flash(f"Updated {member['name']}'s Dynamis lotting jobs.", "success")
         return redirect(url_for("endgame_dashboard", _anchor="jobs"))
+
+    def dynamis_payout_redirect(event_id):
+        return redirect(url_for("endgame_dashboard", payout_event=event_id, _anchor="dynamis-payout"))
+
+    def dynamis_payout_event_or_404(event_id):
+        event = get_db().execute("SELECT * FROM guild_events WHERE id=?", (event_id,)).fetchone()
+        if not event or not is_dynamis_payout_event(dict(event)):
+            abort(404, description="Choose a Dynamis Endgame event.")
+        return event
+
+    @app.post("/endgame/dynamis-payouts/<int:event_id>/create")
+    @admin_required
+    def create_dynamis_payout(event_id):
+        event = dynamis_payout_event_or_404(event_id)
+        db = get_db()
+        existing = db.execute("SELECT id FROM dynamis_payouts WHERE event_id=?", (event_id,)).fetchone()
+        if existing:
+            return dynamis_payout_redirect(event_id)
+        prices = dynamis_payout_market_values()
+        actor = require_member_identity()
+        cursor = db.execute(
+            """INSERT INTO dynamis_payouts(event_id,lungo_market_value,montiont_market_value,byne_market_value,
+               whiteshell_market_value,bronzepiece_market_value,byne_single_market_value,created_by)
+               VALUES(?,?,?,?,?,?,?,?)""",
+            (event_id, prices["Lungo-Nango Jadeshell"], prices["Montiont Silverpiece"],
+             prices["100 Byne Bill"], prices["T. Whiteshell"], prices["O. Bronzepiece"],
+             prices["Byne Bill"], actor["id"]),
+        )
+        attendance_ids = {
+            row["member_id"] for row in db.execute(
+                "SELECT member_id FROM guild_event_attendance WHERE event_id=? AND attended=1", (event_id,)
+            ).fetchall()
+        }
+        signup_ids = [row["member_id"] for row in db.execute(
+            """SELECT member_id FROM guild_event_signups WHERE event_id=?
+               AND rsvp_status IN ('going','maybe') ORDER BY member_id""", (event_id,)
+        ).fetchall()]
+        attendee_ids = list(attendance_ids) + [member_id for member_id in signup_ids if member_id not in attendance_ids]
+        # A Dynamis alliance can contain at most 36 participants.
+        for member_id in attendee_ids[:36]:
+            db.execute(
+                """INSERT INTO dynamis_payout_attendance(payout_id,member_id,attended,added_manually)
+                   VALUES(?,?,?,0)""",
+                (cursor.lastrowid, member_id, int(member_id in attendance_ids or not attendance_ids)),
+            )
+        db.execute(
+            "INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+            (actor["id"], "Dynamis Payout", "Tracker created", f"{event['name']} ({len(attendee_ids[:36])} seeded attendees)"),
+        )
+        db.commit()
+        flash("Created the Dynamis payout tracker from the event roster.", "success")
+        return dynamis_payout_redirect(event_id)
+
+    @app.post("/endgame/dynamis-payouts/<int:event_id>/settings")
+    @admin_required
+    def update_dynamis_payout(event_id):
+        dynamis_payout_event_or_404(event_id)
+        db = get_db()
+        payout = db.execute("SELECT id FROM dynamis_payouts WHERE event_id=?", (event_id,)).fetchone()
+        if not payout:
+            abort(404)
+        fields = ("entry_cost", "lungo_quantity", "montiont_quantity", "byne_quantity",
+                  "whiteshell_quantity", "bronzepiece_quantity", "byne_single_quantity")
+        values = [payout_gil_value(request.form.get(field)) for field in fields]
+        actual_values = [payout_gil_value(request.form.get(f"{key}_actual_sale"), allow_blank=True)
+                         for key in ("lungo", "montiont", "byne", "whiteshell", "bronzepiece", "byne_single")]
+        zone = request.form.get("zone", "").strip()
+        valid_zones = {drop["area"] for drop in dynamis_catalog()}
+        if (any(value < 0 for value in values) or any(value is not None and value < 0 for value in actual_values)
+                or zone not in valid_zones):
+            abort(400, description="Enter valid non-negative gil amounts and drop quantities.")
+        actor = require_member_identity()
+        db.execute(
+            """UPDATE dynamis_payouts SET zone=?,entry_cost=?,lungo_quantity=?,montiont_quantity=?,byne_quantity=?,
+               whiteshell_quantity=?,bronzepiece_quantity=?,byne_single_quantity=?,lungo_actual_sale=?,montiont_actual_sale=?,byne_actual_sale=?,
+               whiteshell_actual_sale=?,bronzepiece_actual_sale=?,byne_single_actual_sale=?,updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+            (zone, *values, *actual_values, payout["id"]),
+        )
+        db.execute("INSERT INTO admin_change_log(actor_member_id,area,action,details) VALUES(?,?,?,?)",
+                   (actor["id"], "Dynamis Payout", "Payout values updated", str(event_id)))
+        db.commit()
+        flash("Saved Dynamis currency values and payout totals.", "success")
+        return dynamis_payout_redirect(event_id)
+
+    @app.post("/endgame/dynamis-payouts/<int:event_id>/refresh-market")
+    @admin_required
+    def refresh_dynamis_payout_market(event_id):
+        dynamis_payout_event_or_404(event_id)
+        prices = dynamis_payout_market_values()
+        get_db().execute(
+            """UPDATE dynamis_payouts SET lungo_market_value=?,montiont_market_value=?,byne_market_value=?,
+               whiteshell_market_value=?,bronzepiece_market_value=?,byne_single_market_value=?,updated_at=CURRENT_TIMESTAMP WHERE event_id=?""",
+            (prices["Lungo-Nango Jadeshell"], prices["Montiont Silverpiece"], prices["100 Byne Bill"],
+             prices["T. Whiteshell"], prices["O. Bronzepiece"], prices["Byne Bill"], event_id),
+        )
+        get_db().commit()
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify(ok=True, member_id=member["id"], member_name=member["name"])
+        return dynamis_payout_redirect(event_id)
+
+    @app.post("/endgame/dynamis-payouts/<int:event_id>/sales")
+    @admin_required
+    def record_dynamis_payout_sale(event_id):
+        dynamis_payout_event_or_404(event_id)
+        payout = get_db().execute("SELECT id FROM dynamis_payouts WHERE event_id=?", (event_id,)).fetchone()
+        item = request.form.get("item", "").strip()[:120]
+        buyer_id = request.form.get("buyer_member_id", "").strip()
+        sale_gil = payout_gil_value(request.form.get("sale_gil"))
+        buyer = get_db().execute("SELECT id FROM members WHERE id=?", (buyer_id,)).fetchone() if buyer_id.isdigit() else None
+        if not payout or not item or sale_gil < 0 or (buyer_id and not buyer):
+            abort(400, description="Choose an item and valid buyer and sale value.")
+        get_db().execute("INSERT INTO dynamis_payout_sales(payout_id,item,buyer_member_id,sale_gil,sold) VALUES(?,?,?,?,?)",
+                         (payout["id"], item, buyer["id"] if buyer else None, sale_gil, int(request.form.get("sold") == "1")))
+        get_db().commit()
+        return dynamis_payout_redirect(event_id)
+
+    @app.post("/endgame/dynamis-payouts/<int:event_id>/sales/<int:sale_id>")
+    @admin_required
+    def update_dynamis_payout_sale(event_id, sale_id):
+        dynamis_payout_event_or_404(event_id)
+        payout = get_db().execute("SELECT id FROM dynamis_payouts WHERE event_id=?", (event_id,)).fetchone()
+        if not payout:
+            abort(404)
+        if request.form.get("remove") == "1":
+            get_db().execute("DELETE FROM dynamis_payout_sales WHERE id=? AND payout_id=?", (sale_id, payout["id"]))
+        else:
+            get_db().execute("UPDATE dynamis_payout_sales SET sold=? WHERE id=? AND payout_id=?",
+                             (int(request.form.get("sold") == "1"), sale_id, payout["id"]))
+        get_db().commit()
+        return dynamis_payout_redirect(event_id)
+
+    @app.post("/endgame/dynamis-payouts/<int:event_id>/attendance/add")
+    @admin_required
+    def add_dynamis_payout_attendee(event_id):
+        dynamis_payout_event_or_404(event_id)
+        member_id = request.form.get("member_id", "").strip()
+        payout = get_db().execute("SELECT id FROM dynamis_payouts WHERE event_id=?", (event_id,)).fetchone()
+        member = get_db().execute("SELECT id,name FROM members WHERE id=?", (member_id,)).fetchone() if member_id.isdigit() else None
+        already_listed = bool(payout and get_db().execute(
+            "SELECT 1 FROM dynamis_payout_attendance WHERE payout_id=? AND member_id=?", (payout["id"], member["id"])
+        ).fetchone()) if member else False
+        current_count = get_db().execute("SELECT COUNT(*) count FROM dynamis_payout_attendance WHERE payout_id=?", (payout["id"],)).fetchone()["count"] if payout else 0
+        if not payout or not member or (current_count >= 36 and not already_listed):
+            abort(400, description="Choose a valid member; a Dynamis payout roster is limited to 36 slots.")
+        get_db().execute(
+            """INSERT INTO dynamis_payout_attendance(payout_id,member_id,attended,added_manually)
+               VALUES(?,?,1,1) ON CONFLICT(payout_id,member_id) DO UPDATE SET attended=1,added_manually=1""",
+            (payout["id"], member["id"]),
+        )
+        get_db().commit()
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify(ok=True, member_id=member["id"], member_name=member["name"])
+        return dynamis_payout_redirect(event_id)
+
+    @app.post("/endgame/dynamis-payouts/<int:event_id>/attendance/<int:member_id>")
+    @admin_required
+    def update_dynamis_payout_attendee(event_id, member_id):
+        dynamis_payout_event_or_404(event_id)
+        payout = get_db().execute("SELECT id FROM dynamis_payouts WHERE event_id=?", (event_id,)).fetchone()
+        if not payout:
+            abort(404)
+        remove_member_id = request.form.get("remove_member_id", "").strip()
+        if member_id == 0:
+            if remove_member_id.isdigit():
+                get_db().execute("DELETE FROM dynamis_payout_attendance WHERE payout_id=? AND member_id=?", (payout["id"], int(remove_member_id)))
+            else:
+                attendee_rows = get_db().execute("SELECT member_id FROM dynamis_payout_attendance WHERE payout_id=?", (payout["id"],)).fetchall()
+                for attendee in attendee_rows:
+                    attendee_id = attendee["member_id"]
+                    get_db().execute(
+                        "UPDATE dynamis_payout_attendance SET attended=?,entry_paid=?,payout_paid=? WHERE payout_id=? AND member_id=?",
+                        (int(request.form.get(f"attended_{attendee_id}") == "1"),
+                         int(request.form.get(f"entry_paid_{attendee_id}") == "1"),
+                         int(request.form.get(f"payout_paid_{attendee_id}") == "1"), payout["id"], attendee_id),
+                    )
+        elif request.form.get("remove") == "1":
+            get_db().execute("DELETE FROM dynamis_payout_attendance WHERE payout_id=? AND member_id=?", (payout["id"], member_id))
+        else:
+            get_db().execute(
+                """UPDATE dynamis_payout_attendance SET attended=?,entry_paid=?,payout_paid=?
+                   WHERE payout_id=? AND member_id=?""",
+                (int(request.form.get("attended") == "1"), int(request.form.get("entry_paid") == "1"),
+                 int(request.form.get("payout_paid") == "1"), payout["id"], member_id),
+            )
+        get_db().commit()
+        if request.accept_mimetypes.best == "application/json":
+            return jsonify(ok=True, removed_member_id=int(remove_member_id) if member_id == 0 and remove_member_id.isdigit() else None)
+        return dynamis_payout_redirect(event_id)
 
     def current_dkp_balances():
         """Calculate available DKP from endgame attendance minus recorded awards."""
