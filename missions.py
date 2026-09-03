@@ -537,6 +537,7 @@ JOB_COLORS = {
     "RDM": "#c44f62", "THF": "#d5b84a", "PLD": "#6e9ed2", "DRK": "#654078",
     "BST": "#8b6848", "BRD": "#d47aaa", "RNG": "#4f9a68", "SAM": "#9c493f",
     "NIN": "#58617d", "DRG": "#6659a8", "SMN": "#4f9b92",
+    "BLU": "#3b9cc5", "COR": "#c08442", "PUP": "#bc6f9e",
 }
 
 

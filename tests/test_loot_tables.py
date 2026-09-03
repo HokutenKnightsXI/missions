@@ -159,6 +159,14 @@ def test_loot_hub_offers_general_dynamis_and_limbus_modes(client):
     assert b"#ff9f1c" in styling.data
 
 
+def test_dynamis_catalog_renders_blu_cor_and_pup_jobs(client):
+    page = client.get("/loot-tables?mode=dynamis&view=area")
+    assert page.status_code == 200
+    assert b"Mirage Keffiyeh" in page.data
+    assert b"Commodore Tricorne" in page.data
+    assert b"Pantin Taj" in page.data
+
+
 def test_dynamis_ownership_is_shared_between_area_and_job_views(client):
     response = client.post("/loot-tables/ownership", data={
         "catalog": "dynamis", "view": "job", "member_id": "1",
