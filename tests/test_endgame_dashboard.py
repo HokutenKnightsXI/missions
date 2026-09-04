@@ -104,6 +104,8 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     assert b"Edit Attendance" in response.data
     assert b"loot-column-filters" in response.data
     assert b"ENDGAME_MEMBER_DETAILS" in response.data
+    assert b'"dynamis_main": "BLU"' in response.data
+    assert b'"dynamis_secondary": "NIN"' in response.data
     assert b'data-name="alecy"' in response.data
     alecy_row = response.data.split(b'data-name="alecy"', 1)[1].split(b"</tr>", 1)[0]
     assert b'data-dkp="3"' in alecy_row

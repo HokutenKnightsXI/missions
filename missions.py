@@ -3005,6 +3005,12 @@ def create_app(test_config=None):
             member["id"]: (member["main_job"], member["secondary_job"])
             for member in prototype_roster if member["id"]
         }
+        imaven = next(
+            (member for member in prototype_roster if member["name"].casefold() == "imaven"),
+            None,
+        )
+        if imaven and imaven["id"]:
+            dynamis_defaults[imaven["id"]] = ("BLU", "NIN")
         dynamis_members = []
         for member in get_db().execute(
             "SELECT id,name FROM members ORDER BY name COLLATE NOCASE"
