@@ -985,9 +985,12 @@ def test_admin_can_import_discord_created_events_without_duplicates(monkeypatch,
     page = client.get("/endgame")
     assert b"Sync Events &amp; Signups" in page.data
 
-    first = client.post("/endgame/events/sync-discord", data={"csrf_token": "token"})
+    first = client.post("/endgame/events/sync-discord", data={
+        "csrf_token": "token", "next": "alliance_builder",
+    })
     second = client.post("/endgame/events/sync-discord", data={"csrf_token": "token"})
     assert first.status_code == 302 and second.status_code == 302
+    assert first.location.endswith("/alliance-builder")
     assert [call[1] for call in calls].count("/api/events") == 2
     assert [call[1] for call in calls].count("/api/events/discord-message-manual-1") == 2
     assert [call[1] for call in calls].count("/api/events/discord-message-user-1") == 2

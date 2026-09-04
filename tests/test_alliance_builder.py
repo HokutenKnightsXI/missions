@@ -64,6 +64,33 @@ def test_alliance_builder_supports_two_three_party_alliances(app):
     assert b"(!signedUp||signedUp.has" not in script.data
 
 
+def test_event_admin_can_sync_events_from_alliance_builder(tmp_path):
+    app = create_app({
+        "TESTING": True,
+        "DATABASE": str(tmp_path / "alliance-event-sync.db"),
+        "SECRET_KEY": "test",
+        "AUTH_DISABLED": False,
+        "HOKUTEN_EVENT_BOT_API_URL": "https://events.example.test",
+        "HOKUTEN_EVENT_BOT_API_TOKEN": "secret",
+    })
+    client = app.test_client()
+    with client.session_transaction() as session:
+        session["is_editor"] = True
+        session["is_admin"] = True
+        session["member_id"] = 1
+        session["csrf_token"] = "token"
+
+    page = client.get("/alliance-builder")
+
+    assert page.status_code == 200
+    actions = page.data.split(b'class="alliance-hero-actions"', 1)[1].split(b"</div>", 1)[0]
+    assert b"+ Load Saved Alliance" in actions
+    assert b"Sync Events &amp; Signups" in actions
+    assert actions.index(b"+ Load Saved Alliance") < actions.index(b"Sync Events &amp; Signups")
+    assert b'action="/endgame/events/sync-discord"' in actions
+    assert b'name="next" value="alliance_builder"' in actions
+
+
 def test_member_can_save_and_reopen_own_alliance_layout(app):
     maven, lion = add_roster(app)
     client = app.test_client()
