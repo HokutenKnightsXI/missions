@@ -315,6 +315,9 @@ def test_spellbook_saves_a_private_named_template(tmp_path):
     assert b'book-skillchain-filter' in builder_script
     assert b'goal-damage-types' not in builder_script
     assert b'skillchain_catalog.json' in builder_script
+    assert b'event.preventDefault()' in builder_script
+    assert b'equipped.delete(remove.dataset.remove)' in builder_script
+    assert builder_script.index(b'if (remove)') < builder_script.index(b'const view =')
 
 
 def test_spellbook_rejects_level_invalid_template(tmp_path):

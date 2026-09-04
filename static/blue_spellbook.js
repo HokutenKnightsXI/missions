@@ -279,8 +279,16 @@
   };
 
   document.addEventListener("click", event => {
-    const toggle = event.target.closest("[data-toggle]");
     const remove = event.target.closest("[data-remove]");
+    if (remove) {
+      event.preventDefault();
+      event.stopPropagation();
+      equipped.delete(remove.dataset.remove);
+      render();
+      return;
+    }
+
+    const toggle = event.target.closest("[data-toggle]");
     const quick = event.target.closest("[data-quick-add]");
     const view = event.target.closest("[data-view-spell]");
     if (toggle) {
@@ -289,8 +297,7 @@
       else { const spell = spells.find(row => row.spell === name); if (spell && canAdd(spell)) equipped.add(name); }
       render();
     }
-    if (remove) { event.stopPropagation(); equipped.delete(remove.dataset.remove); render(); }
-    else if (view) { const spell = spells.find(row => row.spell === view.dataset.viewSpell); if (spell) showSpell(spell); }
+    if (view) { const spell = spells.find(row => row.spell === view.dataset.viewSpell); if (spell) showSpell(spell); }
     if (quick) { const spell = spells.find(row => row.spell === quick.dataset.quickAdd); if (spell && canAdd(spell)) { equipped.add(spell.spell); render(); renderQuickPicker(); } }
     if (event.target.closest("#add-spell-tile")) openPicker();
   });
