@@ -2211,6 +2211,10 @@ def create_app(test_config=None):
             role_jobs=ALLIANCE_ROLE_JOBS, owner=owner, guild_events=guild_events,
             shared_mode=shared_mode, share_url=share_url, change_history=change_history,
             has_second_alliance=any(row["party_number"] > 3 for row in slot_rows),
+            event_bot_sync_enabled=bool(
+                app.config.get("HOKUTEN_EVENT_BOT_API_URL") and
+                app.config.get("HOKUTEN_EVENT_BOT_API_TOKEN")
+            ),
         )
 
     @app.post("/alliance-builder/save")
@@ -4138,6 +4142,12 @@ def create_app(test_config=None):
     def sync_discord_events():
         if not can_create_guild_events():
             abort(403, description="Only designated event administrators can import Discord events.")
+        return_to_alliance = request.form.get("next", "").strip() == "alliance_builder"
+        def sync_redirect():
+            if return_to_alliance:
+                return redirect(url_for("alliance_builder"))
+            return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+
         api_url = str(app.config.get("HOKUTEN_EVENT_BOT_API_URL", "")).strip()
         api_token = str(app.config.get("HOKUTEN_EVENT_BOT_API_TOKEN", "")).strip()
         if not api_url or not api_token:
@@ -4146,7 +4156,7 @@ def create_app(test_config=None):
             response = hokuten_event_bot_request(api_url, api_token, "GET", "/api/events") or {}
         except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
             flash("Hokuten Event Bot events could not be retrieved.", "error")
-            return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+            return sync_redirect()
 
         actor = require_member_identity()
         db = get_db()
@@ -4244,7 +4254,7 @@ def create_app(test_config=None):
             f"and matched {matched_members} roster response(s)"
             f"{' (' + str(failed_signups) + ' failed)' if failed_signups else ''}.", "success",
         )
-        return redirect(url_for("endgame_dashboard", _anchor="event-calendar"))
+        return sync_redirect()
 
     @app.post("/endgame/events/new")
     @admin_required
