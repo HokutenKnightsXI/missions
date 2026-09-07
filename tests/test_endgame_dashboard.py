@@ -54,9 +54,9 @@ def test_endgame_master_tab_requires_sign_in_and_renders_all_subtabs(tmp_path):
     sign_in(client, admin=True)
     response = client.get("/endgame")
     assert response.status_code == 200
-    assert b"endgame_dashboard.js?v=61" in response.data
-    assert b"setInterval(loadAuctions, 15000)" in client.get("/static/endgame_dashboard.js").data
-    assert b"setInterval(refresh, 15000)" in client.get("/static/header_nav.js").data
+    assert b"endgame_dashboard.js?v=62" in response.data
+    assert b"setInterval(loadAuctions, 5000)" in client.get("/static/endgame_dashboard.js").data
+    assert b"setInterval(refresh, 5000)" in client.get("/static/header_nav.js").data
     assert response.data.count(b"data-endgame-view=") == 4
     for view in (b">Calendar</button>", b">DKP/Loot</button>", b">LS Bank</button>", b">Operations</button>"):
         assert view in response.data
