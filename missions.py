@@ -3576,15 +3576,24 @@ def create_app(test_config=None):
                FROM endgame_attendance_dkp_adjustments GROUP BY member_id"""
         ).fetchall():
             earned[adjustment["member_id"]] = earned.get(adjustment["member_id"], 0) + int(round(adjustment["delta"] or 0))
-        for event in get_db().execute("SELECT * FROM guild_events").fetchall():
-            if (not is_endgame_guild_event(event) or event["status"] != "Completed"
-                    or event["start_at"] <= "2026-08-13T23:59"):
-                continue
+        completed_events = {
+            event["id"]: int(round(event["dkp_value"]))
+            for event in get_db().execute(
+                "SELECT * FROM guild_events WHERE status='Completed' AND start_at>'2026-08-13T23:59'"
+            ).fetchall()
+            if is_endgame_guild_event(event)
+        }
+        if completed_events:
+            event_marks = ",".join("?" for _ in completed_events)
             for attendee in get_db().execute(
-                "SELECT member_id FROM guild_event_attendance WHERE event_id=? AND attended=1",
-                (event["id"],),
+                f"""SELECT event_id,member_id FROM guild_event_attendance
+                     WHERE attended=1 AND event_id IN ({event_marks})""",
+                list(completed_events),
             ).fetchall():
-                earned[attendee["member_id"]] = earned.get(attendee["member_id"], 0) + int(round(event["dkp_value"]))
+                earned[attendee["member_id"]] = (
+                    earned.get(attendee["member_id"], 0)
+                    + completed_events[attendee["event_id"]]
+                )
         spent = {
             row["member_id"]: int(round(row["spent"] or 0))
             for row in get_db().execute(
@@ -3643,11 +3652,20 @@ def create_app(test_config=None):
         return 4 if not any(item[f"p{tier}"] for tier in (1, 2, 3)) else None
 
     def refresh_auction_statuses():
-        get_db().execute(
+        db = get_db()
+        now = datetime.utcnow().isoformat(timespec="seconds")
+        expired = db.execute(
+            "SELECT 1 FROM endgame_auctions WHERE status='Active' AND paused_at IS NULL AND ends_at<=? LIMIT 1",
+            (now,),
+        ).fetchone()
+        if not expired:
+            return False
+        db.execute(
             "UPDATE endgame_auctions SET status='Closed' WHERE status='Active' AND paused_at IS NULL AND ends_at<=?",
-            (datetime.utcnow().isoformat(timespec="seconds"),),
+            (now,),
         )
-        get_db().commit()
+        db.commit()
+        return True
 
     def auction_payload():
         refresh_auction_statuses()
@@ -3655,6 +3673,13 @@ def create_app(test_config=None):
         cap = current_bid_cap(balances)
         actor_id = current_member_id()
         catalog = gear_catalog_by_name(str(Path(app.root_path) / "static" / "gear_catalog.json"))
+        actor_levels = {}
+        if actor_id:
+            actor_levels = {
+                row["job"]: row["level"] for row in get_db().execute(
+                    "SELECT job,level FROM member_jobs WHERE member_id=?", (actor_id,)
+                ).fetchall()
+            }
         my_reserved = 0
         if actor_id:
             reserved = get_db().execute(
@@ -3672,25 +3697,50 @@ def create_app(test_config=None):
                WHERE a.status IN ('Active','Closed','Confirmed')
                GROUP BY a.id ORDER BY a.id DESC LIMIT 32"""
         ).fetchall()
+        auction_ids = [row["id"] for row in rows]
+        items_by_auction = {}
+        awards_by_auction = {}
+        bids_by_item = {}
+        if auction_ids:
+            auction_marks = ",".join("?" for _ in auction_ids)
+            item_rows = get_db().execute(
+                f"SELECT * FROM endgame_auction_items WHERE auction_id IN ({auction_marks}) ORDER BY id",
+                auction_ids,
+            ).fetchall()
+            for item_row in item_rows:
+                items_by_auction.setdefault(item_row["auction_id"], []).append(item_row)
+
+            for award_row in get_db().execute(
+                f"""SELECT l.id,l.auction_id,l.auction_item_id,l.item,l.job,l.family,l.distribution,
+                           l.classification,l.dkp_cost,l.recipient_member_id,m.name recipient
+                    FROM endgame_loot_awards l JOIN members m ON m.id=l.recipient_member_id
+                    WHERE l.auction_id IN ({auction_marks}) ORDER BY l.id""",
+                auction_ids,
+            ).fetchall():
+                auction_awards = awards_by_auction.setdefault(award_row["auction_id"], {})
+                award = dict(award_row)
+                award.pop("auction_id", None)
+                auction_awards.setdefault(award_row["auction_item_id"], []).append(award)
+
+            item_ids = [item_row["id"] for item_row in item_rows]
+            if item_ids:
+                item_marks = ",".join("?" for _ in item_ids)
+                for bid_row in get_db().execute(
+                    f"""SELECT b.*,m.name FROM endgame_auction_bids b
+                         JOIN members m ON m.id=b.member_id
+                         WHERE b.auction_item_id IN ({item_marks})""",
+                    item_ids,
+                ).fetchall():
+                    bids_by_item.setdefault(bid_row["auction_item_id"], []).append(bid_row)
         for row in rows:
             auction = dict(row)
             auction["paused"] = bool(auction.get("paused_at"))
             auction["items"] = []
-            awards_by_item = {}
-            for award_row in get_db().execute(
-                """SELECT l.id,l.auction_item_id,l.item,l.job,l.family,l.distribution,l.classification,l.dkp_cost,
-                          l.recipient_member_id,m.name recipient
-                   FROM endgame_loot_awards l JOIN members m ON m.id=l.recipient_member_id
-                   WHERE l.auction_id=? ORDER BY l.id""", (row["id"],)
-            ).fetchall():
-                award = dict(award_row)
-                awards_by_item.setdefault(award["auction_item_id"], []).append(award)
-            legacy_auction_awards = awards_by_item.pop(None, [])
-            for item_row in get_db().execute(
-                "SELECT * FROM endgame_auction_items WHERE auction_id=? ORDER BY id", (row["id"],)
-            ).fetchall():
+            awards_by_item = awards_by_auction.get(row["id"], {})
+            legacy_auction_awards = awards_by_item.get(None, [])
+            for item_row in items_by_auction.get(row["id"], []):
                 item = dict(item_row)
-                item["awards"] = awards_by_item.pop(item["id"], [])
+                item["awards"] = list(awards_by_item.get(item["id"], []))
                 # Legacy awards made before auction-item links existed still appear with their auction.
                 item["awards"].extend(
                     award for award in legacy_auction_awards
@@ -3709,11 +3759,7 @@ def create_app(test_config=None):
                     "rare": bool(tooltip_item.get("rare")), "ex": bool(tooltip_item.get("ex")),
                 }
                 bids = []
-                for bid_row in get_db().execute(
-                    """SELECT b.*,m.name FROM endgame_auction_bids b
-                       JOIN members m ON m.id=b.member_id WHERE b.auction_item_id=?""",
-                    (item["id"],),
-                ).fetchall():
+                for bid_row in bids_by_item.get(item["id"], []):
                     bid = dict(bid_row)
                     bid["tier"] = auction_priority_tier(item, bid["job"])
                     bid["balance"] = balances.get(bid["member_id"], {}).get("balance", 0)
@@ -3728,12 +3774,7 @@ def create_app(test_config=None):
                 item["max_bid"] = max(0, min(cap["cap"], actor_balance))
                 eligible_jobs = []
                 if actor_id:
-                    levels = {
-                        level["job"]: level["level"] for level in get_db().execute(
-                            "SELECT job,level FROM member_jobs WHERE member_id=?", (actor_id,)
-                        ).fetchall()
-                    }
-                    for job, level in levels.items():
+                    for job, level in actor_levels.items():
                         tier = auction_priority_tier(item, job)
                         if tier and level >= item["required_level"]:
                             eligible_jobs.append({"job": job, "level": level, "tier": tier})
