@@ -1334,6 +1334,49 @@ def test_sky_auction_includes_complete_seiryu_pool(tmp_path):
     assert "STR+6" in leggings["tooltip"]["description"]
 
 
+def test_auction_poll_batches_related_queries_without_writing(monkeypatch, tmp_path):
+    import sqlite3
+    import missions
+
+    statements = []
+    original_connect = sqlite3.connect
+
+    def traced_connect(*args, **kwargs):
+        connection = original_connect(*args, **kwargs)
+        connection.set_trace_callback(statements.append)
+        return connection
+
+    monkeypatch.setattr(missions.sqlite3, "connect", traced_connect)
+    app = make_app(tmp_path)
+    client = app.test_client()
+    sign_in(client, member_id=1, admin=True)
+    database = original_connect(app.config["DATABASE"])
+    event_id = database.execute(
+        "SELECT id FROM guild_events WHERE name='Sky Operations' ORDER BY id LIMIT 1"
+    ).fetchone()[0]
+    database.execute(
+        "INSERT OR REPLACE INTO member_jobs(member_id,custom_name,job,level) VALUES(1,'','BLM',75)"
+    )
+    database.commit()
+    database.close()
+    assert client.post("/endgame/auctions", data={
+        "csrf_token": "token", "event_id": str(event_id),
+        "boss": "Seiryu", "duration_minutes": "5",
+    }).status_code == 302
+
+    statements.clear()
+    response = client.get("/api/endgame/auctions")
+
+    assert response.status_code == 200
+    normalized = [" ".join(statement.split()) for statement in statements]
+    assert sum("FROM endgame_auction_items WHERE auction_id IN" in sql for sql in normalized) == 1
+    assert sum("WHERE b.auction_item_id IN" in sql for sql in normalized) == 1
+    assert sum("SELECT job,level FROM member_jobs WHERE member_id=" in sql for sql in normalized) == 1
+    assert sum("FROM guild_event_attendance WHERE attended=1 AND event_id IN" in sql for sql in normalized) <= 1
+    assert not any(sql.startswith("UPDATE endgame_auctions SET status='Closed'") for sql in normalized)
+    assert "COMMIT" not in normalized
+
+
 def test_live_dkp_auction_records_winner_and_deducts_balance(tmp_path):
     import sqlite3
 
