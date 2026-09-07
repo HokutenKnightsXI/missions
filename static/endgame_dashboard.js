@@ -1066,7 +1066,7 @@
       if (event.target.closest(".auction-winner-select")) auctionEditingUntil = Date.now() + 600000;
     });
     loadAuctions();
-    setInterval(loadAuctions, 3000);
+    setInterval(loadAuctions, 15000);
     setInterval(() => document.querySelectorAll("[data-auction-ends]").forEach(clock => { if (clock.dataset.auctionPaused !== "true") clock.textContent = countdownText(clock.dataset.auctionEnds); }), 1000);
   }
   const auctionTooltip = document.querySelector("#auction-item-tooltip");

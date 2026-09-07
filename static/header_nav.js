@@ -55,6 +55,6 @@
     } catch (_) { banner.hidden = true; }
   };
   refresh();
-  setInterval(refresh, 5000);
+  setInterval(refresh, 15000);
   setInterval(render, 1000);
 })();
