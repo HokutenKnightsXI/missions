@@ -15,6 +15,33 @@ python missions.py
 
 Open <http://127.0.0.1:5000>. The SQLite database is created automatically at `instance/missions.db`.
 
+## Container deployment
+
+Every push to `main` publishes Linux container images to GitHub Container Registry:
+
+```text
+ghcr.io/hokutenknightsxi/missions:latest
+ghcr.io/hokutenknightsxi/missions:<full-git-commit-sha>
+```
+
+The container listens on port `8000` and runs as non-root UID/GID `10001`. It must be
+given a persistent, writable volume mounted at `/app/instance`; otherwise the SQLite
+database will be lost whenever the container is replaced. Configure the production
+secrets from `.env.example` as container environment variables rather than copying a
+`.env` file into the image. In Kubernetes, setting pod `securityContext.fsGroup: 10001`
+allows the application user to write to a compatible mounted volume.
+
+For a direct Docker test:
+
+```bash
+docker build -t hokuten-missions .
+docker run --rm -p 8000:8000 --env-file .env -v missions-data:/app/instance hokuten-missions
+```
+
+Keep the Kubernetes deployment at one replica while it uses SQLite. Containerization
+makes deployments repeatable, but multiple replicas require a shared server database
+such as PostgreSQL and coordinated application state.
+
 ## Discord sign-in
 
 Create an application in the Discord Developer Portal and register the deployment callback

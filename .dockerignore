@@ -1,0 +1,16 @@
+.git
+.github
+.pytest_cache
+.venv
+__pycache__
+*.py[cod]
+
+.env
+instance
+map-dats
+tests
+
+/*.pdf
+/*.png
+/*.mp3
+/maven_help_board_prototype.html
